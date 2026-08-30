@@ -1,0 +1,69 @@
+id: poc
+name: Proof of Concept
+
+intent: >
+  Prove one specific idea works, as cheaply and quickly as possible. The code
+  is expected to be rewritten or thrown away. Speed beats durability — but
+  never at the cost of hiding what was skipped.
+
+definition_of_done: >
+  The happy path runs end to end and demonstrates the idea to a human, and the
+  shortcuts taken are written down.
+
+# Gate vocabulary used below: required | recommended | skip
+requirement:
+  grilling_depth: light          # light | deep
+  max_questions: 5               # ask the highest-leverage ones only
+  write_assumptions: required    # even a POC records what it assumed
+  write_non_goals: recommended
+  write_success_criteria: required
+
+design:
+  prd: skip
+  frd: skip
+  tdd: skip
+  adr: skip
+  # Instead of documents: a short design note in the conversation, then build.
+  design_note: required
+  architecture_review: skip
+
+development:
+  code_standards: relaxed        # relaxed | strict
+  error_handling: happy-path     # happy-path | defensive
+  logging: minimal
+  comments: why-only
+  optimization_pass: skip
+  dead_code_cleanup: recommended
+  max_file_length_guidance: soft
+
+testing:
+  functional_tests: recommended  # at least one smoke test for the happy path
+  unit_tests: skip
+  integration_tests: skip
+  regression_tests: skip
+  security_review: skip
+  manual_test_plan: recommended
+  coverage_target: none
+
+deployment:
+  containerize: recommended
+  ci_pipeline: skip
+  iac: skip
+  runbook: skip
+  rollback_plan: skip
+  observability: skip
+  target: local                  # local | staging | production
+
+maintenance:
+  triage_process: skip
+  regression_test_on_fix: skip
+  changelog: skip
+
+# Shortcuts are allowed on this track -- that is what the track is for. They are
+# not allowed to be invisible. See .agents/work/DEBT.md
+debt:
+  record: required          # every deliberate compromise gets an entry
+  entry_detail: short       # short | full  (blocker/major still get a detail block)
+  code_marker: required     # a shortcut visible in code carries a DEBT-NNN comment
+  review_cadence: iteration # when the ledger is reconciled against the code
+  blockers_allowed: true    # a `blocker` may stand open -- it just blocks promotion

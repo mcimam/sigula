@@ -1,0 +1,109 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# .agents/config.yml — the single knob file for this project.
+#
+# Change behaviour HERE, not inside skills or rules. Skills read this file and
+# adapt; they never hardcode a workflow. Run `/kickoff` on a fresh clone to
+# have the agent fill this in by interviewing you.
+# ─────────────────────────────────────────────────────────────────────────────
+
+project:
+  name: "<PROJECT_NAME>"
+  # One line: what this software does, and for whom.
+  summary: "<ONE_LINE_SUMMARY>"
+  # poc | internal-tool | client-project | product | library
+  kind: "<PROJECT_KIND>"
+
+# ── Track ────────────────────────────────────────────────────────────────────
+# Which rigor profile applies. Defined in .agents/workflow/tracks/<id>.yml
+#   poc         → fast, disposable, minimal gates
+#   production  → full SDLC, every gate enforced
+# Add your own by dropping a new file in that directory. Nothing else changes.
+track: poc
+
+# ── Phases ───────────────────────────────────────────────────────────────────
+# Active phases, in order. Remove one and the agent stops routing work through
+# it — e.g. a library has no `deployment`, a spike has no `maintenance`.
+phases:
+  - requirement
+  - design
+  - development
+  - testing
+  - deployment
+  - maintenance
+
+# ── Language ─────────────────────────────────────────────────────────────────
+# Applies to what the agent PRODUCES. The scaffold's own files stay English so
+# this repo travels well. Values: en | id
+language:
+  documents: en      # PRD, FRD, TDD, ADR, runbook, test plan
+  code: en           # identifiers, comments, docstrings
+  commits: en        # commit messages, PR titles/bodies
+  conversation: id   # how the agent talks to you in chat
+
+# ── Paths ────────────────────────────────────────────────────────────────────
+paths:
+  docs: docs                    # human-facing deliverables
+  prd: docs/prd
+  frd: docs/frd
+  tdd: docs/tdd
+  adr: docs/adr
+  src: src
+  tests: tests
+  state: .agents/work/STATE.md
+  notes: .agents/work/notes     # scratch, transient, safe to delete
+
+# ── Commands ─────────────────────────────────────────────────────────────────
+# How to actually run things. An empty string means NOT CONFIGURED: the agent
+# must ask you rather than guess a command and run it.
+commands:
+  install: ""
+  dev: ""
+  build: ""
+  test: ""
+  test_one: ""            # single-test form, e.g. "pytest {file}::{name}"
+  lint: ""
+  format: ""
+  typecheck: ""
+  migrate: ""
+  deploy_staging: ""
+  deploy_production: ""
+
+# ── Autonomy ─────────────────────────────────────────────────────────────────
+# What the agent may do unattended vs. what needs your explicit go-ahead.
+autonomy:
+  auto:
+    - read/search the codebase
+    - write and edit source + test files
+    - run install, build, lint, format, typecheck, test
+    - deploy to local or staging
+  ask_first:
+    - deploy to production
+    - run or write database migrations against a shared environment
+    - rollback a release
+    - change secrets, credentials, or infrastructure config
+    - delete files or drop data
+    - install a new runtime dependency
+    - push, force-push, or open a PR
+    - anything that costs money or is visible outside this repo
+
+# ── Debt ─────────────────────────────────────────────────────────────────────
+# The ledger is what makes a POC promotable instead of merely rewritable.
+# See .agents/work/DEBT.md and skills/debt-tracking.
+debt:
+  ledger: .agents/work/DEBT.md
+  # Severity that blocks promoting this project to a stricter track.
+  promotion_blocker: blocker
+  # Warn once the open ledger passes this size. A ledger too long to hold in
+  # your head is a ledger that has stopped being managed.
+  review_threshold: 15
+  # Where to grep for DEBT-NNN markers when reconciling ledger against code.
+  scan_paths: [src, tests]
+
+# ── Overrides ────────────────────────────────────────────────────────────────
+# Anything here beats the active track's default. Delete a key to fall back.
+overrides: {}
+# overrides:
+#   testing:
+#     security_review: required   # POC that touches auth still gets a sec pass
+#   design:
+#     tdd: required

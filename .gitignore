@@ -1,0 +1,48 @@
+# Agent scaffold
+.agents/settings.local.json
+.agents/work/notes/*
+!.agents/work/notes/.gitkeep
+.claude/settings.local.json
+
+# Secrets — never committed. See .agents/rules/security.md
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+credentials*
+
+# Dependencies / build output — add your stack's entries during /kickoff
+node_modules/
+dist/
+build/
+target/
+out/
+__pycache__/
+*.pyc
+.venv/
+venv/
+vendor/
+.gradle/
+bin/
+obj/
+
+# Logs, coverage, local runtime state
+*.log
+npm-debug.log*
+.coverage
+coverage/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.sqlite3
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.idea/
+.vscode/
+*.iml

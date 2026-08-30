@@ -1,0 +1,68 @@
+id: production
+name: Production Ready
+
+intent: >
+  Build software other people depend on. It will be read, extended, and
+  operated by someone who was not in the room when it was written. Correctness,
+  legibility, and operability outrank speed.
+
+definition_of_done: >
+  Requirements are written down, the design is recorded, the code meets the
+  project's standards, functional and security tests pass, it is deployable and
+  rollback-able, and a human could take it over tomorrow.
+
+# Gate vocabulary used below: required | recommended | skip
+requirement:
+  grilling_depth: deep
+  max_questions: 0               # 0 = no cap, keep going until it's solid
+  write_assumptions: required
+  write_non_goals: required
+  write_success_criteria: required
+
+design:
+  prd: required                  # what and why, user-facing
+  frd: required                  # functional behaviour, rules, edge cases
+  tdd: required                  # technical design: components, data, contracts
+  adr: required                  # one per non-obvious, hard-to-reverse decision
+  design_note: skip              # superseded by the documents above
+  architecture_review: required  # agent argues against its own design first
+
+development:
+  code_standards: strict
+  error_handling: defensive
+  logging: structured
+  comments: why-and-contract
+  optimization_pass: required    # runs at the end of each iteration
+  dead_code_cleanup: required
+  max_file_length_guidance: enforced
+
+testing:
+  functional_tests: required
+  unit_tests: required
+  integration_tests: required
+  regression_tests: required
+  security_review: required
+  manual_test_plan: required
+  coverage_target: meaningful    # cover behaviour and edges, not a percentage
+
+deployment:
+  containerize: required
+  ci_pipeline: required
+  iac: recommended
+  runbook: required
+  rollback_plan: required
+  observability: required        # logs, health check, and one real alert
+  target: production
+
+maintenance:
+  triage_process: required
+  regression_test_on_fix: required
+  changelog: required
+
+# On this track the ledger is a control, not a diary.
+debt:
+  record: required
+  entry_detail: full        # every entry gets interest and blast radius
+  code_marker: required
+  review_cadence: iteration
+  blockers_allowed: false   # a `blocker` must be paid or explicitly accepted before shipping
