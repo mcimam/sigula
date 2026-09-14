@@ -1,0 +1,966 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap">
+<style>
+  body { margin: 0; }
+  a { color: oklch(0.55 0.16 265); }
+  a:hover { color: oklch(0.46 0.17 265); }
+  *:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+</style>
+</helmet>
+
+<div style="display:flex; min-height:100vh; background:{{ t.bg }}; color:{{ t.textPrimary }}; font-family:'Public Sans',sans-serif; position:relative;">
+
+  <div style="width:{{ sidebarWidth }}; flex-shrink:0; background:{{ t.surface }}; border-right:1px solid {{ t.border }}; padding:14px 10px; display:flex; flex-direction:column; position:sticky; top:0; height:100vh; box-sizing:border-box; transition:width .15s ease;">
+    <div style="display:flex; align-items:center; justify-content:space-between; padding:2px 6px 14px; gap:6px;">
+      <sc-if value="{{ sidebarExpanded }}" hint-placeholder-val="{{ true }}">
+        <div style="font-weight:800; font-size:17px; letter-spacing:-0.01em;">ACME</div>
+      </sc-if>
+      <button onClick="{{ toggleSidebar }}" title="{{ sidebarToggleTitle }}" style="width:26px; height:26px; flex-shrink:0; border-radius:6px; background:transparent; border:1px solid {{ t.border }}; font-size:12px; color:{{ t.textSecondary }}; cursor:pointer; margin-left:auto;" style-hover="background:{{ t.surfaceHover }};">{{ sidebarToggleIcon }}</button>
+    </div>
+
+    <sc-if value="{{ sidebarExpanded }}" hint-placeholder-val="{{ true }}">
+      <div style="position:relative; margin-bottom:10px;">
+        <span style="position:absolute; left:9px; top:50%; transform:translateY(-50%); font-size:13px; color:{{ t.textTertiary }};">⌕</span>
+        <input placeholder="Search menu…" value="{{ navQuery }}" onChange="{{ onNavQuery }}" style="width:100%; box-sizing:border-box; background:{{ t.bg }}; border:1px solid {{ t.border }}; border-radius:8px; padding:7px 10px 7px 28px; min-height:34px; font-size:13.5px; color:{{ t.textPrimary }}; font-family:inherit;" />
+      </div>
+    </sc-if>
+
+    <div style="flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:12px;">
+      <sc-for list="{{ navGroups }}" as="grp" hint-placeholder-count="3">
+        <div>
+          <sc-if value="{{ sidebarExpanded }}" hint-placeholder-val="{{ true }}">
+            <button onClick="{{ grp.onToggle }}" style="width:100%; display:flex; align-items:center; gap:6px; background:transparent; border:none; padding:2px 8px 4px; font-family:inherit; cursor:pointer;">
+              <span style="font-size:11px; font-weight:700; letter-spacing:0.06em; color:{{ t.textTertiary }};">{{ grp.label }}</span>
+              <span style="font-size:9px; color:{{ t.textTertiary }}; margin-left:auto;">{{ grp.caret }}</span>
+            </button>
+          </sc-if>
+          <sc-if value="{{ grp.open }}" hint-placeholder-val="{{ true }}">
+            <div style="display:flex; flex-direction:column; gap:2px;">
+              <sc-for list="{{ grp.items }}" as="nav" hint-placeholder-count="3">
+                <div>
+                  <div style="display:flex; align-items:center; gap:2px;">
+                    <button onClick="{{ nav.onClick }}" title="{{ nav.name }}" style="flex:1; min-width:0; text-align:left; display:flex; align-items:center; gap:10px; background:{{ nav.bg }}; color:{{ nav.color }}; border:none; padding:0 8px; min-height:36px; border-radius:8px; font-family:inherit; font-size:14px; font-weight:{{ nav.weight }}; cursor:pointer;" style-hover="background:{{ t.surfaceHover }};">
+                      <sc-if value="{{ sidebarCollapsed }}" hint-placeholder-val="{{ false }}">
+                        <span style="width:24px; height:24px; flex-shrink:0; border-radius:6px; background:{{ t.surfaceAlt }}; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700;">{{ nav.initial }}</span>
+                      </sc-if>
+                      <sc-if value="{{ sidebarExpanded }}" hint-placeholder-val="{{ true }}">
+                        <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ nav.name }}</span>
+                      </sc-if>
+                    </button>
+                    <sc-if value="{{ nav.hasChildren }}" hint-placeholder-val="{{ false }}">
+                      <button onClick="{{ nav.onToggleChildren }}" aria-label="Toggle submenu" style="width:22px; height:36px; flex-shrink:0; background:transparent; border:none; font-size:9px; color:{{ t.textTertiary }}; cursor:pointer;">{{ nav.childCaret }}</button>
+                    </sc-if>
+                  </div>
+                  <sc-if value="{{ nav.childrenOpen }}" hint-placeholder-val="{{ false }}">
+                    <div style="display:flex; flex-direction:column; gap:2px; padding-left:30px; margin-top:2px;">
+                      <sc-for list="{{ nav.children }}" as="child" hint-placeholder-count="2">
+                        <button onClick="{{ child.onClick }}" style="text-align:left; background:{{ child.bg }}; color:{{ child.color }}; border:none; padding:0 10px; min-height:32px; border-radius:6px; font-family:inherit; font-size:13px; font-weight:{{ child.weight }}; cursor:pointer;" style-hover="background:{{ t.surfaceHover }};">{{ child.name }}</button>
+                      </sc-for>
+                    </div>
+                  </sc-if>
+                </div>
+              </sc-for>
+            </div>
+          </sc-if>
+        </div>
+      </sc-for>
+      <sc-if value="{{ navNoResults }}" hint-placeholder-val="{{ false }}">
+        <div style="padding:10px 8px; font-size:13px; color:{{ t.textSecondary }};">No menu item matches “{{ navQuery }}”.</div>
+      </sc-if>
+    </div>
+
+    <div style="position:relative; margin-top:8px; padding-top:10px; border-top:1px solid {{ t.borderLight }};">
+      <sc-if value="{{ userMenuOpen }}" hint-placeholder-val="{{ false }}">
+        <div style="position:absolute; bottom:calc(100% + 6px); left:0; right:0; background:{{ t.surface }}; border:1px solid {{ t.border }}; border-radius:10px; box-shadow:0 12px 28px rgba(0,0,0,0.28); padding:6px; z-index:8;">
+          <button onClick="{{ toggleTheme }}" style="width:100%; text-align:left; background:transparent; border:none; padding:0 10px; min-height:38px; border-radius:6px; font-family:inherit; font-size:13.5px; font-weight:600; color:{{ t.textPrimary }}; cursor:pointer;" style-hover="background:{{ t.surfaceHover }};">{{ themeLabel }}</button>
+          <button style="width:100%; text-align:left; background:transparent; border:none; padding:0 10px; min-height:38px; border-radius:6px; font-family:inherit; font-size:13.5px; font-weight:600; color:{{ t.textPrimary }}; cursor:pointer;" style-hover="background:{{ t.surfaceHover }};">Settings</button>
+          <button style="width:100%; text-align:left; background:transparent; border:none; padding:0 10px; min-height:38px; border-radius:6px; font-family:inherit; font-size:13.5px; font-weight:600; color:{{ t.danger }}; cursor:pointer;" style-hover="background:{{ t.surfaceHover }};">Log out</button>
+        </div>
+      </sc-if>
+      <button onClick="{{ toggleUserMenu }}" style="width:100%; display:flex; align-items:center; gap:10px; background:transparent; border:none; padding:6px; border-radius:8px; font-family:inherit; cursor:pointer;" style-hover="background:{{ t.surfaceHover }};">
+        <div style="width:30px; height:30px; flex-shrink:0; border-radius:50%; background:{{ t.brandTint }}; color:{{ t.brand }}; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700;">MC</div>
+        <sc-if value="{{ sidebarExpanded }}" hint-placeholder-val="{{ true }}">
+          <div style="flex:1; min-width:0; text-align:left;">
+            <div style="font-size:13.5px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Maya Chen</div>
+            <div style="font-size:11.5px; color:{{ t.textTertiary }};">Admin</div>
+          </div>
+          <span style="font-size:10px; color:{{ t.textTertiary }};">▾</span>
+        </sc-if>
+      </button>
+    </div>
+  </div>
+
+  <div style="flex:1; min-width:0; width:0; display:flex; flex-direction:column;">
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 20px; border-bottom:1px solid {{ t.border }}; background:{{ t.surface }}; min-height:52px; box-sizing:border-box; flex-wrap:wrap;">
+      <div style="display:flex; align-items:center; gap:14px; flex-wrap:wrap;">
+        <div style="font-weight:800; font-size:18px; letter-spacing:-0.01em;">Items</div>
+        <div style="display:flex; gap:2px; padding:3px; background:{{ t.surfaceAlt }}; border-radius:8px;">
+          <button onClick="{{ setViewList }}" title="List view" aria-pressed="{{ isList }}" style="width:36px; height:32px; display:flex; align-items:center; justify-content:center; background:{{ listBtnBg }}; border:none; border-radius:6px; cursor:pointer; color:{{ listBtnColor }};">
+            <span style="display:flex; flex-direction:column; gap:3px; width:15px;">
+              <span style="height:2px; background:currentColor; border-radius:1px;"></span>
+              <span style="height:2px; background:currentColor; border-radius:1px;"></span>
+              <span style="height:2px; background:currentColor; border-radius:1px;"></span>
+            </span>
+          </button>
+          <button onClick="{{ setViewKanban }}" title="Kanban view" aria-pressed="{{ isKanban }}" style="width:36px; height:32px; display:flex; align-items:center; justify-content:center; background:{{ kanbanBtnBg }}; border:none; border-radius:6px; cursor:pointer; color:{{ kanbanBtnColor }};">
+            <span style="display:flex; gap:3px; width:15px; height:14px;">
+              <span style="flex:1; height:100%; background:currentColor; border-radius:1px;"></span>
+              <span style="flex:1; height:60%; align-self:flex-start; background:currentColor; border-radius:1px;"></span>
+              <span style="flex:1; height:80%; align-self:flex-start; background:currentColor; border-radius:1px;"></span>
+            </span>
+          </button>
+        </div>
+      </div>
+      <button onClick="{{ openNew }}" style="background:{{ t.brand }}; color:{{ t.onBrand }}; border:1px solid transparent; padding:0 20px; min-height:44px; border-radius:8px; font-size:14.5px; font-weight:700; font-family:inherit; cursor:pointer;" style-hover="background:{{ t.brandHover }};">+ New item</button>
+    </div>
+
+    <div style="padding:20px clamp(20px,3vw,32px); flex:1; min-width:0; box-sizing:border-box;">
+
+      <sc-if value="{{ isList }}" hint-placeholder-val="{{ true }}">
+        <div style="position:relative; margin-bottom:14px;">
+          <div style="display:flex; align-items:center; flex-wrap:wrap; gap:6px; background:{{ t.surface }}; border:1px solid {{ t.border }}; border-radius:8px; padding:6px 8px; min-height:44px; box-sizing:border-box;">
+            <span style="font-size:15px; color:{{ t.textTertiary }}; padding-left:4px;">⌕</span>
+            <sc-for list="{{ conditions }}" as="c" hint-placeholder-count="2">
+              <div style="display:flex; align-items:center; gap:6px;">
+                <sc-if value="{{ c.showJoiner }}" hint-placeholder-val="{{ false }}">
+                  <button onClick="{{ c.onToggleJoiner }}" title="{{ c.joinerTitle }}" style="background:{{ c.joinerBg }}; border:1px solid {{ c.joinerBorder }}; border-radius:6px; padding:0 8px; min-height:30px; font-family:'JetBrains Mono',monospace; font-size:11.5px; font-weight:700; letter-spacing:0.04em; color:{{ c.joinerColor }}; cursor:pointer;" style-hover="background:{{ t.surfaceHover }};">{{ c.joiner }}</button>
+                </sc-if>
+                <div style="display:flex; align-items:center; gap:6px; padding:4px 4px 4px 10px; border-radius:6px; background:{{ t.brandTint }};">
+                  <span style="font-size:13px; color:{{ t.textSecondary }};">{{ c.fieldLabel }}</span>
+                  <span style="font-size:13px; color:{{ t.textTertiary }};">{{ c.opLabel }}</span>
+                  <span style="font-size:13.5px; font-weight:600; color:{{ t.brand }};">{{ c.value }}</span>
+                  <button onClick="{{ c.onRemove }}" aria-label="{{ c.removeLabel }}" style="background:transparent; border:none; width:24px; height:24px; border-radius:4px; font-size:14px; color:{{ t.textSecondary }}; cursor:pointer;" style-hover="background:{{ t.surfaceHover }};">×</button>
+                </div>
+              </div>
+            </sc-for>
+            <sc-if value="{{ pendingField }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex; align-items:center; gap:6px; padding:4px 4px 4px 10px; border-radius:6px; background:{{ t.surfaceAlt }};">
+                <span style="font-size:13px; font-weight:600; color:{{ t.textPrimary }};">{{ pendingFieldLabel }}</span>
+                <span style="font-size:13px; color:{{ t.textTertiary }};">is</span>
+                <button onClick="{{ clearPendingField }}" aria-label="Cancel this filter" style="background:transparent; border:none; width:24px; height:24px; border-radius:4px; font-size:14px; color:{{ t.textSecondary }}; cursor:pointer;" style-hover="background:{{ t.surfaceHover }};">×</button>
+              </div>
+            </sc-if>
+            <input placeholder="{{ searchPlaceholder }}" value="{{ searchDraft }}" onChange="{{ onSearchDraft }}" onFocus="{{ openSuggest }}" onKeyDown="{{ onSearchKey }}" style="flex:1; min-width:160px; background:transparent; border:none; outline:none; padding:0 4px; min-height:32px; font-size:14.5px; color:{{ t.textPrimary }}; font-family:inherit;" />
+            <sc-if value="{{ hasFilters }}" hint-placeholder-val="{{ false }}">
+              <button onClick="{{ clearQuery }}" style="background:transparent; border:none; padding:0 10px; min-height:32px; border-radius:6px; font-family:inherit; font-size:13px; font-weight:600; color:{{ t.textSecondary }}; cursor:pointer;" style-hover="background:{{ t.surfaceHover }}; color:{{ t.textPrimary }};">Clear all</button>
+            </sc-if>
+            <div style="width:1px; align-self:stretch; background:{{ t.borderLight }}; margin:2px 2px;"></div>
+            <span style="font-size:11px; font-weight:700; letter-spacing:0.06em; color:{{ t.textTertiary }}; padding-left:2px;">GROUP</span>
+            <sc-for list="{{ groupLevels }}" as="g" hint-placeholder-count="2">
+              <div style="display:flex; align-items:center; gap:6px;">
+                <sc-if value="{{ g.showThen }}" hint-placeholder-val="{{ false }}">
+                  <span style="font-size:12.5px; color:{{ t.textTertiary }};">then</span>
+                </sc-if>
+                <div style="display:flex; align-items:center; gap:2px; background:{{ t.surfaceAlt }}; border:1px solid {{ t.borderLight }}; border-radius:8px; padding:0 0 0 4px;">
+                  <span style="font-family:'JetBrains Mono',monospace; font-size:11px; color:{{ t.textTertiary }}; padding:0 4px;">{{ g.levelNo }}</span>
+                  <select value="{{ g.field }}" onChange="{{ g.onChange }}" aria-label="{{ g.ariaLabel }}" style="background:transparent; border:none; padding:0 4px; min-height:36px; font-size:13.5px; font-weight:600; color:{{ t.textPrimary }}; font-family:inherit; cursor:pointer;">
+                    <sc-for list="{{ g.options }}" as="o" hint-placeholder-count="4">
+                      <option value="{{ o.value }}">{{ o.label }}</option>
+                    </sc-for>
+                  </select>
+                  <button onClick="{{ g.onRemove }}" aria-label="Remove this grouping level" style="background:transparent; border:none; width:28px; height:36px; border-radius:0 8px 8px 0; font-size:14px; color:{{ t.textSecondary }}; cursor:pointer;" style-hover="background:{{ t.surfaceHover }};">×</button>
+                </div>
+              </div>
+            </sc-for>
+            <sc-if value="{{ canAddLevel }}" hint-placeholder-val="{{ true }}">
+              <button onClick="{{ addGroupLevel }}" style="background:transparent; border:1px dashed {{ t.border }}; border-radius:8px; padding:0 10px; min-height:36px; font-family:inherit; font-size:13px; font-weight:600; color:{{ t.textSecondary }}; cursor:pointer;" style-hover="background:{{ t.surfaceHover }}; color:{{ t.textPrimary }};">{{ addLevelLabel }}</button>
+            </sc-if>
+          </div>
+          <sc-if value="{{ suggestOpen }}" hint-placeholder-val="{{ false }}">
+            <div style="position:absolute; top:calc(100% + 4px); left:0; right:0; z-index:6; background:{{ t.surface }}; border:1px solid {{ t.border }}; border-radius:8px; box-shadow:0 12px 28px rgba(0,0,0,0.2); max-height:280px; overflow-y:auto; padding:4px;">
+              <div style="display:flex; justify-content:space-between; gap:12px; padding:8px 10px 6px; font-size:11.5px; font-weight:700; letter-spacing:0.06em; color:{{ t.textTertiary }};"><span>{{ suggestHeading }}</span><span>{{ suggestKeyHint }}</span></div>
+              <sc-for list="{{ suggestions }}" as="sg" hint-placeholder-count="4">
+                <button onClick="{{ sg.onClick }}" style="width:100%; text-align:left; display:flex; align-items:center; gap:10px; background:{{ sg.bg }}; border:none; border-radius:6px; padding:0 10px; min-height:44px; font-family:inherit; font-size:14.5px; color:{{ t.textPrimary }}; cursor:pointer;" style-hover="background:{{ t.surfaceHover }};">
+                  <span style="font-size:11px; font-weight:700; letter-spacing:0.04em; color:{{ t.textSecondary }}; background:{{ t.surfaceAlt }}; border-radius:4px; padding:4px 7px; flex-shrink:0;">{{ sg.tag }}</span>
+                  <span style="flex:1;">{{ sg.label }}</span>
+                  <span style="font-size:12.5px; color:{{ t.textTertiary }};">{{ sg.hint }}</span>
+                </button>
+              </sc-for>
+              <sc-if value="{{ suggestEmpty }}" hint-placeholder-val="{{ false }}">
+                <div style="padding:12px 10px; font-size:14px; color:{{ t.textSecondary }};">Nothing matches "{{ searchDraft }}". Press Enter to search every column anyway.</div>
+              </sc-if>
+            </div>
+          </sc-if>
+        </div>
+        <div style="font-size:12.5px; line-height:1.5; color:{{ t.textTertiary }}; margin:-8px 0 14px;">{{ queryEcho }}</div>
+
+        <sc-if value="{{ hasSelection }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex; align-items:center; gap:12px; padding:10px 16px; border-radius:8px; background:{{ t.brandTint }}; margin-bottom:10px; flex-wrap:wrap;">
+            <span style="font-size:13.5px; font-weight:600; color:{{ t.brand }};">{{ selectionLabel }}</span>
+            <button onClick="{{ deleteSelected }}" style="background:transparent; border:1px solid {{ t.danger }}; color:{{ t.danger }}; padding:0 12px; min-height:32px; border-radius:6px; font-family:inherit; font-size:13px; font-weight:600; cursor:pointer;" style-hover="background:{{ t.surfaceHover }};">Delete selected</button>
+            <button onClick="{{ clearSelection }}" style="background:transparent; border:none; color:{{ t.textSecondary }}; font-family:inherit; font-size:13px; font-weight:600; cursor:pointer;">Clear selection</button>
+          </div>
+        </sc-if>
+
+        <div style="background:{{ t.surface }}; border:1px solid {{ t.border }}; border-radius:12px; overflow-x:auto; overflow-y:hidden; max-width:100%;">
+          <div style="min-width:880px;">
+            <div style="display:grid; grid-template-columns:36px 0.8fr 1.5fr 1fr 1fr 1fr 0.9fr; padding:0 20px; background:{{ t.surfaceAlt }}; align-items:center;">
+              <input type="checkbox" checked="{{ allSelected }}" onChange="{{ toggleSelectAll }}" aria-label="Select all rows" style="width:20px; height:20px; accentColor:{{ t.brand }}; cursor:pointer;" />
+              <sc-for list="{{ tableHeaders }}" as="h" hint-placeholder-count="6">
+                <button onClick="{{ h.onClick }}" title="{{ h.title }}" style="background:transparent; border:none; font-family:inherit; text-align:left; font-size:11.5px; font-weight:700; letter-spacing:0.05em; color:{{ h.color }}; cursor:pointer; display:flex; align-items:center; gap:4px; min-height:44px; padding:0;">{{ h.label }}<span style="opacity:{{ h.arrowOpacity }};">{{ h.arrow }}</span></button>
+              </sc-for>
+            </div>
+
+            <sc-for list="{{ tableItems }}" as="it" hint-placeholder-count="6">
+              <div>
+                <sc-if value="{{ it.isGroup }}" hint-placeholder-val="{{ false }}">
+                  <button onClick="{{ it.onToggle }}" style="width:100%; text-align:left; display:flex; align-items:center; gap:10px; background:{{ it.headerBg }}; border:none; border-top:1px solid {{ t.borderLight }}; border-left:{{ it.accent }}; padding-left:{{ it.indent }}; padding-right:20px; min-height:{{ it.headerHeight }}; font-family:inherit; cursor:pointer;" style-hover="background:{{ t.surfaceHover }};">
+                    <span style="width:14px; font-size:10px; color:{{ t.textSecondary }};">{{ it.caret }}</span>
+                    <span style="font-size:11px; font-weight:700; letter-spacing:0.06em; color:{{ t.textTertiary }};">{{ it.fieldLabel }}</span>
+                    <span style="font-size:{{ it.labelSize }}; font-weight:700; color:{{ t.textPrimary }};">{{ it.label }}</span>
+                    <span style="font-size:12.5px; font-weight:600; color:{{ t.textSecondary }}; padding:3px 8px; border-radius:999px; background:{{ t.surfaceAlt }};">{{ it.count }}</span>
+                  </button>
+                </sc-if>
+                <sc-if value="{{ it.isRow }}" hint-placeholder-val="{{ true }}">
+                  <div style="display:grid; grid-template-columns:36px 0.8fr 1.5fr 1fr 1fr 1fr 0.9fr; padding-left:{{ it.indent }}; padding-right:20px; border-top:1px solid {{ t.borderLight }}; align-items:center;" style-hover="background:{{ t.surfaceHover }};">
+                    <input type="checkbox" checked="{{ it.row.selected }}" onChange="{{ it.row.onToggleSelect }}" style="width:20px; height:20px; accentColor:{{ t.brand }}; cursor:pointer;" />
+                    <div onClick="{{ it.row.onOpen }}" style="font-family:'JetBrains Mono',monospace; font-size:12.5px; color:{{ t.textSecondary }}; padding:11px 0; cursor:pointer;">{{ it.row.id }}</div>
+                    <div onClick="{{ it.row.onOpen }}" style="font-size:14px; font-weight:600; padding:11px 0; cursor:pointer;">{{ it.row.name }}</div>
+                    <div style="font-size:13.5px; color:{{ t.textSecondary }};">{{ it.row.category }}</div>
+                    <div><span style="display:inline-flex; align-items:center; gap:6px; padding:4px 9px; border-radius:999px; background:{{ it.row.statusBg }};"><span style="width:6px; height:6px; border-radius:50%; background:{{ it.row.statusDot }};"></span><span style="font-size:12px; font-weight:600; color:{{ it.row.statusText }}; white-space:nowrap;">{{ it.row.statusLabel }}</span></span></div>
+                    <div style="font-size:13.5px; color:{{ t.textSecondary }};">{{ it.row.owner }}</div>
+                    <div style="font-size:12.5px; font-family:'JetBrains Mono',monospace; color:{{ t.textTertiary }};">{{ it.row.updated }}</div>
+                  </div>
+                </sc-if>
+              </div>
+            </sc-for>
+
+            <sc-if value="{{ tableEmpty }}" hint-placeholder-val="{{ false }}">
+              <div style="padding:40px 24px; text-align:center; border-top:1px solid {{ t.borderLight }};">
+                <div style="font-size:14.5px; font-weight:700; margin-bottom:4px;">No records match this search</div>
+                <div style="font-size:13.5px; color:{{ t.textSecondary }};">Try clearing a filter, or swap an AND for an OR.</div>
+              </div>
+            </sc-if>
+          </div>
+        </div>
+
+        <sc-if value="{{ isUngrouped }}" hint-placeholder-val="{{ true }}">
+          <div style="background:{{ t.surface }}; border:1px solid {{ t.border }}; border-radius:12px; padding:12px clamp(12px,3vw,24px); display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-top:14px;">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <label style="font-size:13.5px; color:{{ t.textSecondary }};">Rows</label>
+              <select value="{{ pageSize }}" onChange="{{ onPageSize }}" aria-label="Rows per page" style="background:{{ t.bg }}; border:1px solid {{ t.border }}; border-radius:8px; padding:0 10px; min-height:44px; font-size:14px; font-family:'JetBrains Mono',monospace; color:{{ t.textPrimary }};">
+                <option value="5">5</option><option value="10">10</option><option value="25">25</option><option value="50">50</option>
+              </select>
+            </div>
+            <div style="display:flex; align-items:center; gap:4px; flex-wrap:wrap;">
+              <button onClick="{{ firstPage }}" disabled="{{ atFirst }}" title="First page" style="background:transparent; border:1px solid {{ t.border }}; border-radius:8px; padding:0 12px; min-height:44px; font-family:inherit; font-size:14px; font-weight:600; color:{{ navBtnColor }}; cursor:{{ prevCursor }};" style-hover="background:{{ t.surfaceHover }};">«</button>
+              <button onClick="{{ prevPage }}" disabled="{{ atFirst }}" style="background:transparent; border:1px solid {{ t.border }}; border-radius:8px; padding:0 14px; min-height:44px; font-family:inherit; font-size:14px; font-weight:600; color:{{ navBtnColor }}; cursor:{{ prevCursor }};" style-hover="background:{{ t.surfaceHover }};">‹ Prev</button>
+              <sc-for list="{{ pages }}" as="p" hint-placeholder-count="7">
+                <div>
+                  <sc-if value="{{ p.isGap }}" hint-placeholder-val="{{ false }}">
+                    <div style="width:32px; height:44px; display:flex; align-items:flex-end; justify-content:center; padding-bottom:12px; font-size:14px; color:{{ t.textTertiary }};">…</div>
+                  </sc-if>
+                  <sc-if value="{{ p.isPage }}" hint-placeholder-val="{{ true }}">
+                    <button onClick="{{ p.onClick }}" aria-current="{{ p.current }}" style="min-width:44px; height:44px; padding:0 6px; border:none; display:flex; align-items:center; justify-content:center; border-radius:8px; font-family:'JetBrains Mono',monospace; font-size:14px; font-weight:600; cursor:pointer; background:{{ p.bg }}; color:{{ p.color }};" style-hover="background:{{ p.hoverBg }};">{{ p.n }}</button>
+                  </sc-if>
+                </div>
+              </sc-for>
+              <button onClick="{{ nextPage }}" disabled="{{ atLast }}" style="background:transparent; border:1px solid {{ t.border }}; border-radius:8px; padding:0 14px; min-height:44px; font-family:inherit; font-size:14px; font-weight:600; color:{{ nextBtnColor }}; cursor:{{ nextCursor }};" style-hover="background:{{ t.surfaceHover }};">Next ›</button>
+              <button onClick="{{ lastPage }}" disabled="{{ atLast }}" title="Last page" style="background:transparent; border:1px solid {{ t.border }}; border-radius:8px; padding:0 12px; min-height:44px; font-family:inherit; font-size:14px; font-weight:600; color:{{ nextBtnColor }}; cursor:{{ nextCursor }};" style-hover="background:{{ t.surfaceHover }};">»</button>
+            </div>
+            <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+              <span style="font-size:13.5px; color:{{ t.textSecondary }};">{{ rangeLabel }}</span>
+              <div style="display:flex; align-items:center; gap:8px;">
+                <label style="font-size:13.5px; color:{{ t.textSecondary }};">Go to</label>
+                <input inputmode="numeric" placeholder="{{ page }}" value="{{ jumpDraft }}" onChange="{{ onJumpDraft }}" onKeyDown="{{ onJumpKey }}" aria-label="Go to page number" style="width:76px; box-sizing:border-box; background:{{ t.bg }}; border:1px solid {{ t.border }}; border-radius:8px; padding:0 10px; min-height:44px; font-size:14px; font-family:'JetBrains Mono',monospace; text-align:right; color:{{ t.textPrimary }};" style-focus="border-color:{{ t.brand }}; outline:2px solid {{ t.brandTint }};" />
+                <button onClick="{{ goToPage }}" style="background:transparent; border:1px solid {{ t.border }}; border-radius:8px; padding:0 14px; min-height:44px; font-family:inherit; font-size:14px; font-weight:600; color:{{ t.textPrimary }}; cursor:pointer;" style-hover="background:{{ t.surfaceHover }};">Go</button>
+              </div>
+            </div>
+          </div>
+        </sc-if>
+      </sc-if>
+
+      <sc-if value="{{ isKanban }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex; gap:16px; overflow-x:auto; padding-bottom:8px; align-items:flex-start;">
+          <sc-for list="{{ columns }}" as="col" hint-placeholder-count="5">
+            <div style="width:260px; flex-shrink:0; background:{{ t.surfaceAlt }}; border-radius:12px; padding:12px; box-sizing:border-box;">
+              <div style="display:flex; align-items:center; gap:8px; padding:4px 6px 12px;">
+                <span style="width:7px; height:7px; border-radius:50%; background:{{ col.dot }};"></span>
+                <span style="font-size:13px; font-weight:700; letter-spacing:0.03em; color:{{ t.textSecondary }};">{{ col.label }}</span>
+                <span style="font-size:12px; color:{{ t.textTertiary }}; margin-left:auto;">{{ col.count }}</span>
+              </div>
+              <div style="display:flex; flex-direction:column; gap:8px;">
+                <sc-for list="{{ col.cards }}" as="card" hint-placeholder-count="2">
+                  <div onClick="{{ card.onOpen }}" style="background:{{ t.surface }}; border:1px solid {{ t.border }}; border-radius:10px; padding:14px; cursor:pointer;" style-hover="border-color:{{ t.brand }};">
+                    <div style="font-size:14px; font-weight:600; margin-bottom:6px;">{{ card.name }}</div>
+                    <div style="font-family:'JetBrains Mono',monospace; font-size:12px; color:{{ t.textTertiary }}; margin-bottom:10px;">{{ card.id }}</div>
+                    <div style="display:flex; align-items:center; justify-content:space-between;">
+                      <span style="font-size:12.5px; color:{{ t.textSecondary }};">{{ card.owner }}</span>
+                      <span style="font-size:11px; color:{{ t.textTertiary }};">{{ card.updated }}</span>
+                    </div>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+      </sc-if>
+
+    </div>
+  </div>
+
+  <sc-if value="{{ drawerOpen }}" hint-placeholder-val="{{ false }}">
+    <sc-if value="{{ showScrim }}" hint-placeholder-val="{{ false }}">
+      <div onClick="{{ closeDrawer }}" style="position:fixed; inset:0; background:{{ t.scrim }}; z-index:10;"></div>
+    </sc-if>
+  </sc-if>
+
+  <div style="position:fixed; top:0; right:0; height:100vh; width:{{ drawerWidth }}; background:{{ t.surface }}; border-left:1px solid {{ t.border }}; box-shadow:{{ drawerShadow }}; z-index:11; transform:{{ drawerTransform }}; transition:transform .18s ease, width .18s ease; display:flex; flex-direction:column; box-sizing:border-box;">
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:16px 20px; border-bottom:1px solid {{ t.borderLight }};">
+      <div>
+        <div style="font-size:16px; font-weight:800;">{{ drawerTitle }}</div>
+        <div style="font-family:'JetBrains Mono',monospace; font-size:12px; color:{{ t.textTertiary }}; margin-top:2px;">{{ drawerId }}</div>
+      </div>
+      <div style="display:flex; align-items:center; gap:6px; position:relative;">
+        <sc-if value="{{ showActionMenuBtn }}" hint-placeholder-val="{{ false }}">
+          <button onClick="{{ toggleActionMenu }}" aria-label="More actions" style="width:34px; height:34px; border-radius:8px; background:transparent; border:1px solid {{ t.border }}; font-size:16px; color:{{ t.textSecondary }}; cursor:pointer;" style-hover="background:{{ t.surfaceHover }};">⋮</button>
+        </sc-if>
+        <sc-if value="{{ actionMenuOpen }}" hint-placeholder-val="{{ false }}">
+          <div style="position:absolute; top:calc(100% + 6px); right:76px; min-width:160px; background:{{ t.surface }}; border:1px solid {{ t.border }}; border-radius:10px; box-shadow:0 12px 28px rgba(0,0,0,0.24); padding:6px; z-index:12;">
+            <button onClick="{{ duplicateRecord }}" style="width:100%; text-align:left; background:transparent; border:none; padding:0 10px; min-height:38px; border-radius:6px; font-family:inherit; font-size:13.5px; font-weight:600; color:{{ t.textPrimary }}; cursor:pointer;" style-hover="background:{{ t.surfaceHover }};">Duplicate</button>
+            <button onClick="{{ deleteFromMenu }}" style="width:100%; text-align:left; background:transparent; border:none; padding:0 10px; min-height:38px; border-radius:6px; font-family:inherit; font-size:13.5px; font-weight:600; color:{{ t.danger }}; cursor:pointer;" style-hover="background:{{ t.surfaceHover }};">Delete</button>
+          </div>
+        </sc-if>
+        <button onClick="{{ toggleFullPage }}" title="{{ fullPageToggleTitle }}" style="width:34px; height:34px; border-radius:8px; background:transparent; border:1px solid {{ t.border }}; font-size:14px; color:{{ t.textSecondary }}; cursor:pointer;" style-hover="background:{{ t.surfaceHover }};">{{ fullPageIcon }}</button>
+        <button onClick="{{ closeDrawer }}" aria-label="Close" style="width:34px; height:34px; border-radius:8px; background:transparent; border:1px solid {{ t.border }}; font-size:15px; color:{{ t.textSecondary }}; cursor:pointer;" style-hover="background:{{ t.surfaceHover }};">×</button>
+      </div>
+    </div>
+
+    <div style="flex:1; overflow-y:auto; display:grid; grid-template-columns:{{ drawerBodyColumns }};">
+      <div style="border-right:{{ drawerFormBorder }};">
+        <div style="padding:20px; display:grid; grid-template-columns:{{ formColumns }}; gap:18px 20px; max-width:{{ formMaxWidth }};">
+          <div style="grid-column:1 / -1;">
+            <label style="display:block; font-size:13.5px; font-weight:600; color:{{ t.textSecondary }}; margin-bottom:14px;">Status</label>
+            <div style="display:flex; align-items:flex-start;">
+              <sc-for list="{{ statusSteps }}" as="st" hint-placeholder-count="5">
+                <div style="display:flex; align-items:flex-start; flex:{{ st.grow }}; min-width:0;">
+                  <button onClick="{{ st.onClick }}" style="display:flex; flex-direction:column; align-items:center; gap:6px; background:transparent; border:none; padding:0; font-family:inherit; cursor:pointer; flex-shrink:0;">
+                    <span style="width:22px; height:22px; border-radius:50%; background:{{ st.dotBg }}; border:2px solid {{ st.dotBorder }}; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; color:{{ st.dotText }};">{{ st.dotContent }}</span>
+                    <span style="font-size:12px; font-weight:600; color:{{ st.labelColor }}; white-space:nowrap;">{{ st.label }}</span>
+                  </button>
+                  <sc-if value="{{ st.hasConnector }}" hint-placeholder-val="{{ true }}">
+                    <div style="flex:1; height:2px; background:{{ st.connectorColor }}; margin:10px 4px 0;"></div>
+                  </sc-if>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+          <div>
+            <label style="display:block; font-size:13.5px; font-weight:600; color:{{ t.textSecondary }}; margin-bottom:6px;">Name <span style="color:{{ t.danger }};">*</span></label>
+            <input placeholder="e.g. Website redesign" value="{{ draftName }}" onChange="{{ onDraftName }}" style="width:100%; box-sizing:border-box; background:{{ t.bg }}; border:1px solid {{ t.border }}; border-radius:8px; padding:10px 14px; min-height:44px; font-size:15px; color:{{ t.textPrimary }}; font-family:inherit;" style-focus="border-color:{{ t.brand }}; outline:2px solid {{ t.brandTint }};" />
+          </div>
+          <sc-if value="{{ drawerFullPage }}" hint-placeholder-val="{{ false }}">
+            <div>
+              <label style="display:block; font-size:13.5px; font-weight:600; color:{{ t.textSecondary }}; margin-bottom:6px;">Category</label>
+              <select value="{{ draftCategory }}" onChange="{{ onDraftCategory }}" style="width:100%; box-sizing:border-box; background:{{ t.bg }}; border:1px solid {{ t.border }}; border-radius:8px; padding:10px 14px; min-height:44px; font-size:15px; color:{{ t.textPrimary }}; font-family:inherit;">
+                <option value="Design">Design</option>
+                <option value="Engineering">Engineering</option>
+                <option value="Marketing">Marketing</option>
+                <option value="Finance">Finance</option>
+              </select>
+            </div>
+          </sc-if>
+          <div>
+            <label style="display:block; font-size:13.5px; font-weight:600; color:{{ t.textSecondary }}; margin-bottom:6px;">Owner</label>
+            <select value="{{ draftOwner }}" onChange="{{ onDraftOwner }}" style="width:100%; box-sizing:border-box; background:{{ t.bg }}; border:1px solid {{ t.border }}; border-radius:8px; padding:10px 14px; min-height:44px; font-size:15px; color:{{ t.textPrimary }}; font-family:inherit;">
+              <option value="Maya Chen">Maya Chen</option>
+              <option value="Diego Ruiz">Diego Ruiz</option>
+              <option value="Sam Osei">Sam Osei</option>
+              <option value="Priya Nair">Priya Nair</option>
+            </select>
+          </div>
+          <sc-if value="{{ drawerFullPage }}" hint-placeholder-val="{{ false }}">
+            <div>
+              <label style="display:block; font-size:13.5px; font-weight:600; color:{{ t.textSecondary }}; margin-bottom:6px;">Priority</label>
+              <select value="{{ draftPriority }}" onChange="{{ onDraftPriority }}" style="width:100%; box-sizing:border-box; background:{{ t.bg }}; border:1px solid {{ t.border }}; border-radius:8px; padding:10px 14px; min-height:44px; font-size:15px; color:{{ t.textPrimary }}; font-family:inherit;">
+                <option value="Low">Low</option>
+                <option value="Medium">Medium</option>
+                <option value="High">High</option>
+              </select>
+            </div>
+          </sc-if>
+          <sc-if value="{{ drawerFullPage }}" hint-placeholder-val="{{ false }}">
+            <div>
+              <label style="display:block; font-size:13.5px; font-weight:600; color:{{ t.textSecondary }}; margin-bottom:6px;">Due date</label>
+              <input type="date" value="{{ draftDueDate }}" onChange="{{ onDraftDueDate }}" style="width:100%; box-sizing:border-box; background:{{ t.bg }}; border:1px solid {{ t.border }}; border-radius:8px; padding:10px 14px; min-height:44px; font-size:15px; color:{{ t.textPrimary }}; font-family:inherit;" />
+            </div>
+          </sc-if>
+          <sc-if value="{{ drawerFullPage }}" hint-placeholder-val="{{ false }}">
+            <div>
+              <label style="display:block; font-size:13.5px; font-weight:600; color:{{ t.textSecondary }}; margin-bottom:6px;">Tags</label>
+              <input placeholder="e.g. urgent, client-facing" value="{{ draftTags }}" onChange="{{ onDraftTags }}" style="width:100%; box-sizing:border-box; background:{{ t.bg }}; border:1px solid {{ t.border }}; border-radius:8px; padding:10px 14px; min-height:44px; font-size:15px; color:{{ t.textPrimary }}; font-family:inherit;" />
+            </div>
+          </sc-if>
+          <sc-if value="{{ drawerFullPage }}" hint-placeholder-val="{{ false }}">
+            <div style="grid-column:1 / -1;">
+              <label style="display:block; font-size:13.5px; font-weight:600; color:{{ t.textSecondary }}; margin-bottom:6px;">Description</label>
+              <textarea placeholder="Add a description…" rows="4" value="{{ draftDesc }}" onChange="{{ onDraftDesc }}" style="width:100%; box-sizing:border-box; background:{{ t.bg }}; border:1px solid {{ t.border }}; border-radius:8px; padding:10px 14px; font-size:15px; line-height:1.55; color:{{ t.textPrimary }}; font-family:inherit; resize:vertical;" style-focus="border-color:{{ t.brand }}; outline:2px solid {{ t.brandTint }};"></textarea>
+            </div>
+          </sc-if>
+        </div>
+      </div>
+
+      <sc-if value="{{ drawerFullPage }}" hint-placeholder-val="{{ false }}">
+        <div style="padding:20px; display:flex; flex-direction:column; gap:16px; background:{{ t.surfaceAlt }};">
+          <div style="font-size:13px; font-weight:700; letter-spacing:0.04em; color:{{ t.textTertiary }};">ACTIVITY &amp; COMMENTS</div>
+          <div style="display:flex; gap:10px;">
+            <div style="width:32px; height:32px; border-radius:50%; background:{{ t.brandTint }}; color:{{ t.brand }}; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700;">YOU</div>
+            <div style="flex:1;">
+              <textarea placeholder="Write a comment…" rows="2" value="{{ commentDraft }}" onChange="{{ onCommentDraft }}" style="width:100%; box-sizing:border-box; background:{{ t.bg }}; border:1px solid {{ t.border }}; border-radius:8px; padding:8px 12px; font-size:14px; color:{{ t.textPrimary }}; font-family:inherit; resize:vertical; min-height:60px; margin-bottom:6px;" style-focus="border-color:{{ t.brand }}; outline:2px solid {{ t.brandTint }};"></textarea>
+              <button onClick="{{ postComment }}" disabled="{{ postDisabled }}" style="background:{{ postButtonBg }}; color:{{ postButtonColor }}; border:none; padding:0 14px; min-height:36px; border-radius:8px; font-size:13px; font-weight:700; font-family:inherit; cursor:{{ postButtonCursor }};">Post comment</button>
+            </div>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:14px;">
+            <sc-for list="{{ chatterItems }}" as="ci" hint-placeholder-count="4">
+              <div style="display:flex; gap:10px;">
+                <div style="width:32px; height:32px; border-radius:50%; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; background:{{ ci.avatarBg }}; color:{{ ci.avatarColor }};">{{ ci.initials }}</div>
+                <div style="flex:1;">
+                  <sc-if value="{{ ci.isLog }}" hint-placeholder-val="{{ false }}">
+                    <div style="font-size:13px; line-height:1.5; color:{{ t.textSecondary }};"><span style="font-weight:600; color:{{ t.textPrimary }};">{{ ci.who }}</span> {{ ci.text }} · {{ ci.time }}</div>
+                  </sc-if>
+                  <sc-if value="{{ ci.isComment }}" hint-placeholder-val="{{ false }}">
+                    <div>
+                      <div style="display:flex; align-items:baseline; gap:8px; margin-bottom:2px;">
+                        <span style="font-size:13.5px; font-weight:700;">{{ ci.who }}</span>
+                        <span style="font-size:12px; color:{{ t.textTertiary }};">{{ ci.time }}</span>
+                      </div>
+                      <div style="font-size:14px; color:{{ t.textPrimary }}; line-height:1.5;">{{ ci.message }}</div>
+                    </div>
+                  </sc-if>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+    </div>
+
+    <div style="display:flex; gap:10px; padding:16px 20px; border-top:1px solid {{ t.borderLight }};">
+      <button onClick="{{ closeDrawer }}" style="flex:1; background:transparent; color:{{ t.textSecondary }}; border:1px solid {{ t.border }}; min-height:44px; border-radius:8px; font-size:14.5px; font-weight:600; font-family:inherit; cursor:pointer;" style-hover="background:{{ t.surfaceAlt }};">Cancel</button>
+      <button onClick="{{ saveDrawer }}" style="flex:1; background:{{ t.brand }}; color:{{ t.onBrand }}; border:1px solid transparent; min-height:44px; border-radius:8px; font-size:14.5px; font-weight:700; font-family:inherit; cursor:pointer;" style-hover="background:{{ t.brandHover }};">Save</button>
+    </div>
+  </div>
+
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:900},&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;dark&quot;,&quot;options&quot;:[&quot;dark&quot;,&quot;light&quot;],&quot;tsType&quot;:&quot;'dark'|'light'&quot;}}">
+class Component extends DCLogic {
+  state = {
+    theme: (this.props.theme === 'light' || this.props.theme === 'dark') ? this.props.theme : 'dark',
+    sidebarCollapsed: false,
+    navQuery: '',
+    navClosedGroups: {},
+    navClosedParents: { Items: true },
+    userMenuOpen: false,
+    activeNav: 'Items',
+    view: 'list',
+    drawerOpen: false, drawerFullPage: false, drawerMode: 'new', editingId: null, drawerTab: 'details', actionMenuOpen: false,
+    selectedIds: [],
+    conditions: [],
+    searchDraft: '', pendingField: null, suggestOpen: false,
+    groupLevels: [],
+    closedGroups: {},
+    sortKey: 'id', sortDir: 'asc',
+    page: 1, pageSize: 5, jumpDraft: '',
+    items: [
+      { id: 'REC-0148', name: 'Website redesign', category: 'Design', status: 'active', owner: 'Maya Chen', updated: '2h ago', desc: '' },
+      { id: 'REC-0147', name: 'Q3 pricing update', category: 'Finance', status: 'review', owner: 'Diego Ruiz', updated: '5h ago', desc: '' },
+      { id: 'REC-0146', name: 'Warehouse audit', category: 'Engineering', status: 'blocked', owner: 'Sam Osei', updated: 'Yesterday', desc: '' },
+      { id: 'REC-0145', name: 'Vendor onboarding', category: 'Marketing', status: 'draft', owner: 'Maya Chen', updated: '2d ago', desc: '' },
+      { id: 'REC-0144', name: 'Holiday campaign', category: 'Marketing', status: 'done', owner: 'Priya Nair', updated: '3d ago', desc: '' },
+      { id: 'REC-0143', name: 'Supplier contract renewal', category: 'Finance', status: 'active', owner: 'Diego Ruiz', updated: '4d ago', desc: '' },
+      { id: 'REC-0142', name: 'API rate limit fix', category: 'Engineering', status: 'review', owner: 'Sam Osei', updated: '5d ago', desc: '' },
+      { id: 'REC-0141', name: 'Brand guidelines v4', category: 'Design', status: 'draft', owner: 'Priya Nair', updated: '1w ago', desc: '' },
+      { id: 'REC-0140', name: 'Checkout flow revamp', category: 'Engineering', status: 'active', owner: 'Maya Chen', updated: '1w ago', desc: '' },
+      { id: 'REC-0139', name: 'Investor deck', category: 'Finance', status: 'done', owner: 'Diego Ruiz', updated: '2w ago', desc: '' },
+      { id: 'REC-0138', name: 'Referral program', category: 'Marketing', status: 'review', owner: 'Priya Nair', updated: '2w ago', desc: '' },
+      { id: 'REC-0137', name: 'Data warehouse migration', category: 'Engineering', status: 'blocked', owner: 'Sam Osei', updated: '3w ago', desc: '' },
+    ],
+    draftName: '', draftCategory: 'Design', draftStatus: 'draft', draftOwner: 'Maya Chen', draftDesc: '',
+    draftPriority: 'Medium', draftDueDate: '', draftTags: '',
+    commentDraft: '',
+    chatterItems: [
+      { type: 'log', who: 'System', text: 'changed status from Active to In review', time: '2h ago' },
+      { type: 'comment', who: 'Maya Chen', time: '3h ago', message: 'Reviewed the draft, looks good.' },
+      { type: 'log', who: 'System', text: 'created this item', time: '3d ago' },
+    ],
+  };
+
+  tokens(theme) {
+    const hue = 265;
+    const light = {
+      bg: 'oklch(0.985 0.004 250)', surface: 'oklch(1 0 0)', surfaceAlt: 'oklch(0.965 0.006 250)',
+      surfaceHover: 'oklch(0.945 0.007 250)', border: 'oklch(0.86 0.008 250)', borderLight: 'oklch(0.92 0.006 250)',
+      textPrimary: 'oklch(0.2 0.012 250)', textSecondary: 'oklch(0.42 0.012 250)', textTertiary: 'oklch(0.52 0.01 250)',
+      brand: `oklch(0.53 0.16 ${hue})`, brandHover: `oklch(0.46 0.17 ${hue})`, onBrand: 'oklch(0.99 0 0)',
+      brandTint: `oklch(0.53 0.16 ${hue} / 0.12)`, danger: 'oklch(0.52 0.18 25)',
+      scrim: 'oklch(0.2 0.012 250 / 0.35)',
+      status: {
+        draft: { dot: 'oklch(0.52 0.015 265)', text: 'oklch(0.38 0.015 265)', bg: 'oklch(0.55 0.015 265 / 0.1)' },
+        active: { dot: 'oklch(0.52 0.14 230)', text: 'oklch(0.4 0.14 230)', bg: 'oklch(0.55 0.14 230 / 0.1)' },
+        review: { dot: 'oklch(0.52 0.13 290)', text: 'oklch(0.4 0.13 290)', bg: 'oklch(0.55 0.13 290 / 0.1)' },
+        blocked: { dot: 'oklch(0.6 0.15 70)', text: 'oklch(0.4 0.15 70)', bg: 'oklch(0.62 0.15 70 / 0.12)' },
+        done: { dot: 'oklch(0.52 0.14 145)', text: 'oklch(0.36 0.14 145)', bg: 'oklch(0.55 0.14 145 / 0.1)' },
+      }
+    };
+    const dark = {
+      bg: 'oklch(0.17 0.012 250)', surface: 'oklch(0.21 0.012 250)', surfaceAlt: 'oklch(0.25 0.013 250)',
+      surfaceHover: 'oklch(0.28 0.014 250)', border: 'oklch(0.34 0.014 250)', borderLight: 'oklch(0.28 0.013 250)',
+      textPrimary: 'oklch(0.96 0.004 250)', textSecondary: 'oklch(0.78 0.01 250)', textTertiary: 'oklch(0.64 0.012 250)',
+      brand: `oklch(0.7 0.15 ${hue})`, brandHover: `oklch(0.77 0.14 ${hue})`, onBrand: 'oklch(0.15 0.02 265)',
+      brandTint: `oklch(0.7 0.15 ${hue} / 0.2)`, danger: 'oklch(0.68 0.18 25)',
+      scrim: 'oklch(0.05 0.01 250 / 0.55)',
+      status: {
+        draft: { dot: 'oklch(0.7 0.015 265)', text: 'oklch(0.86 0.012 265)', bg: 'oklch(0.68 0.015 265 / 0.16)' },
+        active: { dot: 'oklch(0.72 0.14 230)', text: 'oklch(0.86 0.11 230)', bg: 'oklch(0.7 0.14 230 / 0.18)' },
+        review: { dot: 'oklch(0.74 0.13 290)', text: 'oklch(0.87 0.1 290)', bg: 'oklch(0.72 0.13 290 / 0.18)' },
+        blocked: { dot: 'oklch(0.78 0.15 70)', text: 'oklch(0.89 0.11 70)', bg: 'oklch(0.75 0.15 70 / 0.2)' },
+        done: { dot: 'oklch(0.72 0.14 145)', text: 'oklch(0.86 0.11 145)', bg: 'oklch(0.7 0.14 145 / 0.18)' },
+      }
+    };
+    return theme === 'dark' ? dark : light;
+  }
+
+  fieldDefs() {
+    return [
+      { key: 'id', label: 'ID', pickable: false },
+      { key: 'name', label: 'Name', pickable: false },
+      { key: 'category', label: 'Category', pickable: true },
+      { key: 'status', label: 'Status', pickable: true },
+      { key: 'owner', label: 'Owner', pickable: true },
+      { key: 'updated', label: 'Updated', pickable: false },
+    ];
+  }
+
+  openNew() {
+    this.setState({ drawerOpen: true, drawerFullPage: false, drawerMode: 'new', editingId: null, drawerTab: 'details', draftName: '', draftCategory: 'Design', draftStatus: 'draft', draftOwner: 'Maya Chen', draftDesc: '', draftPriority: 'Medium', draftDueDate: '', draftTags: '' });
+  }
+  openEdit(row) {
+    this.setState({ drawerOpen: true, drawerFullPage: false, drawerMode: 'edit', editingId: row.id, drawerTab: 'details', draftName: row.name, draftCategory: row.category, draftStatus: row.status, draftOwner: row.owner, draftDesc: row.desc || '', draftPriority: row.priority || 'Medium', draftDueDate: row.dueDate || '', draftTags: row.tags || '' });
+  }
+  closeDrawer() { this.setState({ drawerOpen: false, drawerFullPage: false, actionMenuOpen: false }); }
+  duplicateRecord() {
+    this.setState(s => {
+      const src = s.items.find(it => it.id === s.editingId);
+      if (!src) return { actionMenuOpen: false };
+      const n = 149 + s.items.length;
+      const copy = { ...src, id: `REC-0${n}`, name: `${src.name} (copy)`, updated: 'just now' };
+      return { items: [copy, ...s.items], actionMenuOpen: false, drawerOpen: false, drawerFullPage: false };
+    });
+  }
+  saveDrawer() {
+    this.setState(s => {
+      if (s.drawerMode === 'edit') {
+        return { drawerOpen: false, drawerFullPage: false, items: s.items.map(it => it.id === s.editingId ? { ...it, name: s.draftName, category: s.draftCategory, status: s.draftStatus, owner: s.draftOwner, desc: s.draftDesc, priority: s.draftPriority, dueDate: s.draftDueDate, tags: s.draftTags, updated: 'just now' } : it) };
+      }
+      const n = 149 + s.items.length;
+      const newItem = { id: `REC-0${n}`, name: s.draftName || 'Untitled', category: s.draftCategory, status: s.draftStatus, owner: s.draftOwner, updated: 'just now', desc: s.draftDesc, priority: s.draftPriority, dueDate: s.draftDueDate, tags: s.draftTags };
+      return { drawerOpen: false, drawerFullPage: false, items: [newItem, ...s.items] };
+    });
+  }
+  deleteRow(id) {
+    if (!window.confirm('Delete this record? This cannot be undone.')) return;
+    this.setState(s => ({ items: s.items.filter(it => it.id !== id), selectedIds: s.selectedIds.filter(x => x !== id) }));
+  }
+  deleteSelected() {
+    if (!window.confirm(`Delete ${this.state.selectedIds.length} record(s)? This cannot be undone.`)) return;
+    this.setState(s => ({ items: s.items.filter(it => !s.selectedIds.includes(it.id)), selectedIds: [] }));
+  }
+  toggleSelectRow(id) {
+    this.setState(s => ({ selectedIds: s.selectedIds.includes(id) ? s.selectedIds.filter(x => x !== id) : [...s.selectedIds, id] }));
+  }
+
+  renderVals() {
+    const theme = this.state.theme;
+    const t = this.tokens(theme);
+    const S = t.status;
+    const statusLabels = { draft: 'Draft', active: 'Active', review: 'In review', blocked: 'Blocked', done: 'Done' };
+    const statusOrder = ['draft', 'active', 'review', 'blocked', 'done'];
+
+    const sidebarExpanded = !this.state.sidebarCollapsed;
+    const navGroupDefs = [
+      { label: 'WORK', items: [{ name: 'Dashboard' }, { name: 'My tasks' }, { name: 'Inbox' }, { name: 'Approvals' }] },
+      { label: 'RECORDS', items: [
+        { name: 'Items', children: ['All items', 'My items', 'Archived'] },
+        { name: 'Orders' }, { name: 'Shipments' }, { name: 'Invoices' }, { name: 'Customers' },
+      ] },
+      { label: 'SETUP', items: [{ name: 'General' }, { name: 'Fields' }] },
+    ];
+    const navQ = this.state.navQuery.trim().toLowerCase();
+    const navGroups = navGroupDefs.map(g => {
+      const items = navQ
+        ? g.items.filter(it => it.name.toLowerCase().includes(navQ) || (it.children || []).some(c => c.toLowerCase().includes(navQ)))
+        : g.items;
+      const open = navQ ? true : !this.state.navClosedGroups[g.label];
+      return {
+        label: g.label, open, caret: open ? '▾' : '▸',
+        onToggle: () => this.setState(s => ({ navClosedGroups: { ...s.navClosedGroups, [g.label]: open } })),
+        items: items.map(it => {
+          const active = this.state.activeNav === it.name;
+          const hasChildren = !!it.children;
+          const childrenOpen = navQ ? true : !this.state.navClosedParents[it.name];
+          return {
+            name: it.name, initial: it.name[0],
+            onClick: () => this.setState({ activeNav: it.name }),
+            bg: active ? t.brandTint : 'transparent', color: active ? t.brand : t.textSecondary, weight: active ? 700 : 600,
+            hasChildren, childCaret: childrenOpen ? '▾' : '▸', childrenOpen,
+            onToggleChildren: () => this.setState(s => ({ navClosedParents: { ...s.navClosedParents, [it.name]: childrenOpen } })),
+            children: (it.children || []).filter(c => !navQ || c.toLowerCase().includes(navQ)).map(c => ({
+              name: c,
+              onClick: () => this.setState({ activeNav: c }),
+              bg: this.state.activeNav === c ? t.brandTint : 'transparent',
+              color: this.state.activeNav === c ? t.brand : t.textSecondary,
+              weight: this.state.activeNav === c ? 700 : 600,
+            })),
+          };
+        }),
+      };
+    }).filter(g => g.items.length > 0);
+
+    const fieldDefs = this.fieldDefs();
+    const labelOf = (k) => (fieldDefs.find(f => f.key === k) || { label: 'Any field' }).label;
+    const conds = this.state.conditions;
+    const testCond = (r, c) => {
+      const v = String(c.value).toLowerCase();
+      if (c.field === 'any') return fieldDefs.some(f => String(r[f.key === 'status' ? 'status' : f.key] ?? '').toLowerCase().includes(v));
+      const raw = c.field === 'status' ? statusLabels[r.status] : r[c.field];
+      const rv = String(raw ?? '').toLowerCase();
+      return c.op === 'is' ? rv === v : rv.includes(v);
+    };
+    const orGroups = [];
+    conds.forEach((c, i) => {
+      if (i === 0 || c.joiner === 'OR') orGroups.push([]);
+      orGroups[orGroups.length - 1].push(c);
+    });
+    let rows = orGroups.length
+      ? this.state.items.filter(r => orGroups.some(g => g.every(c => testCond(r, c))))
+      : this.state.items.slice();
+    const sortKey = this.state.sortKey, sortDir = this.state.sortDir === 'asc' ? 1 : -1;
+    rows = [...rows].sort((a, b) => (a[sortKey] > b[sortKey] ? 1 : a[sortKey] < b[sortKey] ? -1 : 0) * sortDir);
+
+    const mapRow = (r) => ({
+      id: r.id, name: r.name, category: r.category, owner: r.owner, updated: r.updated,
+      statusLabel: statusLabels[r.status], statusDot: S[r.status].dot, statusText: S[r.status].text, statusBg: S[r.status].bg,
+      selected: this.state.selectedIds.includes(r.id),
+      onToggleSelect: () => this.toggleSelectRow(r.id),
+      onOpen: () => this.openEdit(r),
+    });
+
+    const headerDefs = [
+      { key: 'id', label: 'ID' }, { key: 'name', label: 'NAME' }, { key: 'category', label: 'CATEGORY' },
+      { key: 'status', label: 'STATUS' }, { key: 'owner', label: 'OWNER' }, { key: 'updated', label: 'UPDATED' },
+    ];
+    const tableHeaders = headerDefs.map(h => {
+      const active = this.state.sortKey === h.key;
+      return {
+        label: h.label,
+        title: active ? `Sorted, click to reverse` : `Sort by ${h.label.toLowerCase()}`,
+        color: active ? t.textPrimary : t.textTertiary, arrow: active ? (this.state.sortDir === 'asc' ? '↑' : '↓') : '↑',
+        arrowOpacity: active ? 1 : 0,
+        onClick: () => this.setState(s => ({ sortKey: h.key, sortDir: s.sortKey === h.key ? (s.sortDir === 'asc' ? 'desc' : 'asc') : 'asc' })),
+      };
+    });
+
+    const levels = this.state.groupLevels;
+    const isGrouped = levels.length > 0;
+    const closed = this.state.closedGroups;
+    const indentOf = (depth) => `calc(20px + ${depth * 22}px)`;
+    const headerStyles = [
+      { bg: t.surfaceHover, size: '14.5px', height: '44px' },
+      { bg: t.surfaceAlt, size: '13.5px', height: '40px' },
+      { bg: 'transparent', size: '13px', height: '38px' },
+    ];
+    const groupKeyFn = (f, r) => f === 'status' ? statusLabels[r.status] : r[f];
+    const tableItems = [];
+    const buildItems = (rs, depth, prefix) => {
+      if (depth >= levels.length) {
+        rs.forEach(r => tableItems.push({ isGroup: false, isRow: true, row: mapRow(r), indent: indentOf(depth) }));
+        return;
+      }
+      const f = levels[depth];
+      const map = new Map();
+      rs.forEach(r => { const k = String(groupKeyFn(f, r)); if (!map.has(k)) map.set(k, []); map.get(k).push(r); });
+      [...map.entries()].sort((a, b) => a[0].localeCompare(b[0])).forEach(([k, group]) => {
+        const path = `${prefix}/${f}:${k}`;
+        const open = !closed[path];
+        const hs = headerStyles[Math.min(depth, headerStyles.length - 1)];
+        tableItems.push({
+          isGroup: true, isRow: false, label: k, fieldLabel: labelOf(f).toUpperCase(),
+          count: `${group.length} ${group.length === 1 ? 'record' : 'records'}`,
+          caret: open ? '▾' : '▸', headerBg: hs.bg, labelSize: hs.size, headerHeight: hs.height,
+          accent: depth === 0 ? `3px solid ${t.brand}` : `3px solid ${t.borderLight}`,
+          indent: indentOf(depth),
+          onToggle: () => this.setState(s => ({ closedGroups: { ...s.closedGroups, [path]: open } })),
+        });
+        if (open) buildItems(group, depth + 1, path);
+      });
+    };
+
+    const pageSize = Number(this.state.pageSize);
+    const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
+    const page = Math.min(this.state.page, totalPages);
+    const window2 = new Set([1, totalPages, page, page - 1, page + 1]);
+    if (page <= 3) [2, 3, 4].forEach(n => window2.add(n));
+    if (page >= totalPages - 2) [totalPages - 1, totalPages - 2, totalPages - 3].forEach(n => window2.add(n));
+    const shown = [...window2].filter(n => n >= 1 && n <= totalPages).sort((a, b) => a - b);
+    const pages = [];
+    shown.forEach((n, i) => {
+      if (i > 0 && n - shown[i - 1] > 1) pages.push({ isGap: true, isPage: false, n: '…' });
+      const on = page === n;
+      pages.push({
+        isGap: false, isPage: true, n, current: on ? 'page' : 'false',
+        onClick: () => this.setState({ page: n }),
+        bg: on ? t.brand : 'transparent', color: on ? t.onBrand : t.textSecondary,
+        hoverBg: on ? t.brandHover : t.surfaceHover,
+      });
+    });
+    const commitJump = () => {
+      const n = parseInt(this.state.jumpDraft, 10);
+      if (!n || n < 1) { this.setState({ jumpDraft: '' }); return; }
+      this.setState({ page: Math.min(totalPages, n), jumpDraft: '' });
+    };
+    const pageRows = rows.slice((page - 1) * pageSize, (page - 1) * pageSize + pageSize);
+    if (isGrouped) {
+      buildItems(rows, 0, '');
+    } else {
+      pageRows.forEach(r => tableItems.push({ isGroup: false, isRow: true, row: mapRow(r), indent: '20px' }));
+    }
+    const visibleIds = isGrouped ? rows.map(r => r.id) : pageRows.map(r => r.id);
+    const allSelected = visibleIds.length > 0 && visibleIds.every(id => this.state.selectedIds.includes(id));
+
+    const draft = this.state.searchDraft.trim();
+    const dl = draft.toLowerCase();
+    const pending = this.state.pendingField;
+    const valuesOf = (k) => [...new Set(this.state.items.map(r => String(k === 'status' ? statusLabels[r.status] : r[k])))].sort((a, b) => a.localeCompare(b));
+    const recordCount = (n) => `${n} ${n === 1 ? 'record' : 'records'}`;
+    const addCond = (field, op, value) => this.setState(s => ({
+      conditions: [...s.conditions, { field, op, value, joiner: 'AND' }],
+      searchDraft: '', pendingField: null, suggestOpen: false, page: 1,
+    }));
+    const suggestions = [];
+    if (pending) {
+      valuesOf(pending).filter(v => !dl || v.toLowerCase().includes(dl)).forEach(v => {
+        const n = this.state.items.filter(r => String(pending === 'status' ? statusLabels[r.status] : r[pending]) === v).length;
+        suggestions.push({ tag: labelOf(pending), label: v, hint: recordCount(n), onClick: () => addCond(pending, 'is', v) });
+      });
+    } else if (!draft) {
+      fieldDefs.filter(f => f.pickable).forEach(f => {
+        suggestions.push({ tag: 'FILTER', label: `${f.label} is…`, hint: `${valuesOf(f.key).length} values`, onClick: () => this.setState({ pendingField: f.key, searchDraft: '', suggestOpen: true }) });
+      });
+    } else {
+      fieldDefs.filter(f => f.pickable).forEach(f => {
+        valuesOf(f.key).filter(v => v.toLowerCase().includes(dl)).slice(0, 3).forEach(v => {
+          const n = this.state.items.filter(r => String(f.key === 'status' ? statusLabels[r.status] : r[f.key]) === v).length;
+          suggestions.push({ tag: f.label, label: v, hint: recordCount(n), onClick: () => addCond(f.key, 'is', v) });
+        });
+      });
+      const anyN = this.state.items.filter(r => (r.name + ' ' + r.id + ' ' + r.owner + ' ' + r.category).toLowerCase().includes(dl)).length;
+      suggestions.push({ tag: 'ALL', label: `Contains "${draft}"`, hint: recordCount(anyN), onClick: () => addCond('any', 'contains', draft) });
+      suggestions.push({ tag: 'NAME', label: `Name contains "${draft}"`, hint: recordCount(this.state.items.filter(r => r.name.toLowerCase().includes(dl)).length), onClick: () => addCond('name', 'contains', draft) });
+    }
+    const suggestList = suggestions.map((sg, i) => ({ ...sg, bg: i === 0 ? t.brandTint : 'transparent' }));
+
+    const conditions = conds.map((c, i) => ({
+      fieldLabel: c.field === 'any' ? 'Any field' : labelOf(c.field),
+      opLabel: c.op === 'is' ? 'is' : 'contains',
+      value: c.value,
+      removeLabel: `Remove filter ${labelOf(c.field)} ${c.value}`,
+      showJoiner: i > 0, joiner: c.joiner,
+      joinerTitle: c.joiner === 'AND' ? 'Both must match — click for OR' : 'Either can match — click for AND',
+      joinerBg: c.joiner === 'OR' ? t.surfaceAlt : 'transparent',
+      joinerBorder: c.joiner === 'OR' ? t.border : t.borderLight,
+      joinerColor: c.joiner === 'OR' ? t.textPrimary : t.textSecondary,
+      onToggleJoiner: () => this.setState(s => ({ conditions: s.conditions.map((x, j) => j === i ? { ...x, joiner: x.joiner === 'AND' ? 'OR' : 'AND' } : x) })),
+      onRemove: () => this.setState(s => {
+        const next = s.conditions.filter((_, j) => j !== i);
+        if (next.length) next[0] = { ...next[0], joiner: 'AND' };
+        return { conditions: next };
+      }),
+    }));
+
+    const phrase = (c) => `${c.field === 'any' ? 'any field' : labelOf(c.field)} ${c.op === 'is' ? 'is' : 'contains'} ${c.value}`;
+    const queryEcho = conds.length
+      ? `Showing records where ${orGroups.map(g => g.map(phrase).join(' and ')).join(', or ')}.`
+      : 'No filters. Type to search every column, or pick a field to filter on.';
+
+    const available = fieldDefs.filter(f => f.pickable && !levels.includes(f.key));
+    const groupLevels = levels.map((f, i) => ({
+      field: f, levelNo: i + 1, showThen: i > 0, ariaLabel: `Grouping level ${i + 1}`,
+      options: fieldDefs.filter(o => o.pickable && (o.key === f || !levels.includes(o.key))).map(o => ({ value: o.key, label: o.label })),
+      onChange: (e) => this.setState(s => { const next = [...s.groupLevels]; next[i] = e.target.value; return { groupLevels: next, closedGroups: {} }; }),
+      onRemove: () => this.setState(s => ({ groupLevels: s.groupLevels.filter((_, j) => j !== i), closedGroups: {} })),
+    }));
+
+    const columnOrder = statusOrder;
+    const columns = columnOrder.map(key => {
+      const colRows = this.state.items.filter(r => r.status === key);
+      return { label: statusLabels[key], dot: S[key].dot, count: colRows.length, cards: colRows.map(r => ({ id: r.id, name: r.name, owner: r.owner, updated: r.updated, onOpen: () => this.openEdit(r) })) };
+    });
+
+    const statusChoices = columnOrder.map(key => ({
+      label: statusLabels[key], dot: S[key].dot,
+      bg: this.state.draftStatus === key ? S[key].bg : 'transparent',
+      border: this.state.draftStatus === key ? S[key].dot : t.border,
+      text: this.state.draftStatus === key ? S[key].text : t.textSecondary,
+      onClick: () => this.setState({ draftStatus: key }),
+    }));
+
+    const chatterItems = this.state.chatterItems.map(it => ({
+      ...it,
+      isLog: it.type === 'log', isComment: it.type === 'comment',
+      initials: it.who.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase(),
+      avatarBg: it.type === 'log' ? t.surfaceAlt : t.brandTint,
+      avatarColor: it.type === 'log' ? t.textSecondary : t.brand,
+    }));
+    const commentDraft = this.state.commentDraft.trim();
+
+    return {
+      t, sidebarExpanded, sidebarCollapsed: this.state.sidebarCollapsed,
+      sidebarWidth: this.state.sidebarCollapsed ? '64px' : '250px',
+      toggleSidebar: () => this.setState(s => ({ sidebarCollapsed: !s.sidebarCollapsed })),
+      sidebarToggleIcon: this.state.sidebarCollapsed ? '›' : '‹',
+      sidebarToggleTitle: this.state.sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar',
+      navQuery: this.state.navQuery, onNavQuery: (e) => this.setState({ navQuery: e.target.value }),
+      navGroups, navNoResults: navQ !== '' && navGroups.length === 0,
+      userMenuOpen: this.state.userMenuOpen, toggleUserMenu: () => this.setState(s => ({ userMenuOpen: !s.userMenuOpen })),
+      theme, themeLabel: theme === 'dark' ? 'Light mode' : 'Dark mode',
+      toggleTheme: () => this.setState(s => ({ theme: s.theme === 'dark' ? 'light' : 'dark' })),
+
+      isList: this.state.view === 'list', isKanban: this.state.view === 'kanban',
+      setViewList: () => this.setState({ view: 'list' }), setViewKanban: () => this.setState({ view: 'kanban' }),
+      listBtnBg: this.state.view === 'list' ? t.surface : 'transparent', listBtnColor: this.state.view === 'list' ? t.textPrimary : t.textSecondary,
+      kanbanBtnBg: this.state.view === 'kanban' ? t.surface : 'transparent', kanbanBtnColor: this.state.view === 'kanban' ? t.textPrimary : t.textSecondary,
+      openNew: () => this.openNew(),
+
+      conditions, hasFilters: conds.length > 0 || !!draft || !!pending,
+      clearQuery: () => this.setState({ conditions: [], searchDraft: '', pendingField: null, suggestOpen: false, page: 1 }),
+      searchDraft: this.state.searchDraft,
+      onSearchDraft: (e) => this.setState({ searchDraft: e.target.value, suggestOpen: true }),
+      openSuggest: () => this.setState({ suggestOpen: true }),
+      suggestOpen: this.state.suggestOpen,
+      suggestions: suggestList, suggestEmpty: suggestList.length === 0,
+      suggestHeading: pending ? `${labelOf(pending).toUpperCase()} VALUES` : (draft ? 'SUGGESTIONS' : 'FILTER BY A FIELD'),
+      suggestKeyHint: 'ENTER TO ADD · ESC TO CLOSE',
+      pendingField: !!pending, pendingFieldLabel: pending ? labelOf(pending) : '',
+      clearPendingField: () => this.setState({ pendingField: null, searchDraft: '' }),
+      searchPlaceholder: pending ? `Pick or type a ${labelOf(pending).toLowerCase()}…` : 'Search items…',
+      onSearchKey: (e) => {
+        if (e.key === 'Enter') {
+          if (pending && draft) addCond(pending, 'is', draft);
+          else if (draft) addCond('any', 'contains', draft);
+        } else if (e.key === 'Escape') {
+          this.setState({ suggestOpen: false, pendingField: null, searchDraft: '' });
+        } else if (e.key === 'Backspace' && !this.state.searchDraft) {
+          if (pending) this.setState({ pendingField: null });
+          else this.setState(s => {
+            const next = s.conditions.slice(0, -1);
+            if (next.length) next[0] = { ...next[0], joiner: 'AND' };
+            return { conditions: next };
+          });
+        }
+      },
+      queryEcho,
+      groupLevels, isGrouped, canAddLevel: levels.length < 3 && available.length > 0,
+      addLevelLabel: levels.length ? '+ Add level' : '+ Group records',
+      addGroupLevel: () => { if (available.length) this.setState(s => ({ groupLevels: [...s.groupLevels, available[0].key], closedGroups: {} })); },
+
+      hasSelection: this.state.selectedIds.length > 0,
+      selectionLabel: `${this.state.selectedIds.length} selected`,
+      deleteSelected: () => this.deleteSelected(),
+      clearSelection: () => this.setState({ selectedIds: [] }),
+      allSelected, toggleSelectAll: () => this.setState(s => ({ selectedIds: allSelected ? s.selectedIds.filter(id => !visibleIds.includes(id)) : [...new Set([...s.selectedIds, ...visibleIds])] })),
+
+      tableHeaders, isUngrouped: !isGrouped, tableItems,
+      tableEmpty: rows.length === 0,
+      columns,
+
+      pageSize: this.state.pageSize, onPageSize: (e) => this.setState({ pageSize: e.target.value, page: 1 }),
+      pageLabel: `Page ${page} of ${totalPages}`,
+      rangeLabel: rows.length === 0 ? 'No records' : `Records ${(page - 1) * pageSize + 1}–${Math.min(page * pageSize, rows.length)} of ${rows.length}`,
+      atFirst: page === 1, atLast: page === totalPages,
+      navBtnColor: page === 1 ? t.textTertiary : t.textSecondary,
+      nextBtnColor: page === totalPages ? t.textTertiary : t.textSecondary,
+      prevCursor: page === 1 ? 'not-allowed' : 'pointer',
+      nextCursor: page === totalPages ? 'not-allowed' : 'pointer',
+      pages, page,
+      jumpDraft: this.state.jumpDraft,
+      onJumpDraft: (e) => this.setState({ jumpDraft: e.target.value.replace(/[^0-9]/g, '') }),
+      onJumpKey: (e) => { if (e.key === 'Enter') commitJump(); },
+      goToPage: commitJump,
+      firstPage: () => this.setState({ page: 1 }),
+      lastPage: () => this.setState({ page: totalPages }),
+      prevPage: () => this.setState(s => ({ page: Math.max(1, page - 1) })),
+      nextPage: () => this.setState(s => ({ page: Math.min(totalPages, page + 1) })),
+
+      drawerOpen: this.state.drawerOpen, drawerFullPage: this.state.drawerFullPage,
+      showScrim: this.state.drawerOpen && !this.state.drawerFullPage,
+      drawerWidth: this.state.drawerFullPage ? '100vw' : 'min(420px,100vw)',
+      drawerShadow: this.state.drawerFullPage ? 'none' : '-16px 0 32px rgba(0,0,0,0.18)',
+      drawerTransform: this.state.drawerOpen ? 'translateX(0)' : 'translateX(100%)',
+      drawerTitle: this.state.drawerMode === 'edit' ? 'Edit item' : 'New item',
+      drawerId: this.state.drawerMode === 'edit' ? this.state.editingId : 'Not yet saved',
+      toggleFullPage: () => this.setState(s => ({ drawerFullPage: !s.drawerFullPage })),
+      drawerBodyColumns: this.state.drawerFullPage ? 'minmax(0,1fr) 380px' : '1fr',
+      drawerFormBorder: this.state.drawerFullPage ? `1px solid ${t.borderLight}` : 'none',
+      formColumns: this.state.drawerFullPage ? 'repeat(2,1fr)' : '1fr',
+      formMaxWidth: '100%',
+      draftPriority: this.state.draftPriority, onDraftPriority: (e) => this.setState({ draftPriority: e.target.value }),
+      draftDueDate: this.state.draftDueDate, onDraftDueDate: (e) => this.setState({ draftDueDate: e.target.value }),
+      draftTags: this.state.draftTags, onDraftTags: (e) => this.setState({ draftTags: e.target.value }),
+      showActionMenuBtn: this.state.drawerMode === 'edit',
+      actionMenuOpen: this.state.actionMenuOpen,
+      toggleActionMenu: () => this.setState(s => ({ actionMenuOpen: !s.actionMenuOpen })),
+      duplicateRecord: () => this.duplicateRecord(),
+      deleteFromMenu: () => { this.setState({ actionMenuOpen: false }); this.deleteRow(this.state.editingId); this.closeDrawer(); },
+      statusSteps: statusOrder.map((key, i) => {
+        const curIdx = statusOrder.indexOf(this.state.draftStatus);
+        const isCurrent = key === this.state.draftStatus;
+        const passed = i <= curIdx;
+        return {
+          label: statusLabels[key],
+          onClick: () => this.setState({ draftStatus: key }),
+          grow: i === statusOrder.length - 1 ? '0' : '1',
+          hasConnector: i < statusOrder.length - 1,
+          connectorColor: i < curIdx ? t.brand : t.borderLight,
+          dotBg: isCurrent ? t.brand : (passed ? t.brandTint : t.surfaceAlt),
+          dotBorder: passed ? t.brand : t.border,
+          dotText: isCurrent ? t.onBrand : t.brand,
+          dotContent: passed && !isCurrent ? '✓' : '',
+          labelColor: isCurrent ? t.textPrimary : t.textTertiary,
+        };
+      }),
+      fullPageIcon: this.state.drawerFullPage ? '⤡' : '⤢',
+      fullPageToggleTitle: this.state.drawerFullPage ? 'Collapse to side panel' : 'Expand to full page',
+      closeDrawer: () => this.closeDrawer(), saveDrawer: () => this.saveDrawer(),
+      draftName: this.state.draftName, onDraftName: (e) => this.setState({ draftName: e.target.value }),
+      draftCategory: this.state.draftCategory, onDraftCategory: (e) => this.setState({ draftCategory: e.target.value }),
+      draftOwner: this.state.draftOwner, onDraftOwner: (e) => this.setState({ draftOwner: e.target.value }),
+      draftDesc: this.state.draftDesc, onDraftDesc: (e) => this.setState({ draftDesc: e.target.value }),
+      statusChoices,
+
+      commentDraft: this.state.commentDraft, onCommentDraft: (e) => this.setState({ commentDraft: e.target.value }),
+      postDisabled: commentDraft === '', postButtonBg: commentDraft === '' ? t.surfaceAlt : t.brand,
+      postButtonColor: commentDraft === '' ? t.textTertiary : t.onBrand, postButtonCursor: commentDraft === '' ? 'not-allowed' : 'pointer',
+      postComment: () => {
+        if (!commentDraft) return;
+        this.setState(s => ({ commentDraft: '', chatterItems: [{ type: 'comment', who: 'You', time: 'Just now', message: commentDraft }, ...s.chatterItems] }));
+      },
+      chatterItems,
+    };
+  }
+}
+
+</script>
+</body>
+</html>

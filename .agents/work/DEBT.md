@@ -12,12 +12,13 @@ Maintained by `/debt`. Read `.agents/skills/debt-tracking/SKILL.md` for the rule
 
 | ID | Opened | Phase | Sev | What was skipped | Why | Fix cost | Code |
 |---|---|---|---|---|---|---|---|
-| | | | | | | | |
+| DEBT-001 | 2026-09-12 | development | minor | Excel import still accepts a future `last_order_date` without rejecting it | Carried forward from the Django era into the RR7 port; same FRD gap | 1h — reject/clamp in `imports.server.ts` + test | `app/lib/imports.server.ts` |
+| DEBT-006 | 2026-09-12 | development | minor | Import preview bytes live in an in-process `Map`, lost on restart | Pilot rewrite — same class of trade-off as the old Django session store; avoids a new table | 2h — persist preview blob to SQLite with TTL | `app/routes/admin.transaksi.tsx` |
+| DEBT-008 | 2026-09-12 | development | minor | No ESLint/Prettier locked; `config.yml → lint/format` empty | RR scaffold shipped without them; typecheck covers the worst | 1h — add eslint + prettier scripts | `package.json` |
+| DEBT-009 | 2026-09-13 | development | major | Order history no longer append-only — `transaksi` supports edit/delete; master customer/salesman/user can be hard-deleted | Explicit product change by user (2026-09-13); contradicts FRD BR-10 / TDD “never deleted / append-only” | half-day — ADR + FRD amendment, or restore append-only + soft-delete | `app/db/schema.ts` (`transaksi`), `app/lib/orders.server.ts`, `app/lib/masterdata.server.ts` |
+| DEBT-010 | 2026-09-13 | development | major | Opt-in scheduled cron batch (`/admin/settings`) contradicts ADR-0002 manual-only default; in-process scheduler (no separate worker) | User-requested settings page for WAHA + cron; pilot still defaults to manual trigger | half-day — ADR amendment + ops runbook (restart behaviour, TZ, ban-risk comms) | `app/lib/cron.server.ts`, `app/routes/admin.settings.tsx` |
 
 ## Accepted
-
-Debt deliberately carried forever. Each names who accepted it — an unattributed
-acceptance is just an unpaid item with better PR.
 
 | ID | Accepted | By | What | Why it is acceptable | Revisit when |
 |---|---|---|---|---|---|
@@ -27,59 +28,18 @@ acceptance is just an unpaid item with better PR.
 
 | ID | Closed | Outcome | Note |
 |---|---|---|---|
-| | | paid / obsolete | |
+| DEBT-002 | 2026-09-12 | obsolete | Django session lifetime — replaced by 12h cookie session in RR7 auth |
+| DEBT-003 | 2026-09-12 | obsolete | Encryption-at-rest note still valid as infra, but the Django settings marker is gone; reopen as Deployment item when VPS lands |
+| DEBT-004 | 2026-09-12 | obsolete | `uv.lock` / pip-audit — stack is npm now; revisit as CI `npm audit` in Deployment |
+| DEBT-005 | 2026-09-12 | obsolete | Django `theme.css` inline tag — static assets served by Vite |
+| DEBT-007 | 2026-09-12 | paid | Vitest suite rebuilt: isolated SQLite harness + 38 tests covering BR-1/2, recordOrder/reactivation, trigger/double-trigger/preview/retry/skip/fail, reason codes, reassign/reactivate/stats, Excel import/export edges, auth throttle — `npm test` green |
 
 ---
 
 ## Implicit debt — regenerated, do not hand-edit
-
-Everything the `production` track requires that the active track skips. Computed
-by `/debt` from the gate diff, so this list stays complete even when nobody
-remembered to write anything down.
 
 _Run `/debt` to populate. Empty on the `production` track by definition._
 
 | Gate | Active track | production | Means |
 |---|---|---|---|
 | | | | |
-
----
-
-## Format
-
-**ID** — `DEBT-001`, sequential, never reused. Once assigned it survives closure;
-a closed entry keeps its number so old code comments and PRs still resolve.
-
-**Sev** — by consequence, not by how bad it feels:
-
-| Sev | Means | Effect |
-|---|---|---|
-| `blocker` | Real users get hurt: data loss, a security hole, a silent wrong answer | Blocks promotion. On `production`, blocks shipping. |
-| `major` | Costs real time or risk on the next change through this area | Should be paid; needs a stated reason to carry |
-| `minor` | Untidy, bounded, not spreading | Fine to carry indefinitely |
-
-**Fix cost** — a rough size (`1h`, `half-day`, `2d`) plus what it touches. A cost
-nobody estimated is a cost nobody will schedule.
-
-**Code** — the `DEBT-NNN` marker in source, as `file:line`, or `—` if the debt is
-an absence (a test never written, a doc never produced) with nowhere to anchor.
-
-### Detail blocks
-
-`blocker` and `major` entries get a block below the table. `minor` does not — a
-row is enough.
-
-```
-### DEBT-004 — <one-line claim>
-
-**What was skipped.** The specific thing, concretely.
-**Why.** The pressure at the time. Written so it reads as a decision, not an excuse.
-**Interest.** What makes this worse the longer it stands. ← the field that gets it paid
-**Blast radius.** What breaks, and for whom, if it is never fixed.
-**To fix properly.** The actual steps, and the size.
-**Triggers payment.** The condition that makes this urgent.
-```
-
-`Interest` is the one people skip and the one that matters. "Costs nothing extra
-to leave" is a legitimate answer — write it, and the entry can safely become
-`accepted`.

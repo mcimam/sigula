@@ -4,7 +4,7 @@
 !.agents/work/notes/.gitkeep
 .claude/settings.local.json
 
-# Secrets — never committed. See .agents/rules/security.md
+# Secrets — never committed
 .env
 .env.*
 !.env.example
@@ -13,10 +13,11 @@
 secrets/
 credentials*
 
-# Dependencies / build output — add your stack's entries during /kickoff
+# Dependencies / build output
 node_modules/
 dist/
 build/
+.react-router/
 target/
 out/
 __pycache__/
@@ -28,7 +29,15 @@ vendor/
 bin/
 obj/
 
-# Logs, coverage, local runtime state
+# Local SQLite + runtime data
+data/*
+!data/.gitkeep
+*.sqlite3
+*.db
+*.db-shm
+*.db-wal
+
+# Logs, coverage, test caches
 *.log
 npm-debug.log*
 .coverage
@@ -36,7 +45,7 @@ coverage/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
-*.sqlite3
+.vitest/
 
 # Editor / OS
 .DS_Store

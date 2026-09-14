@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap">
+<style>
+  body { margin: 0; }
+  a { color: oklch(0.55 0.16 265); }
+  a:hover { color: oklch(0.46 0.17 265); }
+  *:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+</style>
+</helmet>
+
+<div style="display:flex; min-height:100vh; background:{{ t.bg }}; color:{{ t.textPrimary }}; font-family:'Public Sans',sans-serif;">
+
+  <div style="width:{{ sidebarWidth }}; flex-shrink:0; background:{{ t.surface }}; border-right:1px solid {{ t.border }}; padding:14px 10px; display:flex; flex-direction:column; position:sticky; top:0; height:100vh; box-sizing:border-box; transition:width .15s ease;">
+    <div style="display:flex; align-items:center; justify-content:space-between; padding:2px 6px 14px; gap:6px;">
+      <sc-if value="{{ sidebarExpanded }}" hint-placeholder-val="{{ true }}">
+        <div style="font-weight:800; font-size:17px; letter-spacing:-0.01em;">ACME</div>
+      </sc-if>
+      <button onClick="{{ toggleSidebar }}" title="{{ sidebarToggleTitle }}" style="width:26px; height:26px; flex-shrink:0; border-radius:6px; background:transparent; border:1px solid {{ t.border }}; font-size:12px; color:{{ t.textSecondary }}; cursor:pointer; margin-left:auto;" style-hover="background:{{ t.surfaceHover }};">{{ sidebarToggleIcon }}</button>
+    </div>
+
+    <sc-if value="{{ sidebarExpanded }}" hint-placeholder-val="{{ true }}">
+      <div style="position:relative; margin-bottom:10px;">
+        <span style="position:absolute; left:9px; top:50%; transform:translateY(-50%); font-size:13px; color:{{ t.textTertiary }};">⌕</span>
+        <input placeholder="Search menu…" value="{{ navQuery }}" onChange="{{ onNavQuery }}" style="width:100%; box-sizing:border-box; background:{{ t.bg }}; border:1px solid {{ t.border }}; border-radius:8px; padding:7px 10px 7px 28px; min-height:34px; font-size:13.5px; color:{{ t.textPrimary }}; font-family:inherit;" />
+      </div>
+    </sc-if>
+
+    <div style="flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:12px;">
+      <sc-for list="{{ navGroups }}" as="grp" hint-placeholder-count="3">
+        <div>
+          <sc-if value="{{ sidebarExpanded }}" hint-placeholder-val="{{ true }}">
+            <button onClick="{{ grp.onToggle }}" style="width:100%; display:flex; align-items:center; gap:6px; background:transparent; border:none; padding:2px 8px 4px; font-family:inherit; cursor:pointer;">
+              <span style="font-size:11px; font-weight:700; letter-spacing:0.06em; color:{{ t.textTertiary }};">{{ grp.label }}</span>
+              <span style="font-size:9px; color:{{ t.textTertiary }}; margin-left:auto;">{{ grp.caret }}</span>
+            </button>
+          </sc-if>
+          <sc-if value="{{ grp.open }}" hint-placeholder-val="{{ true }}">
+            <div style="display:flex; flex-direction:column; gap:2px;">
+              <sc-for list="{{ grp.items }}" as="nav" hint-placeholder-count="3">
+                <div>
+                  <div style="display:flex; align-items:center; gap:2px;">
+                    <button onClick="{{ nav.onClick }}" title="{{ nav.name }}" style="flex:1; min-width:0; text-align:left; display:flex; align-items:center; gap:10px; background:{{ nav.bg }}; color:{{ nav.color }}; border:none; padding:0 8px; min-height:36px; border-radius:8px; font-family:inherit; font-size:14px; font-weight:{{ nav.weight }}; cursor:pointer;" style-hover="background:{{ t.surfaceHover }};">
+                      <sc-if value="{{ sidebarCollapsed }}" hint-placeholder-val="{{ false }}">
+                        <span style="width:24px; height:24px; flex-shrink:0; border-radius:6px; background:{{ t.surfaceAlt }}; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700;">{{ nav.initial }}</span>
+                      </sc-if>
+                      <sc-if value="{{ sidebarExpanded }}" hint-placeholder-val="{{ true }}">
+                        <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ nav.name }}</span>
+                      </sc-if>
+                    </button>
+                    <sc-if value="{{ nav.hasChildren }}" hint-placeholder-val="{{ false }}">
+                      <button onClick="{{ nav.onToggleChildren }}" aria-label="Toggle submenu" style="width:22px; height:36px; flex-shrink:0; background:transparent; border:none; font-size:9px; color:{{ t.textTertiary }}; cursor:pointer;">{{ nav.childCaret }}</button>
+                    </sc-if>
+                  </div>
+                  <sc-if value="{{ nav.childrenOpen }}" hint-placeholder-val="{{ false }}">
+                    <div style="display:flex; flex-direction:column; gap:2px; padding-left:30px; margin-top:2px;">
+                      <sc-for list="{{ nav.children }}" as="child" hint-placeholder-count="2">
+                        <button onClick="{{ child.onClick }}" style="text-align:left; background:{{ child.bg }}; color:{{ child.color }}; border:none; padding:0 10px; min-height:32px; border-radius:6px; font-family:inherit; font-size:13px; font-weight:{{ child.weight }}; cursor:pointer;" style-hover="background:{{ t.surfaceHover }};">{{ child.name }}</button>
+                      </sc-for>
+                    </div>
+                  </sc-if>
+                </div>
+              </sc-for>
+            </div>
+          </sc-if>
+        </div>
+      </sc-for>
+      <sc-if value="{{ navNoResults }}" hint-placeholder-val="{{ false }}">
+        <div style="padding:10px 8px; font-size:13px; color:{{ t.textSecondary }};">No menu item matches “{{ navQuery }}”.</div>
+      </sc-if>
+    </div>
+
+    <div style="position:relative; margin-top:8px; padding-top:10px; border-top:1px solid {{ t.borderLight }};">
+      <sc-if value="{{ userMenuOpen }}" hint-placeholder-val="{{ false }}">
+        <div style="position:absolute; bottom:calc(100% + 6px); left:0; right:0; background:{{ t.surface }}; border:1px solid {{ t.border }}; border-radius:10px; box-shadow:0 12px 28px rgba(0,0,0,0.28); padding:6px; z-index:8;">
+          <button onClick="{{ toggleTheme }}" style="width:100%; text-align:left; background:transparent; border:none; padding:0 10px; min-height:38px; border-radius:6px; font-family:inherit; font-size:13.5px; font-weight:600; color:{{ t.textPrimary }}; cursor:pointer;" style-hover="background:{{ t.surfaceHover }};">{{ themeLabel }}</button>
+          <button style="width:100%; text-align:left; background:transparent; border:none; padding:0 10px; min-height:38px; border-radius:6px; font-family:inherit; font-size:13.5px; font-weight:600; color:{{ t.textPrimary }}; cursor:pointer;" style-hover="background:{{ t.surfaceHover }};">Settings</button>
+          <button style="width:100%; text-align:left; background:transparent; border:none; padding:0 10px; min-height:38px; border-radius:6px; font-family:inherit; font-size:13.5px; font-weight:600; color:{{ t.danger }}; cursor:pointer;" style-hover="background:{{ t.surfaceHover }};">Log out</button>
+        </div>
+      </sc-if>
+      <button onClick="{{ toggleUserMenu }}" style="width:100%; display:flex; align-items:center; gap:10px; background:transparent; border:none; padding:6px; border-radius:8px; font-family:inherit; cursor:pointer;" style-hover="background:{{ t.surfaceHover }};">
+        <div style="width:30px; height:30px; flex-shrink:0; border-radius:50%; background:{{ t.brandTint }}; color:{{ t.brand }}; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700;">MC</div>
+        <sc-if value="{{ sidebarExpanded }}" hint-placeholder-val="{{ true }}">
+          <div style="flex:1; min-width:0; text-align:left;">
+            <div style="font-size:13.5px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Maya Chen</div>
+            <div style="font-size:11.5px; color:{{ t.textTertiary }};">Admin</div>
+          </div>
+          <span style="font-size:10px; color:{{ t.textTertiary }};">▾</span>
+        </sc-if>
+      </button>
+    </div>
+  </div>
+
+  <div style="flex:1; min-width:0; width:0; display:flex; flex-direction:column;">
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 20px; border-bottom:1px solid {{ t.border }}; background:{{ t.surface }}; min-height:52px; box-sizing:border-box; flex-wrap:wrap;">
+      <div style="font-weight:800; font-size:18px; letter-spacing:-0.01em;">Dashboard</div>
+      <button style="background:{{ t.brand }}; color:{{ t.onBrand }}; border:1px solid transparent; padding:0 20px; min-height:44px; border-radius:8px; font-size:14.5px; font-weight:700; font-family:inherit; cursor:pointer;" style-hover="background:{{ t.brandHover }};">+ Create new</button>
+    </div>
+
+    <div style="padding:clamp(20px,3vw,32px); display:flex; flex-direction:column; gap:24px;">
+
+      <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:16px;">
+        <sc-for list="{{ kpis }}" as="k" hint-placeholder-count="4">
+          <div style="background:{{ t.surface }}; border:1px solid {{ t.border }}; border-radius:12px; padding:20px 24px;">
+            <div style="display:flex; align-items:center; gap:6px; margin-bottom:10px;">
+              <div style="width:7px; height:7px; border-radius:50%; background:{{ k.dot }};"></div>
+              <div style="font-size:12px; font-weight:600; letter-spacing:0.06em; color:{{ t.textSecondary }};">{{ k.label }}</div>
+            </div>
+            <div style="font-size:clamp(26px,4vw,30px); font-weight:800;">{{ k.value }}</div>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="display:grid; grid-template-columns:2fr 1fr; gap:20px; align-items:start;">
+        <div style="background:{{ t.surface }}; border:1px solid {{ t.border }}; border-radius:12px; padding:20px 24px;">
+          <div style="font-size:15px; font-weight:700; margin-bottom:14px;">Items created per week</div>
+          <div style="height:240px; border-radius:8px; background:repeating-linear-gradient(135deg, {{ t.surfaceAlt }} 0px, {{ t.surfaceAlt }} 10px, {{ t.bg }} 10px, {{ t.bg }} 20px); display:flex; align-items:center; justify-content:center;">
+            <span style="font-family:'JetBrains Mono',monospace; font-size:12px; color:{{ t.textTertiary }}; background:{{ t.surface }}; padding:6px 12px; border-radius:6px; border:1px solid {{ t.border }};">chart placeholder</span>
+          </div>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:16px;">
+          <div style="background:{{ t.surface }}; border:1px solid {{ t.border }}; border-radius:12px; padding:18px;">
+            <div style="font-size:13px; font-weight:700; letter-spacing:0.04em; color:{{ t.textTertiary }}; margin-bottom:10px;">QUICK ACTIONS</div>
+            <div style="display:flex; flex-direction:column; gap:8px;">
+              <sc-for list="{{ quickActions }}" as="qa" hint-placeholder-count="3">
+                <button style="text-align:left; background:transparent; color:{{ t.textPrimary }}; border:1px solid {{ t.border }}; padding:0 14px; min-height:44px; border-radius:8px; font-size:14px; font-weight:600; font-family:inherit; cursor:pointer;" style-hover="background:{{ t.surfaceHover }};">{{ qa.label }}</button>
+              </sc-for>
+            </div>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:10px;">
+            <sc-for list="{{ alerts }}" as="al" hint-placeholder-count="2">
+              <div style="display:flex; align-items:flex-start; gap:10px; padding:12px 14px; border-radius:10px; background:{{ al.bg }};">
+                <div style="width:7px; height:7px; border-radius:50%; background:{{ al.dot }}; margin-top:5px; flex-shrink:0;"></div>
+                <div style="font-size:13.5px; line-height:1.5; color:{{ al.text }};">{{ al.message }}</div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+
+      <div style="background:{{ t.surface }}; border:1px solid {{ t.border }}; border-radius:12px; overflow-x:auto; overflow-y:hidden; max-width:100%;">
+        <div style="font-size:15px; font-weight:700; padding:18px 24px 14px; min-width:640px; box-sizing:border-box;">Recent activity</div>
+        <div style="min-width:640px;">
+          <div style="display:grid; grid-template-columns:1fr 1.6fr 1fr 1fr 1fr; padding:0 24px; background:{{ t.surfaceAlt }};">
+            <sc-for list="{{ ['ID','NAME','STATUS','OWNER','UPDATED'] }}" as="h" hint-placeholder-count="5">
+              <div style="font-size:12px; font-weight:700; letter-spacing:0.05em; color:{{ t.textTertiary }}; padding:10px 0;">{{ h }}</div>
+            </sc-for>
+          </div>
+          <sc-for list="{{ recentItems }}" as="it" hint-placeholder-count="5">
+            <div style="display:grid; grid-template-columns:1fr 1.6fr 1fr 1fr 1fr; padding:0 24px; border-top:1px solid {{ t.borderLight }}; align-items:center;">
+              <div style="font-family:'JetBrains Mono',monospace; font-size:13px; color:{{ t.textSecondary }}; padding:12px 0;">{{ it.id }}</div>
+              <div style="font-size:14.5px; font-weight:600; padding:12px 0;">{{ it.name }}</div>
+              <div style="padding:12px 0;">
+                <span style="display:inline-flex; align-items:center; gap:6px; padding:5px 10px; border-radius:999px; background:{{ it.statusBg }};">
+                  <span style="width:6px; height:6px; border-radius:50%; background:{{ it.statusDot }};"></span>
+                  <span style="font-size:12.5px; font-weight:600; color:{{ it.statusText }}; white-space:nowrap;">{{ it.statusLabel }}</span>
+                </span>
+              </div>
+              <div style="font-size:14px; color:{{ t.textSecondary }}; padding:12px 0;">{{ it.owner }}</div>
+              <div style="font-size:13px; font-family:'JetBrains Mono',monospace; color:{{ t.textTertiary }}; padding:12px 0;">{{ it.updated }}</div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:900},&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;light&quot;,&quot;options&quot;:[&quot;dark&quot;,&quot;light&quot;],&quot;tsType&quot;:&quot;'dark'|'light'&quot;}}">
+class Component extends DCLogic {
+  state = {
+    theme: (this.props.theme === 'light' || this.props.theme === 'dark') ? this.props.theme : 'dark',
+    sidebarCollapsed: false,
+    navQuery: '',
+    navClosedGroups: {},
+    navClosedParents: { Items: true },
+    userMenuOpen: false,
+    activeNav: 'Dashboard',
+  };
+
+  tokens(theme) {
+    const hue = 265;
+    const light = {
+      bg: 'oklch(0.985 0.004 250)', surface: 'oklch(1 0 0)', surfaceAlt: 'oklch(0.965 0.006 250)',
+      surfaceHover: 'oklch(0.945 0.007 250)', border: 'oklch(0.86 0.008 250)', borderLight: 'oklch(0.92 0.006 250)',
+      textPrimary: 'oklch(0.2 0.012 250)', textSecondary: 'oklch(0.42 0.012 250)', textTertiary: 'oklch(0.52 0.01 250)',
+      brand: `oklch(0.53 0.16 ${hue})`, brandHover: `oklch(0.46 0.17 ${hue})`, onBrand: 'oklch(0.99 0 0)',
+      brandTint: `oklch(0.53 0.16 ${hue} / 0.12)`, danger: 'oklch(0.52 0.18 25)',
+      status: {
+        draft: { dot: 'oklch(0.52 0.015 265)', text: 'oklch(0.38 0.015 265)', bg: 'oklch(0.55 0.015 265 / 0.1)' },
+        active: { dot: 'oklch(0.52 0.14 230)', text: 'oklch(0.4 0.14 230)', bg: 'oklch(0.55 0.14 230 / 0.1)' },
+        review: { dot: 'oklch(0.52 0.13 290)', text: 'oklch(0.4 0.13 290)', bg: 'oklch(0.55 0.13 290 / 0.1)' },
+        blocked: { dot: 'oklch(0.6 0.15 70)', text: 'oklch(0.4 0.15 70)', bg: 'oklch(0.62 0.15 70 / 0.12)' },
+        done: { dot: 'oklch(0.52 0.14 145)', text: 'oklch(0.36 0.14 145)', bg: 'oklch(0.55 0.14 145 / 0.1)' },
+      }
+    };
+    const dark = {
+      bg: 'oklch(0.17 0.012 250)', surface: 'oklch(0.21 0.012 250)', surfaceAlt: 'oklch(0.25 0.013 250)',
+      surfaceHover: 'oklch(0.28 0.014 250)', border: 'oklch(0.34 0.014 250)', borderLight: 'oklch(0.28 0.013 250)',
+      textPrimary: 'oklch(0.96 0.004 250)', textSecondary: 'oklch(0.78 0.01 250)', textTertiary: 'oklch(0.64 0.012 250)',
+      brand: `oklch(0.7 0.15 ${hue})`, brandHover: `oklch(0.77 0.14 ${hue})`, onBrand: 'oklch(0.15 0.02 265)',
+      brandTint: `oklch(0.7 0.15 ${hue} / 0.2)`, danger: 'oklch(0.68 0.18 25)',
+      status: {
+        draft: { dot: 'oklch(0.7 0.015 265)', text: 'oklch(0.86 0.012 265)', bg: 'oklch(0.68 0.015 265 / 0.16)' },
+        active: { dot: 'oklch(0.72 0.14 230)', text: 'oklch(0.86 0.11 230)', bg: 'oklch(0.7 0.14 230 / 0.18)' },
+        review: { dot: 'oklch(0.74 0.13 290)', text: 'oklch(0.87 0.1 290)', bg: 'oklch(0.72 0.13 290 / 0.18)' },
+        blocked: { dot: 'oklch(0.78 0.15 70)', text: 'oklch(0.89 0.11 70)', bg: 'oklch(0.75 0.15 70 / 0.2)' },
+        done: { dot: 'oklch(0.72 0.14 145)', text: 'oklch(0.86 0.11 145)', bg: 'oklch(0.7 0.14 145 / 0.18)' },
+      }
+    };
+    return theme === 'dark' ? dark : light;
+  }
+
+  renderVals() {
+    const theme = this.state.theme;
+    const t = this.tokens(theme);
+    const S = t.status;
+    const sidebarExpanded = !this.state.sidebarCollapsed;
+
+    const navGroupDefs = [
+      { label: 'WORK', items: [{ name: 'Dashboard' }, { name: 'My tasks' }, { name: 'Inbox' }, { name: 'Approvals' }] },
+      { label: 'RECORDS', items: [
+        { name: 'Items', children: ['All items', 'My items', 'Archived'] },
+        { name: 'Orders' }, { name: 'Shipments' }, { name: 'Invoices' }, { name: 'Customers' },
+      ] },
+      { label: 'SETUP', items: [{ name: 'General' }, { name: 'Fields' }] },
+    ];
+    const navQ = this.state.navQuery.trim().toLowerCase();
+    const navGroups = navGroupDefs.map(g => {
+      const items = navQ
+        ? g.items.filter(it => it.name.toLowerCase().includes(navQ) || (it.children || []).some(c => c.toLowerCase().includes(navQ)))
+        : g.items;
+      const open = navQ ? true : !this.state.navClosedGroups[g.label];
+      return {
+        label: g.label, open, caret: open ? '▾' : '▸',
+        onToggle: () => this.setState(s => ({ navClosedGroups: { ...s.navClosedGroups, [g.label]: open } })),
+        items: items.map(it => {
+          const active = this.state.activeNav === it.name;
+          const hasChildren = !!it.children;
+          const childrenOpen = navQ ? true : !this.state.navClosedParents[it.name];
+          return {
+            name: it.name, initial: it.name[0],
+            onClick: () => this.setState({ activeNav: it.name }),
+            bg: active ? t.brandTint : 'transparent', color: active ? t.brand : t.textSecondary, weight: active ? 700 : 600,
+            hasChildren, childCaret: childrenOpen ? '▾' : '▸', childrenOpen,
+            onToggleChildren: () => this.setState(s => ({ navClosedParents: { ...s.navClosedParents, [it.name]: childrenOpen } })),
+            children: (it.children || []).filter(c => !navQ || c.toLowerCase().includes(navQ)).map(c => ({
+              name: c,
+              onClick: () => this.setState({ activeNav: c }),
+              bg: this.state.activeNav === c ? t.brandTint : 'transparent',
+              color: this.state.activeNav === c ? t.brand : t.textSecondary,
+              weight: this.state.activeNav === c ? 700 : 600,
+            })),
+          };
+        }),
+      };
+    }).filter(g => g.items.length > 0);
+
+    const kpis = [
+      { label: 'DRAFT', value: 12, dot: S.draft.dot },
+      { label: 'ACTIVE', value: 4, dot: S.active.dot },
+      { label: 'IN REVIEW', value: 3, dot: S.review.dot },
+      { label: 'DONE', value: 8, dot: S.done.dot },
+    ];
+    const quickActions = [{ label: '+ New item' }, { label: 'Import CSV' }, { label: 'Invite teammate' }];
+    const alerts = [
+      { message: 'Sync is running for 3 items. You can keep working.', dot: S.active.dot, text: S.active.text, bg: S.active.bg },
+      { message: 'REC-2026-0001 was marked as done.', dot: S.done.dot, text: S.done.text, bg: S.done.bg },
+    ];
+    const recentDefs = [
+      { id: 'REC-0148', name: 'Website redesign', status: 'active', owner: 'Maya Chen', updated: '2h ago' },
+      { id: 'REC-0147', name: 'Q3 pricing update', status: 'review', owner: 'Diego Ruiz', updated: '5h ago' },
+      { id: 'REC-0146', name: 'Warehouse audit', status: 'blocked', owner: 'Sam Osei', updated: 'Yesterday' },
+      { id: 'REC-0145', name: 'Vendor onboarding', status: 'draft', owner: 'Maya Chen', updated: '2d ago' },
+      { id: 'REC-0144', name: 'Holiday campaign', status: 'done', owner: 'Priya Nair', updated: '3d ago' },
+    ];
+    const statusLabels = { draft: 'Draft', active: 'Active', review: 'In review', blocked: 'Blocked', done: 'Done' };
+    const recentItems = recentDefs.map(r => ({
+      id: r.id, name: r.name, owner: r.owner, updated: r.updated,
+      statusLabel: statusLabels[r.status], statusDot: S[r.status].dot, statusText: S[r.status].text, statusBg: S[r.status].bg,
+    }));
+
+    return {
+      t, S, sidebarExpanded, sidebarCollapsed: this.state.sidebarCollapsed,
+      sidebarWidth: this.state.sidebarCollapsed ? '64px' : '250px',
+      toggleSidebar: () => this.setState(s => ({ sidebarCollapsed: !s.sidebarCollapsed })),
+      sidebarToggleIcon: this.state.sidebarCollapsed ? '›' : '‹',
+      sidebarToggleTitle: this.state.sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar',
+      navQuery: this.state.navQuery, onNavQuery: (e) => this.setState({ navQuery: e.target.value }),
+      navGroups, navNoResults: navQ !== '' && navGroups.length === 0,
+      userMenuOpen: this.state.userMenuOpen, toggleUserMenu: () => this.setState(s => ({ userMenuOpen: !s.userMenuOpen })),
+      kpis, quickActions, alerts, recentItems,
+      theme, themeLabel: theme === 'dark' ? 'Light mode' : 'Dark mode',
+      toggleTheme: () => this.setState(s => ({ theme: s.theme === 'dark' ? 'light' : 'dark' })),
+    };
+  }
+}
+
+</script>
+</body>
+</html>

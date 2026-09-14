@@ -1,0 +1,1665 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap">
+<style>
+  body { margin: 0; }
+  a { color: oklch(0.55 0.16 265); }
+  a:hover { color: oklch(0.46 0.17 265); }
+  ::placeholder { opacity: 0.6; }
+  *:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+</style>
+</helmet>
+
+<div style="background:{{ t.bg }}; min-height:100vh; font-family:'Public Sans',sans-serif; color:{{ t.textPrimary }}; padding:clamp(24px,5vw,56px) clamp(16px,5vw,64px) 96px; transition:background .15s ease, color .15s ease;">
+
+  <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:40px; gap:20px; flex-wrap:wrap;">
+    <div style="max-width:560px;">
+      <div style="font-weight:800; font-size:clamp(26px,4vw,34px); letter-spacing:-0.02em; margin-bottom:10px;">Design System</div>
+      <div style="font-size:15px; line-height:1.55; color:{{ t.textSecondary }}; text-wrap:pretty;">A general-purpose UI kit. Every component below is the approved version — copy it as-is rather than inventing a variant, and the product stays consistent.</div>
+    </div>
+    <div style="display:flex; align-items:center; gap:10px; padding:8px 8px 8px 16px; background:{{ t.surface }}; border:1px solid {{ t.border }}; border-radius:999px; min-height:44px;">
+      <span style="font-size:14px; font-weight:600; color:{{ t.textSecondary }};">{{ themeLabel }}</span>
+      <button onClick="{{ toggleTheme }}" aria-label="Switch between light and dark appearance" style="width:52px; height:30px; border-radius:999px; background:{{ trackBg }}; border:1px solid {{ t.border }}; padding:3px; cursor:pointer; position:relative; display:flex; align-items:center;">
+        <div style="width:22px; height:22px; border-radius:50%; background:{{ t.surface }}; transform:{{ knobTransform }}; transition:transform .15s ease; box-shadow:0 1px 3px rgba(0,0,0,0.25);"></div>
+      </button>
+    </div>
+  </div>
+
+  <!-- HOW TO USE -->
+  <div style="background:{{ t.surface }}; border:1px solid {{ t.border }}; border-radius:12px; padding:clamp(20px,3vw,28px); margin-bottom:56px; display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:24px;">
+    <sc-for list="{{ howToUse }}" as="h" hint-placeholder-count="4">
+      <div>
+        <div style="font-size:15px; font-weight:700; margin-bottom:6px;">{{ h.title }}</div>
+        <div style="font-size:14px; line-height:1.55; color:{{ t.textSecondary }}; text-wrap:pretty;">{{ h.body }}</div>
+      </div>
+    </sc-for>
+  </div>
+
+  <!-- COLORS: SURFACES -->
+  <div style="font-size:12px; font-weight:700; letter-spacing:0.08em; color:{{ t.textTertiary }}; margin-bottom:6px;">COLORS — SURFACES &amp; TEXT</div>
+  <div style="font-size:14px; line-height:1.55; color:{{ t.textSecondary }}; margin-bottom:18px; max-width:720px;">The greys the interface is built from. Page sits on the background, content sits on cards, and text uses three levels of emphasis — nothing else.</div>
+  <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:20px; margin-bottom:56px;">
+    <sc-for list="{{ surfaceSwatches }}" as="sw" hint-placeholder-count="6">
+      <div>
+        <div style="height:72px; border-radius:10px; background:{{ sw.bg }}; border:1px solid {{ sw.border }}; margin-bottom:10px; display:flex; align-items:center; justify-content:center;">
+          <sc-if value="{{ sw.isText }}" hint-placeholder-val="{{ false }}">
+            <span style="font-size:15px; font-weight:600; color:{{ sw.textColor }};">Aa Bb Cc</span>
+          </sc-if>
+        </div>
+        <div style="font-size:14px; font-weight:700;">{{ sw.name }}</div>
+        <div style="font-size:13px; line-height:1.5; color:{{ t.textSecondary }}; margin:2px 0 4px;">{{ sw.use }}</div>
+        <div style="font-size:12px; font-family:'JetBrains Mono',monospace; color:{{ t.textTertiary }};">{{ sw.token }}</div>
+      </div>
+    </sc-for>
+  </div>
+
+  <!-- COLORS: BRAND + STATUS -->
+  <div style="font-size:12px; font-weight:700; letter-spacing:0.08em; color:{{ t.textTertiary }}; margin-bottom:6px;">COLORS — BRAND &amp; STATUS</div>
+  <div style="font-size:14px; line-height:1.55; color:{{ t.textSecondary }}; margin-bottom:18px; max-width:720px;">One colour per meaning, used the same way everywhere. Colour is never the only signal — every status also carries a word, so it still reads for colour-blind users and on a washed-out screen.</div>
+  <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:20px; margin-bottom:56px;">
+    <sc-for list="{{ brandStatusSwatches }}" as="sw" hint-placeholder-count="6">
+      <div>
+        <div style="height:72px; border-radius:10px; background:{{ sw.swatch }};"></div>
+        <div style="font-size:14px; font-weight:700; margin-top:10px;">{{ sw.name }}</div>
+        <div style="font-size:13px; line-height:1.5; color:{{ t.textSecondary }}; margin:2px 0 4px;">{{ sw.use }}</div>
+        <div style="font-size:12px; font-family:'JetBrains Mono',monospace; color:{{ t.textTertiary }};">{{ sw.token }}</div>
+      </div>
+    </sc-for>
+  </div>
+
+  <!-- TYPOGRAPHY -->
+  <div style="font-size:12px; font-weight:700; letter-spacing:0.08em; color:{{ t.textTertiary }}; margin-bottom:6px;">TYPOGRAPHY</div>
+  <div style="font-size:14px; line-height:1.55; color:{{ t.textSecondary }}; margin-bottom:18px; max-width:720px;">Five roles, one typeface family. Body text never goes below 14px, so long shifts of reading stay comfortable.</div>
+  <div style="background:{{ t.surface }}; border:1px solid {{ t.border }}; border-radius:12px; padding:clamp(20px,3vw,32px); margin-bottom:56px;">
+    <sc-for list="{{ typeSamples }}" as="ty" hint-placeholder-count="5">
+      <div style="display:flex; align-items:baseline; justify-content:space-between; gap:20px; padding:16px 0; border-bottom:1px solid {{ t.borderLight }}; flex-wrap:wrap;">
+        <div style="{{ ty.sampleStyle }}">{{ ty.sample }}</div>
+        <div style="font-size:13.5px; line-height:1.5; color:{{ t.textSecondary }}; text-align:right; max-width:480px; flex:1; min-width:220px;">{{ ty.meta }}</div>
+      </div>
+    </sc-for>
+  </div>
+
+  <!-- STATUS PILLS -->
+  <div style="font-size:12px; font-weight:700; letter-spacing:0.08em; color:{{ t.textTertiary }}; margin-bottom:6px;">STATUS PILLS</div>
+  <div style="font-size:14px; line-height:1.55; color:{{ t.textSecondary }}; margin-bottom:18px; max-width:720px;">Two sizes only: the default, and the small one used inside table rows. Same words, same colours, same order in both.</div>
+  <div style="background:{{ t.surface }}; border:1px solid {{ t.border }}; border-radius:12px; padding:24px; margin-bottom:56px;">
+    <div style="font-size:13px; font-weight:600; color:{{ t.textTertiary }}; margin-bottom:12px;">Default</div>
+    <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:24px;">
+      <sc-for list="{{ statusList }}" as="s" hint-placeholder-count="5">
+        <div style="display:flex; align-items:center; gap:7px; padding:7px 14px; border-radius:999px; background:{{ s.bg }};">
+          <div style="width:7px; height:7px; border-radius:50%; background:{{ s.dot }};"></div>
+          <span style="font-size:13.5px; font-weight:600; color:{{ s.text }};">{{ s.label }}</span>
+        </div>
+      </sc-for>
+    </div>
+    <div style="font-size:13px; font-weight:600; color:{{ t.textTertiary }}; margin-bottom:12px;">Small — in tables</div>
+    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+      <sc-for list="{{ statusList }}" as="s" hint-placeholder-count="5">
+        <div style="display:inline-flex; align-items:center; gap:6px; padding:5px 10px; border-radius:999px; background:{{ s.bg }};">
+          <div style="width:6px; height:6px; border-radius:50%; background:{{ s.dot }};"></div>
+          <span style="font-size:12.5px; font-weight:600; color:{{ s.text }};">{{ s.label }}</span>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+
+  <!-- BUTTONS -->
+  <div style="font-size:12px; font-weight:700; letter-spacing:0.08em; color:{{ t.textTertiary }}; margin-bottom:6px;">BUTTONS</div>
+  <div style="font-size:14px; line-height:1.55; color:{{ t.textSecondary }}; margin-bottom:18px; max-width:720px;">One primary button per screen — the thing you most likely want to do. Everything else is outlined or plain text. All buttons are at least 44px tall so they are easy to hit on a phone and forgiving after the hundredth click.</div>
+  <div style="background:{{ t.surface }}; border:1px solid {{ t.border }}; border-radius:12px; padding:24px; margin-bottom:20px;">
+    <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:center;">
+      <button style="background:{{ t.brand }}; color:{{ t.onBrand }}; border:1px solid transparent; padding:{{ d.btnPad }}; min-height:44px; border-radius:8px; font-size:14.5px; font-weight:700; font-family:inherit; cursor:pointer; transition:background .12s ease;" style-hover="background:{{ t.brandHover }};">Create new</button>
+      <button style="background:transparent; color:{{ t.textPrimary }}; border:1px solid {{ t.border }}; padding:{{ d.btnPad }}; min-height:44px; border-radius:8px; font-size:14.5px; font-weight:600; font-family:inherit; cursor:pointer; transition:background .12s ease;" style-hover="background:{{ t.surfaceHover }};">Export</button>
+      <button style="background:transparent; color:{{ t.textSecondary }}; border:1px solid transparent; padding:{{ d.btnPad }}; min-height:44px; border-radius:8px; font-size:14.5px; font-weight:600; font-family:inherit; cursor:pointer; transition:background .12s ease;" style-hover="background:{{ t.surfaceAlt }};">Cancel</button>
+      <button style="background:{{ t.danger }}; color:{{ t.onDanger }}; border:1px solid transparent; padding:{{ d.btnPad }}; min-height:44px; border-radius:8px; font-size:14.5px; font-weight:700; font-family:inherit; cursor:pointer; transition:background .12s ease;" style-hover="background:{{ t.dangerHover }};">Delete item</button>
+      <button disabled="{{ true }}" style="background:{{ t.surfaceAlt }}; color:{{ t.textTertiary }}; border:1px solid {{ t.borderLight }}; padding:{{ d.btnPad }}; min-height:44px; border-radius:8px; font-size:14.5px; font-weight:700; font-family:inherit; cursor:not-allowed;">Unavailable</button>
+    </div>
+  </div>
+  <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:16px; margin-bottom:56px;">
+    <sc-for list="{{ buttonRules }}" as="r" hint-placeholder-count="5">
+      <div style="background:{{ t.surface }}; border:1px solid {{ t.borderLight }}; border-radius:10px; padding:16px;">
+        <div style="font-size:13.5px; font-weight:700; margin-bottom:4px; color:{{ t.textPrimary }};">{{ r.name }}</div>
+        <div style="font-size:13.5px; line-height:1.5; color:{{ t.textSecondary }}; text-wrap:pretty;">{{ r.when }}</div>
+      </div>
+    </sc-for>
+  </div>
+
+  <!-- FORM CONTROLS -->
+  <div style="font-size:12px; font-weight:700; letter-spacing:0.08em; color:{{ t.textTertiary }}; margin-bottom:6px;">FORM CONTROLS — FIELD TYPES</div>
+  <div style="font-size:14px; line-height:1.55; color:{{ t.textSecondary }}; margin-bottom:18px; max-width:720px;">Every field is built the same way: type caption, label, control, then optional hint underneath. Labels are never placeholders, and optional fields say so — nobody has to guess what is required. These thirteen types cover every field in the system; a new type gets added here first.</div>
+  <div style="background:{{ t.surface }}; border:1px solid {{ t.border }}; border-radius:12px; padding:clamp(20px,3vw,32px); display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr)); gap:28px; margin-bottom:20px;">
+
+    <div>
+      <div style="font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.06em; color:{{ t.textTertiary }}; margin-bottom:6px;">SINGLE LINE TEXT</div>
+      <label style="display:block; font-size:13.5px; font-weight:600; color:{{ t.textSecondary }}; margin-bottom:6px;">Name <span style="color:{{ t.danger }};">*</span></label>
+      <input placeholder="e.g. Website redesign" value="{{ fldText }}" onChange="{{ onFldText }}" maxlength="80" style="width:100%; box-sizing:border-box; background:{{ t.bg }}; border:1px solid {{ t.border }}; border-radius:8px; padding:{{ d.fieldPad }}; min-height:44px; font-size:15px; color:{{ t.textPrimary }}; font-family:inherit;" style-focus="border-color:{{ t.brand }}; outline:2px solid {{ t.brandTint }};" />
+      <div style="font-size:13px; color:{{ t.textTertiary }}; margin-top:6px;">One line, 80 characters. Never used for paragraphs.</div>
+    </div>
+
+    <div>
+      <div style="font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.06em; color:{{ t.textTertiary }}; margin-bottom:6px;">NUMBER</div>
+      <label style="display:block; font-size:13.5px; font-weight:600; color:{{ t.textSecondary }}; margin-bottom:6px;">Quantity</label>
+      <div>
+        <input type="number" value="{{ fldNum }}" onChange="{{ onFldNum }}" style="width:100%; box-sizing:border-box; background:{{ t.bg }}; border:1px solid {{ t.border }}; border-radius:8px; padding:{{ d.fieldPad }}; min-height:44px; font-size:15px; font-family:'JetBrains Mono',monospace; text-align:right; color:{{ t.textPrimary }};" style-focus="border-color:{{ t.brand }}; outline:2px solid {{ t.brandTint }};" />
+      </div>
+      <div style="font-size:13px; color:{{ t.textTertiary }}; margin-top:6px;">Right-aligned, monospace, so columns of numbers line up.</div>
+    </div>
+
+    <div style="grid-column:1/-1;">
+      <div style="font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.06em; color:{{ t.textTertiary }}; margin-bottom:6px;">LONG TEXT</div>
+      <label style="display:block; font-size:13.5px; font-weight:600; color:{{ t.textSecondary }}; margin-bottom:6px;">Description</label>
+      <textarea placeholder="Add a description…" rows="3" value="{{ fldLong }}" onChange="{{ onFldLong }}" style="width:100%; box-sizing:border-box; background:{{ t.bg }}; border:1px solid {{ t.border }}; border-radius:8px; padding:{{ d.fieldPad }}; font-size:15px; line-height:1.55; color:{{ t.textPrimary }}; font-family:inherit; resize:vertical; min-height:96px;" style-focus="border-color:{{ t.brand }}; outline:2px solid {{ t.brandTint }};"></textarea>
+      <div style="display:flex; justify-content:space-between; gap:12px; font-size:13px; color:{{ t.textTertiary }}; margin-top:6px;"><span>Full width, resizable, grows down the page.</span><span style="font-family:'JetBrains Mono',monospace;">{{ fldLongCount }}</span></div>
+    </div>
+
+    <div>
+      <div style="font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.06em; color:{{ t.textTertiary }}; margin-bottom:6px;">SELECTION</div>
+      <label style="display:block; font-size:13.5px; font-weight:600; color:{{ t.textSecondary }}; margin-bottom:6px;">Category</label>
+      <select value="{{ fldSel }}" onChange="{{ onFldSel }}" style="width:100%; box-sizing:border-box; background:{{ t.bg }}; border:1px solid {{ t.border }}; border-radius:8px; padding:{{ d.fieldPad }}; min-height:44px; font-size:15px; color:{{ t.textPrimary }}; font-family:inherit;">
+        <option value="">Choose one…</option>
+        <option value="Design">Design</option>
+        <option value="Engineering">Engineering</option>
+        <option value="Marketing">Marketing</option>
+        <option value="Finance">Finance</option>
+      </select>
+      <div style="font-size:13px; color:{{ t.textTertiary }}; margin-top:6px;">Up to about eight fixed options. More than that, use search.</div>
+    </div>
+
+    <div>
+      <div style="font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.06em; color:{{ t.textTertiary }}; margin-bottom:6px;">SELECTION WITH SEARCH — LINKS TO A RECORD</div>
+      <label style="display:block; font-size:13.5px; font-weight:600; color:{{ t.textSecondary }}; margin-bottom:6px;">Customer</label>
+      <div style="position:relative;">
+        <button onClick="{{ openLookupOne }}" aria-expanded="{{ lookupOneOpen }}" style="width:100%; box-sizing:border-box; display:flex; align-items:center; gap:8px; text-align:left; background:{{ t.bg }}; border:1px solid {{ lookupOneBorder }}; border-radius:8px; padding:0 8px 0 12px; min-height:44px; font-family:inherit; cursor:pointer;" style-hover="background:{{ t.surfaceHover }};">
+          <span style="flex:1; font-size:15px; font-weight:{{ lookupOneWeight }}; color:{{ lookupOneColor }};">{{ lookupOneLabel }}</span>
+          <span style="font-family:'JetBrains Mono',monospace; font-size:12px; color:{{ t.textTertiary }};">{{ lookupOneId }}</span>
+          <sc-if value="{{ lookupOne }}" hint-placeholder-val="{{ false }}">
+            <span onClick="{{ clearLookupOne }}" role="button" aria-label="Remove customer" style="width:28px; height:28px; flex-shrink:0; border-radius:6px; display:flex; align-items:center; justify-content:center; font-size:16px; color:{{ t.textSecondary }};" style-hover="background:{{ t.surfaceHover }};">×</span>
+          </sc-if>
+          <span style="font-size:10px; color:{{ t.textSecondary }}; padding-right:4px;">▾</span>
+        </button>
+        <sc-if value="{{ lookupOneOpen }}" hint-placeholder-val="{{ false }}">
+          <div style="position:absolute; top:calc(100% + 4px); left:0; right:0; z-index:5; background:{{ t.surface }}; border:1px solid {{ t.border }}; border-radius:8px; box-shadow:0 12px 28px rgba(0,0,0,0.18); padding:8px;">
+            <input autoFocus="{{ true }}" placeholder="Search customers…" value="{{ lookupOneQuery }}" onChange="{{ onLookupOneQuery }}" onKeyDown="{{ onLookupOneKey }}" style="width:100%; box-sizing:border-box; background:{{ t.bg }}; border:1px solid {{ t.border }}; border-radius:8px; padding:0 12px; min-height:44px; font-size:15px; color:{{ t.textPrimary }}; font-family:inherit; margin-bottom:6px;" style-focus="border-color:{{ t.brand }}; outline:2px solid {{ t.brandTint }};" />
+            <div style="max-height:200px; overflow-y:auto;">
+              <sc-for list="{{ lookupOneResults }}" as="r" hint-placeholder-count="3">
+                <button onClick="{{ r.onClick }}" style="width:100%; text-align:left; display:flex; align-items:center; gap:10px; background:{{ r.bg }}; border:none; border-radius:6px; padding:0 10px; min-height:44px; font-family:inherit; font-size:14.5px; color:{{ t.textPrimary }}; cursor:pointer;" style-hover="background:{{ t.surfaceHover }};">
+                  <span style="flex:1;">{{ r.name }}</span>
+                  <span style="font-family:'JetBrains Mono',monospace; font-size:12px; color:{{ t.textTertiary }};">{{ r.id }}</span>
+                </button>
+              </sc-for>
+              <sc-if value="{{ lookupOneNoResults }}" hint-placeholder-val="{{ false }}">
+                <div style="padding:12px 10px; font-size:14px; color:{{ t.textSecondary }};">No customer matches that name.</div>
+              </sc-if>
+            </div>
+            <button onClick="{{ closeLookupOne }}" style="width:100%; margin-top:6px; background:transparent; border:none; border-top:1px solid {{ t.borderLight }}; min-height:40px; font-family:inherit; font-size:13px; font-weight:600; color:{{ t.textSecondary }}; cursor:pointer;" style-hover="color:{{ t.textPrimary }};">Close</button>
+          </div>
+        </sc-if>
+      </div>
+      <div style="font-size:13px; color:{{ t.textTertiary }}; margin-top:6px;">Points at one record in another table. Closed it reads like a normal select; the search box only appears once it is opened.</div>
+    </div>
+
+    <div>
+      <div style="font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.06em; color:{{ t.textTertiary }}; margin-bottom:6px;">TAGS / MULTIPLE SELECTION</div>
+      <label style="display:block; font-size:13.5px; font-weight:600; color:{{ t.textSecondary }}; margin-bottom:6px;">Tags</label>
+      <div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center; background:{{ t.bg }}; border:1px solid {{ t.border }}; border-radius:8px; padding:6px; min-height:44px; box-sizing:border-box;">
+        <sc-for list="{{ tags }}" as="tag" hint-placeholder-count="2">
+          <div style="display:flex; align-items:center; gap:6px; padding:5px 6px 5px 10px; border-radius:6px; background:{{ t.surfaceAlt }};">
+            <span style="font-size:13.5px; font-weight:600; color:{{ t.textPrimary }};">{{ tag.label }}</span>
+            <button onClick="{{ tag.onRemove }}" aria-label="Remove tag" style="background:transparent; border:none; width:22px; height:22px; border-radius:4px; font-size:14px; color:{{ t.textSecondary }}; cursor:pointer;" style-hover="background:{{ t.surfaceHover }};">×</button>
+          </div>
+        </sc-for>
+        <input placeholder="Add a tag…" value="{{ tagDraft }}" onChange="{{ onTagDraft }}" onKeyDown="{{ onTagKey }}" style="flex:1; min-width:110px; background:transparent; border:none; outline:none; padding:0 8px; min-height:32px; font-size:14.5px; color:{{ t.textPrimary }}; font-family:inherit;" />
+      </div>
+      <div style="font-size:13px; color:{{ t.textTertiary }}; margin-top:6px;">Free text. Enter adds a tag, Backspace on an empty box removes the last one.</div>
+    </div>
+
+    <div>
+      <div style="font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.06em; color:{{ t.textTertiary }}; margin-bottom:6px;">MULTIPLE SELECTION WITH SEARCH — LINKS TO RECORDS</div>
+      <label style="display:block; font-size:13.5px; font-weight:600; color:{{ t.textSecondary }}; margin-bottom:6px;">Related items</label>
+      <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px;">
+        <sc-for list="{{ lookupManyChips }}" as="c" hint-placeholder-count="2">
+          <div style="display:flex; align-items:center; gap:6px; padding:5px 6px 5px 10px; border-radius:6px; background:{{ t.brandTint }};">
+            <span style="font-size:13.5px; font-weight:600; color:{{ t.brand }};">{{ c.name }}</span>
+            <span style="font-family:'JetBrains Mono',monospace; font-size:11.5px; color:{{ t.textTertiary }};">{{ c.id }}</span>
+            <button onClick="{{ c.onRemove }}" aria-label="Remove item" style="background:transparent; border:none; width:22px; height:22px; border-radius:4px; font-size:14px; color:{{ t.textSecondary }}; cursor:pointer;" style-hover="background:{{ t.surfaceHover }};">×</button>
+          </div>
+        </sc-for>
+      </div>
+      <div style="position:relative;">
+        <button onClick="{{ toggleLookupMany }}" aria-expanded="{{ lookupManyOpen }}" style="width:100%; box-sizing:border-box; display:flex; align-items:center; gap:8px; text-align:left; background:{{ t.bg }}; border:1px solid {{ lookupManyBorder }}; border-radius:8px; padding:0 12px; min-height:44px; font-family:inherit; cursor:pointer;" style-hover="background:{{ t.surfaceHover }};">
+          <span style="flex:1; font-size:15px; font-weight:{{ lookupManyWeight }}; color:{{ lookupManyColor }};">{{ lookupManyLabel }}</span>
+          <span style="font-size:10px; color:{{ t.textSecondary }};">▾</span>
+        </button>
+        <sc-if value="{{ lookupManyOpen }}" hint-placeholder-val="{{ false }}">
+          <div style="position:absolute; top:calc(100% + 4px); left:0; right:0; z-index:5; background:{{ t.surface }}; border:1px solid {{ t.border }}; border-radius:8px; box-shadow:0 12px 28px rgba(0,0,0,0.18); padding:8px;">
+            <input autoFocus="{{ true }}" placeholder="Search items…" value="{{ lookupManyQuery }}" onChange="{{ onLookupManyQuery }}" onKeyDown="{{ onLookupManyKey }}" style="width:100%; box-sizing:border-box; background:{{ t.bg }}; border:1px solid {{ t.border }}; border-radius:8px; padding:0 12px; min-height:44px; font-size:15px; color:{{ t.textPrimary }}; font-family:inherit; margin-bottom:6px;" style-focus="border-color:{{ t.brand }}; outline:2px solid {{ t.brandTint }};" />
+            <div style="max-height:200px; overflow-y:auto;">
+              <sc-for list="{{ lookupManyResults }}" as="r" hint-placeholder-count="4">
+                <button onClick="{{ r.onClick }}" style="width:100%; text-align:left; display:flex; align-items:center; gap:10px; background:{{ r.bg }}; border:none; border-radius:6px; padding:0 10px; min-height:44px; font-family:inherit; font-size:14.5px; color:{{ t.textPrimary }}; cursor:pointer;" style-hover="background:{{ t.surfaceHover }};">
+                  <span style="width:18px; height:18px; flex-shrink:0; border-radius:4px; border:1.5px solid {{ r.boxBorder }}; background:{{ r.boxBg }}; color:{{ t.onBrand }}; font-size:12px; display:flex; align-items:center; justify-content:center;">{{ r.tick }}</span>
+                  <span style="flex:1;">{{ r.name }}</span>
+                  <span style="font-family:'JetBrains Mono',monospace; font-size:12px; color:{{ t.textTertiary }};">{{ r.id }}</span>
+                </button>
+              </sc-for>
+              <sc-if value="{{ lookupManyNoResults }}" hint-placeholder-val="{{ false }}">
+                <div style="padding:12px 10px; font-size:14px; color:{{ t.textSecondary }};">No item matches that name.</div>
+              </sc-if>
+            </div>
+            <button onClick="{{ closeLookupMany }}" style="width:100%; margin-top:6px; background:transparent; border:none; border-top:1px solid {{ t.borderLight }}; min-height:40px; font-family:inherit; font-size:13px; font-weight:600; color:{{ t.textSecondary }}; cursor:pointer;" style-hover="color:{{ t.textPrimary }};">Done</button>
+          </div>
+        </sc-if>
+      </div>
+      <div style="font-size:13px; color:{{ t.textTertiary }}; margin-top:6px;">Closed it reads like a normal select. Opened, the search box appears and the list stays open so several records can be ticked.</div>
+    </div>
+
+    <div>
+      <div style="font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.06em; color:{{ t.textTertiary }}; margin-bottom:6px;">DATE</div>
+      <label style="display:block; font-size:13.5px; font-weight:600; color:{{ t.textSecondary }}; margin-bottom:6px;">Due date</label>
+      <input type="date" value="{{ fldDate }}" onChange="{{ onFldDate }}" style="width:100%; box-sizing:border-box; background:{{ t.bg }}; border:1px solid {{ t.border }}; border-radius:8px; padding:{{ d.fieldPad }}; min-height:44px; font-size:15px; color:{{ t.textPrimary }}; font-family:inherit; colorScheme:{{ theme }};" style-focus="border-color:{{ t.brand }}; outline:2px solid {{ t.brandTint }};" />
+      <div style="font-size:13px; color:{{ t.textTertiary }}; margin-top:6px;">Day only. Stored and shown as YYYY-MM-DD.</div>
+    </div>
+
+    <div>
+      <div style="font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.06em; color:{{ t.textTertiary }}; margin-bottom:6px;">DATE &amp; TIME</div>
+      <label style="display:block; font-size:13.5px; font-weight:600; color:{{ t.textSecondary }}; margin-bottom:6px;">Starts at</label>
+      <input type="datetime-local" value="{{ fldDateTime }}" onChange="{{ onFldDateTime }}" style="width:100%; box-sizing:border-box; background:{{ t.bg }}; border:1px solid {{ t.border }}; border-radius:8px; padding:{{ d.fieldPad }}; min-height:44px; font-size:15px; color:{{ t.textPrimary }}; font-family:inherit; colorScheme:{{ theme }};" style-focus="border-color:{{ t.brand }}; outline:2px solid {{ t.brandTint }};" />
+      <div style="font-size:13px; color:{{ t.textTertiary }}; margin-top:6px;">Shown in the reader's own time zone, which is named next to the value.</div>
+    </div>
+
+    <div>
+      <div style="font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.06em; color:{{ t.textTertiary }}; margin-bottom:6px;">PHONE NUMBER</div>
+      <label style="display:block; font-size:13.5px; font-weight:600; color:{{ t.textSecondary }}; margin-bottom:6px;">Mobile</label>
+      <div style="display:flex; gap:8px;">
+        <select value="{{ phoneCode }}" onChange="{{ onPhoneCode }}" aria-label="Country code" style="width:110px; flex-shrink:0; box-sizing:border-box; background:{{ t.bg }}; border:1px solid {{ t.border }}; border-radius:8px; padding:{{ d.fieldPad }}; min-height:44px; font-size:15px; font-family:'JetBrains Mono',monospace; color:{{ t.textPrimary }};">
+          <option value="+62">+62 ID</option>
+          <option value="+65">+65 SG</option>
+          <option value="+60">+60 MY</option>
+          <option value="+1">+1 US</option>
+          <option value="+44">+44 UK</option>
+        </select>
+        <input type="tel" inputmode="tel" placeholder="812 3456 7890" value="{{ phoneNum }}" onChange="{{ onPhoneNum }}" style="flex:1; min-width:0; box-sizing:border-box; background:{{ t.bg }}; border:1px solid {{ t.border }}; border-radius:8px; padding:{{ d.fieldPad }}; min-height:44px; font-size:15px; font-family:'JetBrains Mono',monospace; color:{{ t.textPrimary }};" style-focus="border-color:{{ t.brand }}; outline:2px solid {{ t.brandTint }};" />
+      </div>
+      <div style="font-size:13px; color:{{ t.textTertiary }}; margin-top:6px;">Country code is a separate list, so the number is never typed wrong.</div>
+    </div>
+
+    <div>
+      <div style="font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.06em; color:{{ t.textTertiary }}; margin-bottom:6px;">RADIO BUTTON</div>
+      <div style="font-size:13.5px; font-weight:600; color:{{ t.textSecondary }}; margin-bottom:2px;">Priority</div>
+      <div style="display:flex; flex-direction:column;">
+        <sc-for list="{{ radioOptions }}" as="r" hint-placeholder-count="3">
+          <label style="display:flex; align-items:center; gap:10px; font-size:15px; min-height:44px; cursor:pointer;">
+            <input type="radio" name="priority" checked="{{ r.checked }}" onChange="{{ r.onChange }}" style="width:20px; height:20px; accentColor:{{ t.brand }}; cursor:pointer;" />
+            {{ r.label }}
+          </label>
+        </sc-for>
+      </div>
+      <div style="font-size:13px; color:{{ t.textTertiary }}; margin-top:6px;">Two to five choices, all visible at once, exactly one picked.</div>
+    </div>
+
+    <div>
+      <div style="font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.06em; color:{{ t.textTertiary }}; margin-bottom:6px;">CHECKLIST</div>
+      <div style="font-size:13.5px; font-weight:600; color:{{ t.textSecondary }}; margin-bottom:2px;">Before handover</div>
+      <div style="display:flex; flex-direction:column;">
+        <sc-for list="{{ checklist }}" as="c" hint-placeholder-count="3">
+          <label style="display:flex; align-items:center; gap:10px; font-size:15px; min-height:44px; cursor:pointer;">
+            <input type="checkbox" checked="{{ c.checked }}" onChange="{{ c.onChange }}" style="width:20px; height:20px; accentColor:{{ t.brand }}; cursor:pointer;" />
+            <span style="color:{{ c.color }}; text-decoration:{{ c.strike }};">{{ c.label }}</span>
+          </label>
+        </sc-for>
+      </div>
+      <div style="font-size:13px; color:{{ t.textTertiary }}; margin-top:6px;">{{ checklistCount }}</div>
+    </div>
+
+    <div>
+      <div style="font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.06em; color:{{ t.textTertiary }}; margin-bottom:6px;">TOGGLE</div>
+      <div style="font-size:13.5px; font-weight:600; color:{{ t.textSecondary }}; margin-bottom:6px;">Notifications</div>
+      <button onClick="{{ toggleSwitch }}" role="switch" aria-checked="{{ switchOn }}" style="display:flex; align-items:center; gap:12px; width:100%; background:transparent; border:none; padding:0; min-height:44px; font-family:inherit; cursor:pointer; text-align:left;">
+        <span style="width:46px; height:28px; flex-shrink:0; border-radius:999px; background:{{ switchTrack }}; border:1px solid {{ switchBorder }}; padding:2px; box-sizing:border-box; display:flex; align-items:center;">
+          <span style="width:22px; height:22px; border-radius:50%; background:{{ switchKnobBg }}; transform:{{ switchKnob }}; transition:transform .12s ease; box-shadow:0 1px 2px rgba(0,0,0,0.25);"></span>
+        </span>
+        <span style="font-size:15px; color:{{ t.textPrimary }};">{{ switchLabel }}</span>
+      </button>
+      <div style="font-size:13px; color:{{ t.textTertiary }}; margin-top:6px;">Applies at once, no Save. Use a checkbox when the change is saved with the form.</div>
+    </div>
+
+    <div style="grid-column:1/-1;">
+      <div style="font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.06em; color:{{ t.textTertiary }}; margin-bottom:6px;">UPLOAD FILE</div>
+      <label style="display:block; font-size:13.5px; font-weight:600; color:{{ t.textSecondary }}; margin-bottom:6px;">Attachments</label>
+      <div style="display:flex; align-items:center; gap:14px; flex-wrap:wrap; background:{{ t.bg }}; border:1px dashed {{ t.border }}; border-radius:8px; padding:12px 14px;">
+        <button onClick="{{ addFile }}" style="background:transparent; border:1px solid {{ t.border }}; border-radius:8px; padding:0 16px; min-height:44px; font-family:inherit; font-size:14px; font-weight:600; color:{{ t.textPrimary }}; cursor:pointer;" style-hover="background:{{ t.surfaceHover }};">Choose file</button>
+        <span style="font-size:13.5px; color:{{ t.textSecondary }};">or drop it here — PDF, DOCX, XLSX up to 10 MB</span>
+      </div>
+      <sc-if value="{{ hasFiles }}" hint-placeholder-val="{{ true }}">
+        <div style="display:flex; flex-direction:column; gap:6px; margin-top:8px;">
+          <sc-for list="{{ files }}" as="f" hint-placeholder-count="2">
+            <div style="display:flex; align-items:center; gap:12px; background:{{ t.surfaceAlt }}; border:1px solid {{ t.borderLight }}; border-radius:8px; padding:8px 8px 8px 10px;">
+              <span style="width:36px; height:36px; flex-shrink:0; border-radius:6px; background:{{ t.surface }}; border:1px solid {{ t.border }}; display:flex; align-items:center; justify-content:center; font-family:'JetBrains Mono',monospace; font-size:10px; font-weight:700; color:{{ t.textSecondary }};">{{ f.ext }}</span>
+              <div style="flex:1; min-width:0;">
+                <div style="font-size:14px; font-weight:600; color:{{ t.textPrimary }}; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ f.name }}</div>
+                <div style="font-size:12px; color:{{ t.textTertiary }};">{{ f.meta }}</div>
+              </div>
+              <button onClick="{{ f.onRemove }}" aria-label="{{ f.removeLabel }}" style="background:transparent; border:none; width:32px; height:32px; flex-shrink:0; border-radius:6px; font-size:15px; color:{{ t.textSecondary }}; cursor:pointer;" style-hover="background:{{ t.surfaceHover }}; color:{{ t.danger }};">×</button>
+            </div>
+          </sc-for>
+        </div>
+      </sc-if>
+      <div style="font-size:13px; color:{{ t.textTertiary }}; margin-top:6px;">{{ fileHint }}</div>
+    </div>
+
+    <div style="grid-column:1/-1;">
+      <div style="font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.06em; color:{{ t.textTertiary }}; margin-bottom:6px;">UPLOAD IMAGE</div>
+      <label style="display:block; font-size:13.5px; font-weight:600; color:{{ t.textSecondary }}; margin-bottom:6px;">Photos</label>
+      <div style="display:flex; gap:10px; flex-wrap:wrap;">
+        <sc-for list="{{ images }}" as="im" hint-placeholder-count="2">
+          <div style="width:124px;">
+            <div style="position:relative; width:124px; height:96px; border-radius:8px; border:1px solid {{ t.border }}; background:{{ t.surfaceAlt }}; display:flex; align-items:center; justify-content:center;">
+              <span style="font-family:'JetBrains Mono',monospace; font-size:11px; color:{{ t.textTertiary }};">{{ im.ratio }}</span>
+              <button onClick="{{ im.onRemove }}" aria-label="{{ im.removeLabel }}" style="position:absolute; top:4px; right:4px; width:26px; height:26px; border-radius:6px; border:1px solid {{ t.border }}; background:{{ t.surface }}; font-size:14px; color:{{ t.textSecondary }}; cursor:pointer; display:flex; align-items:center; justify-content:center;" style-hover="color:{{ t.danger }};">×</button>
+            </div>
+            <div style="font-size:11.5px; color:{{ t.textTertiary }}; margin-top:5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ im.name }}</div>
+          </div>
+        </sc-for>
+        <button onClick="{{ addImage }}" style="width:124px; height:96px; flex-shrink:0; border-radius:8px; border:1px dashed {{ t.border }}; background:transparent; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; font-family:inherit; cursor:pointer;" style-hover="background:{{ t.surfaceHover }};">
+          <span style="font-size:18px; color:{{ t.textSecondary }};">+</span>
+          <span style="font-size:13px; font-weight:600; color:{{ t.textSecondary }};">Add image</span>
+        </button>
+      </div>
+      <div style="font-size:13px; color:{{ t.textTertiary }}; margin-top:6px;">{{ imageHint }}</div>
+    </div>
+
+  </div>
+
+  <!-- FIELD STATES -->
+  <div style="font-size:12px; font-weight:700; letter-spacing:0.08em; color:{{ t.textTertiary }}; margin-bottom:6px;">FIELD STATES</div>
+  <div style="font-size:14px; line-height:1.55; color:{{ t.textSecondary }}; margin-bottom:18px; max-width:720px;">Errors appear under the field they belong to, in words, and say how to fix the problem. A red border on its own is not an error message.</div>
+  <div style="background:{{ t.surface }}; border:1px solid {{ t.border }}; border-radius:12px; padding:clamp(20px,3vw,32px); display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr)); gap:24px; margin-bottom:56px;">
+    <sc-for list="{{ fieldStates }}" as="fs" hint-placeholder-count="4">
+      <div>
+        <label style="display:block; font-size:13.5px; font-weight:600; color:{{ t.textSecondary }}; margin-bottom:6px;">{{ fs.label }}</label>
+        <div style="width:100%; box-sizing:border-box; background:{{ fs.bg }}; border:1px solid {{ fs.borderColor }}; outline:{{ fs.ring }}; border-radius:8px; padding:{{ d.fieldPad }}; min-height:44px; display:flex; align-items:center; font-size:15px; color:{{ fs.textColor }};">{{ fs.value }}</div>
+        <div style="font-size:13px; line-height:1.5; color:{{ fs.msgColor }}; margin-top:6px;">{{ fs.msg }}</div>
+      </div>
+    </sc-for>
+  </div>
+
+  <!-- KPI CARDS -->
+  <div style="font-size:12px; font-weight:700; letter-spacing:0.08em; color:{{ t.textTertiary }}; margin-bottom:6px;">SUMMARY CARDS</div>
+  <div style="font-size:14px; line-height:1.55; color:{{ t.textSecondary }}; margin-bottom:18px; max-width:720px;">Counts at the top of a page. Four at most, in the same order as the statuses they count.</div>
+  <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:16px; margin-bottom:56px;">
+    <sc-for list="{{ kpis }}" as="k" hint-placeholder-count="4">
+      <div style="background:{{ t.surface }}; border:1px solid {{ t.border }}; border-radius:12px; padding:20px 24px;">
+        <div style="display:flex; align-items:center; gap:6px; margin-bottom:10px;">
+          <div style="width:7px; height:7px; border-radius:50%; background:{{ k.dot }};"></div>
+          <div style="font-size:12px; font-weight:600; letter-spacing:0.06em; color:{{ t.textSecondary }};">{{ k.label }}</div>
+        </div>
+        <div style="font-size:clamp(26px,4vw,30px); font-weight:800;">{{ k.value }}</div>
+      </div>
+    </sc-for>
+  </div>
+
+  <!-- STATUS STEPPER -->
+  <div style="font-size:12px; font-weight:700; letter-spacing:0.08em; color:{{ t.textTertiary }}; margin-bottom:6px;">STATUS STEPPER</div>
+  <div style="font-size:14px; line-height:1.55; color:{{ t.textSecondary }}; margin-bottom:18px; max-width:720px;">Numbered nodes show what is done, where things stand now, and what comes next. A tick means finished; the ringed number is the current step. Where the user is allowed to move the record along, the nodes are buttons — clicking one sets the status, and everything before it counts as done. When they are not allowed to, the stepper is plain text and says who can change it.</div>
+  <div style="background:{{ t.surface }}; border:1px solid {{ t.border }}; border-radius:12px; margin-bottom:56px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; gap:16px; padding:16px clamp(16px,3vw,32px); border-bottom:1px solid {{ t.borderLight }}; flex-wrap:wrap;">
+      <div style="font-size:13.5px; color:{{ t.textSecondary }};">{{ stepperHint }}</div>
+      <div style="display:flex; gap:2px; padding:3px; background:{{ t.surfaceAlt }}; border-radius:8px;">
+        <sc-for list="{{ stepperModes }}" as="m" hint-placeholder-count="2">
+          <button onClick="{{ m.onClick }}" style="background:{{ m.bg }}; color:{{ m.color }}; border:none; border-radius:6px; padding:0 14px; min-height:38px; font-family:inherit; font-size:13.5px; font-weight:{{ m.weight }}; cursor:pointer;">{{ m.label }}</button>
+        </sc-for>
+      </div>
+    </div>
+    <div style="padding:clamp(20px,3vw,32px) 0; overflow-x:auto;">
+      <div style="display:flex; min-width:560px; padding:0 clamp(16px,3vw,40px);">
+        <sc-for list="{{ stepperStages }}" as="st" hint-placeholder-count="5">
+          <button onClick="{{ st.onClick }}" disabled="{{ st.disabled }}" title="{{ st.title }}" style="flex:1; background:transparent; border:none; padding:8px 0; display:flex; flex-direction:column; align-items:center; gap:10px; font-family:inherit; cursor:{{ st.cursor }}; border-radius:10px;" style-hover="background:{{ st.hoverBg }};">
+            <div style="display:flex; align-items:center; width:100%;">
+              <div style="flex:1; height:2px; background:{{ st.leftLine }};"></div>
+              <div style="width:34px; height:34px; border-radius:50%; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:700; background:{{ st.circleBg }}; border:2px solid {{ st.circleBorder }}; color:{{ st.circleColor }}; box-shadow:{{ st.circleShadow }};">{{ st.content }}</div>
+              <div style="flex:1; height:2px; background:{{ st.rightLine }};"></div>
+            </div>
+            <div style="font-size:13.5px; font-weight:{{ st.fontWeight }}; color:{{ st.textColor }}; text-align:center;">{{ st.label }}</div>
+            <div style="font-size:12px; color:{{ st.stateColor }};">{{ st.stateLabel }}</div>
+          </button>
+        </sc-for>
+      </div>
+    </div>
+  </div>
+
+  <!-- DATA TABLE -->
+  <div style="font-size:12px; font-weight:700; letter-spacing:0.08em; color:{{ t.textTertiary }}; margin-bottom:6px;">DATA TABLE</div>
+  <div style="font-size:14px; line-height:1.55; color:{{ t.textSecondary }}; margin-bottom:18px; max-width:720px;">One search bar does all the filtering, and nobody has to learn a syntax. Typing offers suggestions — search every column, or narrow to one — and each choice becomes a chip. The word between two chips is a button: click it to swap AND for OR. Grouping stacks up to three levels, so records nest category inside owner inside status, in whatever order is set.</div>
+  <div style="background:{{ t.surface }}; border:1px solid {{ t.border }}; border-radius:12px; overflow:hidden; margin-bottom:56px;">
+    <div style="padding:16px clamp(16px,3vw,24px) 14px;">
+      <label style="display:block; font-size:13px; font-weight:600; color:{{ t.textSecondary }}; margin-bottom:6px;">Search &amp; group</label>
+      <div style="position:relative;">
+        <div style="display:flex; align-items:center; flex-wrap:wrap; gap:6px; background:{{ t.bg }}; border:1px solid {{ t.border }}; border-radius:8px; padding:6px 8px; min-height:44px; box-sizing:border-box;">
+          <span style="font-size:15px; color:{{ t.textTertiary }}; padding-left:4px;">⌕</span>
+          <sc-for list="{{ conditions }}" as="c" hint-placeholder-count="2">
+            <div style="display:flex; align-items:center; gap:6px;">
+              <sc-if value="{{ c.showJoiner }}" hint-placeholder-val="{{ false }}">
+                <button onClick="{{ c.onToggleJoiner }}" title="{{ c.joinerTitle }}" style="background:{{ c.joinerBg }}; border:1px solid {{ c.joinerBorder }}; border-radius:6px; padding:0 8px; min-height:30px; font-family:'JetBrains Mono',monospace; font-size:11.5px; font-weight:700; letter-spacing:0.04em; color:{{ c.joinerColor }}; cursor:pointer;" style-hover="background:{{ t.surfaceHover }};">{{ c.joiner }}</button>
+              </sc-if>
+              <div style="display:flex; align-items:center; gap:6px; padding:4px 4px 4px 10px; border-radius:6px; background:{{ t.brandTint }};">
+                <span style="font-size:13px; color:{{ t.textSecondary }};">{{ c.fieldLabel }}</span>
+                <span style="font-size:13px; color:{{ t.textTertiary }};">{{ c.opLabel }}</span>
+                <span style="font-size:13.5px; font-weight:600; color:{{ t.brand }};">{{ c.value }}</span>
+                <button onClick="{{ c.onRemove }}" aria-label="{{ c.removeLabel }}" style="background:transparent; border:none; width:24px; height:24px; border-radius:4px; font-size:14px; color:{{ t.textSecondary }}; cursor:pointer;" style-hover="background:{{ t.surfaceHover }};">×</button>
+              </div>
+            </div>
+          </sc-for>
+          <sc-if value="{{ pendingField }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex; align-items:center; gap:6px; padding:4px 4px 4px 10px; border-radius:6px; background:{{ t.surfaceAlt }};">
+              <span style="font-size:13px; font-weight:600; color:{{ t.textPrimary }};">{{ pendingFieldLabel }}</span>
+              <span style="font-size:13px; color:{{ t.textTertiary }};">is</span>
+              <button onClick="{{ clearPendingField }}" aria-label="Cancel this filter" style="background:transparent; border:none; width:24px; height:24px; border-radius:4px; font-size:14px; color:{{ t.textSecondary }}; cursor:pointer;" style-hover="background:{{ t.surfaceHover }};">×</button>
+            </div>
+          </sc-if>
+          <input placeholder="{{ searchPlaceholder }}" value="{{ searchDraft }}" onChange="{{ onSearchDraft }}" onFocus="{{ openSuggest }}" onKeyDown="{{ onSearchKey }}" style="flex:1; min-width:180px; background:transparent; border:none; outline:none; padding:0 4px; min-height:32px; font-size:14.5px; color:{{ t.textPrimary }}; font-family:inherit;" />
+          <sc-if value="{{ hasFilters }}" hint-placeholder-val="{{ false }}">
+            <button onClick="{{ clearQuery }}" style="background:transparent; border:none; padding:0 10px; min-height:32px; border-radius:6px; font-family:inherit; font-size:13px; font-weight:600; color:{{ t.textSecondary }}; cursor:pointer;" style-hover="background:{{ t.surfaceHover }}; color:{{ t.textPrimary }};">Clear all</button>
+          </sc-if>
+          <div style="width:1px; align-self:stretch; background:{{ t.borderLight }}; margin:2px 2px;"></div>
+          <span style="font-size:11px; font-weight:700; letter-spacing:0.06em; color:{{ t.textTertiary }}; padding-left:2px;">GROUP</span>
+          <sc-for list="{{ groupLevels }}" as="g" hint-placeholder-count="2">
+            <div style="display:flex; align-items:center; gap:6px;">
+              <sc-if value="{{ g.showThen }}" hint-placeholder-val="{{ false }}">
+                <span style="font-size:12.5px; color:{{ t.textTertiary }};">then</span>
+              </sc-if>
+              <div style="display:flex; align-items:center; gap:2px; background:{{ t.surfaceAlt }}; border:1px solid {{ t.borderLight }}; border-radius:8px; padding:0 0 0 4px;">
+                <span style="font-family:'JetBrains Mono',monospace; font-size:11px; color:{{ t.textTertiary }}; padding:0 4px;">{{ g.levelNo }}</span>
+                <select value="{{ g.field }}" onChange="{{ g.onChange }}" aria-label="{{ g.ariaLabel }}" style="background:transparent; border:none; padding:0 4px; min-height:36px; font-size:13.5px; font-weight:600; color:{{ t.textPrimary }}; font-family:inherit; cursor:pointer;">
+                  <sc-for list="{{ g.options }}" as="o" hint-placeholder-count="4">
+                    <option value="{{ o.value }}">{{ o.label }}</option>
+                  </sc-for>
+                </select>
+                <button onClick="{{ g.onRemove }}" aria-label="Remove this grouping level" style="background:transparent; border:none; width:28px; height:36px; border-radius:0 8px 8px 0; font-size:14px; color:{{ t.textSecondary }}; cursor:pointer;" style-hover="background:{{ t.surfaceHover }};">×</button>
+              </div>
+            </div>
+          </sc-for>
+          <sc-if value="{{ canAddLevel }}" hint-placeholder-val="{{ true }}">
+            <button onClick="{{ addGroupLevel }}" style="background:transparent; border:1px dashed {{ t.border }}; border-radius:8px; padding:0 10px; min-height:36px; font-family:inherit; font-size:13px; font-weight:600; color:{{ t.textSecondary }}; cursor:pointer;" style-hover="background:{{ t.surfaceHover }}; color:{{ t.textPrimary }};">{{ addLevelLabel }}</button>
+          </sc-if>
+        </div>
+        <sc-if value="{{ suggestOpen }}" hint-placeholder-val="{{ false }}">
+          <div style="position:absolute; top:calc(100% + 4px); left:0; right:0; z-index:6; background:{{ t.surface }}; border:1px solid {{ t.border }}; border-radius:8px; box-shadow:0 12px 28px rgba(0,0,0,0.2); max-height:280px; overflow-y:auto; padding:4px;">
+            <div style="display:flex; justify-content:space-between; gap:12px; padding:8px 10px 6px; font-size:11.5px; font-weight:700; letter-spacing:0.06em; color:{{ t.textTertiary }};"><span>{{ suggestHeading }}</span><span>{{ suggestKeyHint }}</span></div>
+            <sc-for list="{{ suggestions }}" as="sg" hint-placeholder-count="4">
+              <button onClick="{{ sg.onClick }}" style="width:100%; text-align:left; display:flex; align-items:center; gap:10px; background:{{ sg.bg }}; border:none; border-radius:6px; padding:0 10px; min-height:44px; font-family:inherit; font-size:14.5px; color:{{ t.textPrimary }}; cursor:pointer;" style-hover="background:{{ t.surfaceHover }};">
+                <span style="font-size:11px; font-weight:700; letter-spacing:0.04em; color:{{ t.textSecondary }}; background:{{ t.surfaceAlt }}; border-radius:4px; padding:4px 7px; flex-shrink:0;">{{ sg.tag }}</span>
+                <span style="flex:1;">{{ sg.label }}</span>
+                <span style="font-size:12.5px; color:{{ t.textTertiary }};">{{ sg.hint }}</span>
+              </button>
+            </sc-for>
+            <sc-if value="{{ suggestEmpty }}" hint-placeholder-val="{{ false }}">
+              <div style="padding:12px 10px; font-size:14px; color:{{ t.textSecondary }};">Nothing matches “{{ searchDraft }}”. Press Enter to search every column anyway.</div>
+            </sc-if>
+          </div>
+        </sc-if>
+      </div>
+      <div style="font-size:12.5px; line-height:1.5; color:{{ t.textTertiary }}; margin-top:8px;">{{ queryEcho }}</div>
+      <sc-if value="{{ atLevelLimit }}" hint-placeholder-val="{{ false }}">
+        <div style="font-size:12.5px; line-height:1.5; color:{{ t.textTertiary }}; margin-top:4px;">Three levels is the limit — deeper than that nobody can read.</div>
+      </sc-if>
+    </div>
+    <div style="display:flex; justify-content:space-between; gap:12px; padding:10px clamp(16px,3vw,24px); font-size:13px; color:{{ t.textSecondary }}; border-top:1px solid {{ t.borderLight }}; border-bottom:1px solid {{ t.borderLight }}; flex-wrap:wrap;">
+      <span>{{ tableCount }}</span>
+      <sc-if value="{{ isGrouped }}" hint-placeholder-val="{{ false }}">
+        <button onClick="{{ toggleAllGroups }}" style="background:transparent; border:none; font-family:inherit; font-size:13px; font-weight:600; color:{{ t.brand }}; cursor:pointer; padding:0;">{{ toggleAllLabel }}</button>
+      </sc-if>
+    </div>
+    <div style="overflow-x:auto;">
+      <div style="min-width:900px;">
+        <div style="display:grid; grid-template-columns:1.3fr 1.7fr 1fr 1fr 1fr 0.9fr; padding:0 clamp(16px,3vw,24px); background:{{ t.surfaceAlt }};">
+          <sc-for list="{{ tableHeaders }}" as="h" hint-placeholder-count="6">
+            <button onClick="{{ h.onClick }}" title="{{ h.title }}" style="background:transparent; border:none; font-family:inherit; text-align:left; font-size:12px; font-weight:700; letter-spacing:0.06em; color:{{ h.color }}; cursor:pointer; display:flex; align-items:center; gap:5px; user-select:none; min-height:44px; padding:0;">{{ h.label }}<span style="opacity:{{ h.arrowOpacity }};">{{ h.arrow }}</span></button>
+          </sc-for>
+        </div>
+        <sc-for list="{{ tableItems }}" as="it" hint-placeholder-count="6">
+          <div>
+            <sc-if value="{{ it.isGroup }}" hint-placeholder-val="{{ false }}">
+              <button onClick="{{ it.onToggle }}" style="width:100%; text-align:left; display:flex; align-items:center; gap:10px; background:{{ it.headerBg }}; border:none; border-top:1px solid {{ t.borderLight }}; border-left:{{ it.accent }}; padding-left:{{ it.indent }}; padding-right:clamp(16px,3vw,24px); min-height:{{ it.headerHeight }}; font-family:inherit; cursor:pointer;" style-hover="background:{{ t.surfaceHover }};">
+                <span style="width:14px; font-size:10px; color:{{ t.textSecondary }};">{{ it.caret }}</span>
+                <span style="font-size:11px; font-weight:700; letter-spacing:0.06em; color:{{ t.textTertiary }};">{{ it.fieldLabel }}</span>
+                <span style="font-size:{{ it.labelSize }}; font-weight:700; color:{{ t.textPrimary }};">{{ it.label }}</span>
+                <span style="font-size:12.5px; font-weight:600; color:{{ t.textSecondary }}; padding:3px 8px; border-radius:999px; background:{{ t.surfaceAlt }};">{{ it.count }}</span>
+              </button>
+            </sc-if>
+            <sc-if value="{{ it.isRow }}" hint-placeholder-val="{{ true }}">
+              <div style="display:grid; grid-template-columns:1.3fr 1.7fr 1fr 1fr 1fr 0.9fr; padding-top:{{ it.rowPadY }}; padding-bottom:{{ it.rowPadY }}; padding-left:{{ it.indent }}; padding-right:clamp(16px,3vw,24px); border-top:1px solid {{ t.borderLight }}; align-items:center; transition:background .1s ease;" style-hover="background:{{ t.surfaceHover }};">
+                <div style="font-family:'JetBrains Mono',monospace; font-size:13.5px;">{{ it.row.id }}</div>
+                <div style="font-size:14.5px;">{{ it.row.name }}</div>
+                <div style="font-size:14.5px; color:{{ t.textSecondary }};">{{ it.row.category }}</div>
+                <div>
+                  <div style="display:inline-flex; align-items:center; gap:6px; padding:5px 10px; border-radius:999px; background:{{ it.row.pill.bg }};">
+                    <div style="width:6px; height:6px; border-radius:50%; background:{{ it.row.pill.dot }};"></div>
+                    <span style="font-size:12.5px; font-weight:600; color:{{ it.row.pill.text }};">{{ it.row.status }}</span>
+                  </div>
+                </div>
+                <div style="font-size:14.5px; color:{{ t.textSecondary }};">{{ it.row.owner }}</div>
+                <div style="font-family:'JetBrains Mono',monospace; font-size:13.5px; color:{{ t.textSecondary }};">{{ it.row.updated }}</div>
+              </div>
+            </sc-if>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+    <sc-if value="{{ tableEmpty }}" hint-placeholder-val="{{ false }}">
+      <div style="padding:40px 24px; text-align:center; border-top:1px solid {{ t.borderLight }};">
+        <div style="font-size:15px; font-weight:700; margin-bottom:4px;">No records match this search</div>
+        <div style="font-size:14px; color:{{ t.textSecondary }}; margin-bottom:16px;">Check the field names, or swap an AND for an OR to widen the search.</div>
+        <button onClick="{{ clearQuery }}" style="background:transparent; color:{{ t.textPrimary }}; border:1px solid {{ t.border }}; border-radius:8px; padding:{{ d.btnPad }}; min-height:44px; font-size:14px; font-weight:600; font-family:inherit; cursor:pointer;" style-hover="background:{{ t.surfaceHover }};">Clear search</button>
+      </div>
+    </sc-if>
+  </div>
+
+  <!-- TABS -->
+  <div style="font-size:12px; font-weight:700; letter-spacing:0.08em; color:{{ t.textTertiary }}; margin-bottom:6px;">TABS</div>
+  <div style="font-size:14px; line-height:1.55; color:{{ t.textSecondary }}; margin-bottom:18px; max-width:720px;">The selected tab is marked by both a heavier label and an underline, so the current view is obvious at a glance.</div>
+  <div style="background:{{ t.surface }}; border:1px solid {{ t.border }}; border-radius:12px; padding:0 clamp(16px,3vw,24px); margin-bottom:56px; overflow-x:auto;">
+    <div style="display:flex; gap:8px;">
+      <sc-for list="{{ tabs }}" as="tab" hint-placeholder-count="3">
+        <button onClick="{{ tab.onClick }}" style="background:transparent; border:none; border-bottom:2px solid {{ tab.borderColor }}; padding:0 12px; min-height:52px; font-family:inherit; font-size:14.5px; font-weight:{{ tab.weight }}; cursor:pointer; color:{{ tab.color }}; white-space:nowrap;" style-hover="color:{{ t.textPrimary }};">{{ tab.label }}</button>
+      </sc-for>
+    </div>
+  </div>
+
+  <!-- NAVIGATION -->
+  <div style="font-size:12px; font-weight:700; letter-spacing:0.08em; color:{{ t.textTertiary }}; margin-bottom:6px;">NAVIGATION</div>
+  <div style="font-size:14px; line-height:1.55; color:{{ t.textSecondary }}; margin-bottom:18px; max-width:720px;">Plain nouns, never jargon, in a fixed order. With dozens of destinations, the list is broken into named groups that collapse, and a search box sits above them — typing filters every group at once. The current page is tinted and coloured, not just bolded. On a phone there is no bottom bar: the same grouped list opens as a full-height menu from the header, with the most recent pages pinned at the top.</div>
+  <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr)); gap:20px; margin-bottom:56px; align-items:start;">
+
+    <div style="background:{{ t.surface }}; border:1px solid {{ t.border }}; border-radius:12px; padding:16px; max-width:320px;">
+      <div style="font-size:12px; font-weight:700; letter-spacing:0.06em; color:{{ t.textTertiary }}; padding:0 8px 12px;">DESKTOP — SIDEBAR</div>
+      <div style="font-weight:800; font-size:18px; letter-spacing:-0.01em; padding:0 8px 14px;">ACME</div>
+      <input placeholder="Search menu…" value="{{ navQuery }}" onChange="{{ onNavQuery }}" style="width:100%; box-sizing:border-box; background:{{ t.bg }}; border:1px solid {{ t.border }}; border-radius:8px; padding:0 12px; min-height:44px; font-size:14px; color:{{ t.textPrimary }}; font-family:inherit; margin-bottom:10px;" style-focus="border-color:{{ t.brand }}; outline:2px solid {{ t.brandTint }};" />
+      <div style="max-height:440px; overflow-y:auto; display:flex; flex-direction:column; gap:4px;">
+        <sc-for list="{{ navGroups }}" as="grp" hint-placeholder-count="4">
+          <div>
+            <button onClick="{{ grp.onToggle }}" style="width:100%; text-align:left; display:flex; align-items:center; gap:8px; background:transparent; border:none; padding:0 8px; min-height:36px; font-family:inherit; font-size:11.5px; font-weight:700; letter-spacing:0.06em; color:{{ t.textTertiary }}; cursor:pointer; border-radius:6px;" style-hover="color:{{ t.textSecondary }};">
+              <span style="width:12px; font-size:10px;">{{ grp.caret }}</span>
+              <span style="flex:1;">{{ grp.label }}</span>
+              <span style="font-family:'JetBrains Mono',monospace; font-weight:500;">{{ grp.count }}</span>
+            </button>
+            <sc-if value="{{ grp.open }}" hint-placeholder-val="{{ true }}">
+              <div style="display:flex; flex-direction:column; gap:2px;">
+                <sc-for list="{{ grp.items }}" as="nav" hint-placeholder-count="4">
+                  <button onClick="{{ nav.onClick }}" style="text-align:left; background:{{ nav.bg }}; color:{{ nav.color }}; border:none; padding:0 12px; min-height:40px; border-radius:8px; font-family:inherit; font-size:14.5px; font-weight:{{ nav.weight }}; cursor:pointer;" style-hover="background:{{ t.surfaceHover }};">{{ nav.name }}</button>
+                </sc-for>
+              </div>
+            </sc-if>
+          </div>
+        </sc-for>
+        <sc-if value="{{ navNoResults }}" hint-placeholder-val="{{ false }}">
+          <div style="padding:16px 8px; font-size:14px; color:{{ t.textSecondary }};">Nothing in the menu matches “{{ navQuery }}”.</div>
+        </sc-if>
+      </div>
+    </div>
+
+    <div style="background:{{ t.surface }}; border:1px solid {{ t.border }}; border-radius:12px; padding:16px; max-width:400px;">
+      <div style="font-size:12px; font-weight:700; letter-spacing:0.06em; color:{{ t.textTertiary }}; padding:0 4px 12px;">MOBILE — MENU SHEET</div>
+      <div style="border:1px solid {{ t.border }}; border-radius:12px; overflow:hidden; background:{{ t.bg }};">
+        <div style="display:flex; align-items:center; gap:10px; padding:8px 8px 8px 4px; background:{{ t.surface }}; border-bottom:1px solid {{ t.borderLight }};">
+          <button onClick="{{ toggleMobileMenu }}" aria-label="Open menu" style="width:44px; height:44px; flex-shrink:0; background:transparent; border:none; border-radius:8px; cursor:pointer; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px;" style-hover="background:{{ t.surfaceHover }};">
+            <span style="width:18px; height:2px; background:{{ t.textPrimary }}; border-radius:2px;"></span>
+            <span style="width:18px; height:2px; background:{{ t.textPrimary }}; border-radius:2px;"></span>
+            <span style="width:18px; height:2px; background:{{ t.textPrimary }}; border-radius:2px;"></span>
+          </button>
+          <div style="flex:1; font-size:15px; font-weight:700;">{{ activeNav }}</div>
+          <div style="width:32px; height:32px; border-radius:50%; background:{{ t.brandTint }}; color:{{ t.brand }}; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700;">YOU</div>
+        </div>
+        <sc-if value="{{ mobileMenuOpen }}" hint-placeholder-val="{{ true }}">
+          <div style="padding:12px; max-height:420px; overflow-y:auto;">
+            <input placeholder="Search menu…" value="{{ navQuery }}" onChange="{{ onNavQuery }}" style="width:100%; box-sizing:border-box; background:{{ t.surface }}; border:1px solid {{ t.border }}; border-radius:8px; padding:0 12px; min-height:44px; font-size:15px; color:{{ t.textPrimary }}; font-family:inherit; margin-bottom:14px;" style-focus="border-color:{{ t.brand }}; outline:2px solid {{ t.brandTint }};" />
+            <div style="font-size:11.5px; font-weight:700; letter-spacing:0.06em; color:{{ t.textTertiary }}; padding:0 4px 6px;">RECENT</div>
+            <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:16px;">
+              <sc-for list="{{ navRecent }}" as="r" hint-placeholder-count="3">
+                <button onClick="{{ r.onClick }}" style="background:{{ t.surface }}; border:1px solid {{ t.border }}; border-radius:999px; padding:0 14px; min-height:40px; font-family:inherit; font-size:14px; font-weight:600; color:{{ t.textSecondary }}; cursor:pointer;" style-hover="background:{{ t.surfaceHover }};">{{ r.name }}</button>
+              </sc-for>
+            </div>
+            <sc-for list="{{ navGroups }}" as="grp" hint-placeholder-count="4">
+              <div style="margin-bottom:10px;">
+                <button onClick="{{ grp.onToggle }}" style="width:100%; text-align:left; display:flex; align-items:center; gap:8px; background:transparent; border:none; padding:0 4px; min-height:40px; font-family:inherit; font-size:11.5px; font-weight:700; letter-spacing:0.06em; color:{{ t.textTertiary }}; cursor:pointer;">
+                  <span style="width:12px; font-size:10px;">{{ grp.caret }}</span>
+                  <span style="flex:1;">{{ grp.label }}</span>
+                  <span style="font-family:'JetBrains Mono',monospace; font-weight:500;">{{ grp.count }}</span>
+                </button>
+                <sc-if value="{{ grp.open }}" hint-placeholder-val="{{ true }}">
+                  <div style="display:flex; flex-direction:column; gap:2px;">
+                    <sc-for list="{{ grp.items }}" as="nav" hint-placeholder-count="4">
+                      <button onClick="{{ nav.onClick }}" style="text-align:left; background:{{ nav.bg }}; color:{{ nav.color }}; border:none; padding:0 12px; min-height:48px; border-radius:8px; font-family:inherit; font-size:15px; font-weight:{{ nav.weight }}; cursor:pointer;" style-hover="background:{{ t.surfaceHover }};">{{ nav.name }}</button>
+                    </sc-for>
+                  </div>
+                </sc-if>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+        <sc-if value="{{ mobileMenuClosed }}" hint-placeholder-val="{{ false }}">
+          <div style="padding:28px 16px; text-align:center; font-size:14px; color:{{ t.textTertiary }};">Page content. Tap the menu button to open the destination list.</div>
+        </sc-if>
+      </div>
+      <div style="font-size:13px; line-height:1.5; color:{{ t.textTertiary }}; padding:12px 4px 0;">A bottom bar caps out at four or five destinations, so it is not used here. The sheet covers the screen, scrolls, and every row is a 48px tap target.</div>
+    </div>
+  </div>
+
+  <!-- ALERTS -->
+  <div style="font-size:12px; font-weight:700; letter-spacing:0.08em; color:{{ t.textTertiary }}; margin-bottom:6px;">ALERTS</div>
+  <div style="font-size:14px; line-height:1.55; color:{{ t.textSecondary }}; margin-bottom:18px; max-width:720px;">Each alert names what happened in plain language, and an error also says what to do next. Wording stays calm — no blame, no exclamation marks.</div>
+  <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:56px;">
+    <sc-for list="{{ alerts }}" as="al" hint-placeholder-count="4">
+      <div style="display:flex; align-items:flex-start; gap:12px; padding:14px 18px; border-radius:10px; background:{{ al.bg }}; flex-wrap:wrap;">
+        <div style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
+          <div style="width:8px; height:8px; border-radius:50%; background:{{ al.dot }};"></div>
+          <span style="font-size:12px; font-weight:700; letter-spacing:0.04em; color:{{ al.text }};">{{ al.label }}</span>
+        </div>
+        <span style="font-size:14.5px; line-height:1.5; color:{{ t.textPrimary }}; flex:1; min-width:200px;">{{ al.message }}</span>
+      </div>
+    </sc-for>
+  </div>
+
+  <!-- MODAL -->
+  <div style="font-size:12px; font-weight:700; letter-spacing:0.08em; color:{{ t.textTertiary }}; margin-bottom:6px;">MODAL / DIALOG</div>
+  <div style="font-size:14px; line-height:1.55; color:{{ t.textSecondary }}; margin-bottom:18px; max-width:720px;">The title asks the question, the body says what will happen, and the buttons repeat the actual actions — never just &ldquo;OK&rdquo; and &ldquo;Cancel&rdquo;. The safe option is always on the left. Dialogs that hold a form or a table can be resized: drag the bottom-right corner, or the right and bottom edges. Size is remembered per dialog, the body scrolls rather than the page, and the header and footer stay put.</div>
+  <div style="background:{{ t.scrim }}; border-radius:12px; min-height:460px; display:flex; align-items:center; justify-content:center; padding:24px; margin-bottom:56px;">
+    <div style="position:relative; width:{{ modalW }}; height:{{ modalH }}; max-width:100%; background:{{ t.surface }}; border:1px solid {{ t.border }}; border-radius:12px; box-shadow:0 20px 40px rgba(0,0,0,0.18); display:flex; flex-direction:column; overflow:hidden;">
+      <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; padding:18px 20px; border-bottom:1px solid {{ t.borderLight }}; flex-shrink:0;">
+        <div style="font-size:16.5px; font-weight:700; color:{{ t.textPrimary }};">Edit item</div>
+        <div style="display:flex; align-items:center; gap:6px;">
+          <button onClick="{{ resetModalSize }}" style="background:transparent; border:none; padding:0 10px; min-height:36px; border-radius:8px; font-family:inherit; font-size:13px; font-weight:600; color:{{ t.textSecondary }}; cursor:pointer;" style-hover="background:{{ t.surfaceHover }};">Reset size</button>
+          <button aria-label="Close" style="background:transparent; border:none; width:44px; height:44px; flex-shrink:0; border-radius:8px; font-size:20px; color:{{ t.textSecondary }}; cursor:pointer;" style-hover="background:{{ t.surfaceHover }};">×</button>
+        </div>
+      </div>
+      <div style="flex:1; min-height:0; overflow-y:auto; padding:20px; font-size:14.5px; color:{{ t.textSecondary }}; line-height:1.55;">
+        <div style="margin-bottom:16px;">Changes apply to this item only. Anyone assigned to it will be notified once you save.</div>
+        <label style="display:block; font-size:13.5px; font-weight:600; color:{{ t.textSecondary }}; margin-bottom:6px;">Name</label>
+        <input value="{{ fldText }}" onChange="{{ onFldText }}" style="width:100%; box-sizing:border-box; background:{{ t.bg }}; border:1px solid {{ t.border }}; border-radius:8px; padding:{{ d.fieldPad }}; min-height:44px; font-size:15px; color:{{ t.textPrimary }}; font-family:inherit; margin-bottom:16px;" style-focus="border-color:{{ t.brand }}; outline:2px solid {{ t.brandTint }};" />
+        <label style="display:block; font-size:13.5px; font-weight:600; color:{{ t.textSecondary }}; margin-bottom:6px;">Description</label>
+        <textarea rows="4" value="{{ fldLong }}" onChange="{{ onFldLong }}" style="width:100%; box-sizing:border-box; background:{{ t.bg }}; border:1px solid {{ t.border }}; border-radius:8px; padding:{{ d.fieldPad }}; font-size:15px; line-height:1.55; color:{{ t.textPrimary }}; font-family:inherit; resize:vertical; min-height:96px;" style-focus="border-color:{{ t.brand }}; outline:2px solid {{ t.brandTint }};"></textarea>
+      </div>
+      <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; padding:16px 20px; border-top:1px solid {{ t.borderLight }}; flex-wrap:wrap; flex-shrink:0;">
+        <span style="font-family:'JetBrains Mono',monospace; font-size:12px; color:{{ t.textTertiary }};">{{ modalSizeLabel }}</span>
+        <div style="display:flex; gap:10px;">
+          <button style="background:transparent; color:{{ t.textPrimary }}; border:1px solid {{ t.border }}; padding:{{ d.btnPad }}; min-height:44px; border-radius:8px; font-size:14px; font-weight:600; font-family:inherit; cursor:pointer;" style-hover="background:{{ t.surfaceHover }};">Discard</button>
+          <button style="background:{{ t.brand }}; color:{{ t.onBrand }}; border:none; padding:{{ d.btnPad }}; min-height:44px; border-radius:8px; font-size:14px; font-weight:700; font-family:inherit; cursor:pointer;" style-hover="background:{{ t.brandHover }};">Save changes</button>
+        </div>
+      </div>
+      <div onPointerDown="{{ startResizeX }}" title="Drag to change width" style="position:absolute; top:0; right:0; width:8px; height:100%; cursor:ew-resize;"></div>
+      <div onPointerDown="{{ startResizeY }}" title="Drag to change height" style="position:absolute; bottom:0; left:0; width:100%; height:8px; cursor:ns-resize;"></div>
+      <div onPointerDown="{{ startResizeXY }}" title="Drag to resize" style="position:absolute; bottom:0; right:0; width:20px; height:20px; cursor:nwse-resize; display:flex; align-items:flex-end; justify-content:flex-end; padding:4px;">
+        <div style="width:10px; height:10px; border-right:2px solid {{ t.textTertiary }}; border-bottom:2px solid {{ t.textTertiary }};"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PAGINATION -->
+  <div style="font-size:12px; font-weight:700; letter-spacing:0.08em; color:{{ t.textTertiary }}; margin-bottom:6px;">PAGINATION</div>
+  <div style="font-size:14px; line-height:1.55; color:{{ t.textSecondary }}; margin-bottom:18px; max-width:720px;">Built for hundreds of pages. The number strip always shows the first page, the last page and the pages either side of the current one, with gaps in between, so it never grows past one row. Rows per page is the user's choice and is remembered; the jump box goes straight to a page number. Every target is 44px, and the written position is always in view.</div>
+  <div style="background:{{ t.surface }}; border:1px solid {{ t.border }}; border-radius:12px; padding:12px clamp(12px,3vw,24px); display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-bottom:20px;">
+    <div style="display:flex; align-items:center; gap:8px;">
+      <label style="font-size:13.5px; color:{{ t.textSecondary }};">Rows</label>
+      <select value="{{ pageSize }}" onChange="{{ onPageSize }}" aria-label="Rows per page" style="background:{{ t.bg }}; border:1px solid {{ t.border }}; border-radius:8px; padding:0 10px; min-height:44px; font-size:14px; font-family:'JetBrains Mono',monospace; color:{{ t.textPrimary }};">
+        <option value="10">10</option>
+        <option value="25">25</option>
+        <option value="50">50</option>
+        <option value="100">100</option>
+        <option value="200">200</option>
+      </select>
+    </div>
+    <div style="display:flex; align-items:center; gap:4px; flex-wrap:wrap;">
+      <button onClick="{{ firstPage }}" disabled="{{ atFirst }}" title="First page" style="background:transparent; border:1px solid {{ t.border }}; border-radius:8px; padding:0 12px; min-height:44px; font-family:inherit; font-size:14px; font-weight:600; color:{{ navBtnColor }}; cursor:{{ prevCursor }};" style-hover="background:{{ t.surfaceHover }};">«</button>
+      <button onClick="{{ prevPage }}" disabled="{{ atFirst }}" style="background:transparent; border:1px solid {{ t.border }}; border-radius:8px; padding:0 14px; min-height:44px; font-family:inherit; font-size:14px; font-weight:600; color:{{ navBtnColor }}; cursor:{{ prevCursor }};" style-hover="background:{{ t.surfaceHover }};">‹ Prev</button>
+      <sc-for list="{{ pages }}" as="p" hint-placeholder-count="7">
+        <div>
+          <sc-if value="{{ p.isGap }}" hint-placeholder-val="{{ false }}">
+            <div style="width:32px; height:44px; display:flex; align-items:flex-end; justify-content:center; padding-bottom:12px; font-size:14px; color:{{ t.textTertiary }};">…</div>
+          </sc-if>
+          <sc-if value="{{ p.isPage }}" hint-placeholder-val="{{ true }}">
+            <button onClick="{{ p.onClick }}" aria-current="{{ p.current }}" style="min-width:44px; height:44px; padding:0 6px; border:none; display:flex; align-items:center; justify-content:center; border-radius:8px; font-family:'JetBrains Mono',monospace; font-size:14px; font-weight:600; cursor:pointer; background:{{ p.bg }}; color:{{ p.color }};" style-hover="background:{{ p.hoverBg }};">{{ p.n }}</button>
+          </sc-if>
+        </div>
+      </sc-for>
+      <button onClick="{{ nextPage }}" disabled="{{ atLast }}" style="background:transparent; border:1px solid {{ t.border }}; border-radius:8px; padding:0 14px; min-height:44px; font-family:inherit; font-size:14px; font-weight:600; color:{{ nextBtnColor }}; cursor:{{ nextCursor }};" style-hover="background:{{ t.surfaceHover }};">Next ›</button>
+      <button onClick="{{ lastPage }}" disabled="{{ atLast }}" title="Last page" style="background:transparent; border:1px solid {{ t.border }}; border-radius:8px; padding:0 12px; min-height:44px; font-family:inherit; font-size:14px; font-weight:600; color:{{ nextBtnColor }}; cursor:{{ nextCursor }};" style-hover="background:{{ t.surfaceHover }};">»</button>
+    </div>
+    <div style="display:flex; align-items:center; gap:8px;">
+      <label style="font-size:13.5px; color:{{ t.textSecondary }};">Go to</label>
+      <input inputmode="numeric" placeholder="{{ page }}" value="{{ jumpDraft }}" onChange="{{ onJumpDraft }}" onKeyDown="{{ onJumpKey }}" aria-label="Go to page number" style="width:76px; box-sizing:border-box; background:{{ t.bg }}; border:1px solid {{ t.border }}; border-radius:8px; padding:0 10px; min-height:44px; font-size:14px; font-family:'JetBrains Mono',monospace; text-align:right; color:{{ t.textPrimary }};" style-focus="border-color:{{ t.brand }}; outline:2px solid {{ t.brandTint }};" />
+      <button onClick="{{ goToPage }}" style="background:transparent; border:1px solid {{ t.border }}; border-radius:8px; padding:0 14px; min-height:44px; font-family:inherit; font-size:14px; font-weight:600; color:{{ t.textPrimary }}; cursor:pointer;" style-hover="background:{{ t.surfaceHover }};">Go</button>
+    </div>
+  </div>
+  <div style="display:flex; gap:16px; flex-wrap:wrap; font-size:13.5px; color:{{ t.textSecondary }}; margin-bottom:56px;">
+    <span>{{ pageLabel }}</span>
+    <span style="color:{{ t.textTertiary }};">{{ rangeLabel }}</span>
+  </div>
+
+  <!-- CHATTER / ACTIVITY -->
+  <div style="font-size:12px; font-weight:700; letter-spacing:0.08em; color:{{ t.textTertiary }}; margin-bottom:6px;">ACTIVITY &amp; COMMENTS</div>
+  <div style="font-size:14px; line-height:1.55; color:{{ t.textSecondary }}; margin-bottom:18px; max-width:720px;">One feed for what the system did and what people said. System entries are quieter than comments, so the human conversation stays easy to follow.</div>
+  <div style="background:{{ t.surface }}; border:1px solid {{ t.border }}; border-radius:12px; padding:clamp(20px,3vw,24px); max-width:640px; margin-bottom:56px;">
+    <div style="display:flex; gap:12px; margin-bottom:24px;">
+      <div style="width:36px; height:36px; border-radius:50%; background:{{ t.brandTint }}; color:{{ t.brand }}; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700;">YOU</div>
+      <div style="flex:1;">
+        <label style="display:block; font-size:13.5px; font-weight:600; color:{{ t.textSecondary }}; margin-bottom:6px;">Add a comment</label>
+        <textarea placeholder="Write a comment…" rows="2" value="{{ commentDraft }}" onChange="{{ onCommentDraftChange }}" style="width:100%; box-sizing:border-box; background:{{ t.bg }}; border:1px solid {{ t.border }}; border-radius:8px; padding:{{ d.fieldPad }}; font-size:15px; color:{{ t.textPrimary }}; font-family:inherit; resize:vertical; min-height:72px; margin-bottom:8px;" style-focus="border-color:{{ t.brand }}; outline:2px solid {{ t.brandTint }};"></textarea>
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
+          <span style="font-size:13px; color:{{ t.textTertiary }};">{{ postHint }}</span>
+          <button onClick="{{ postComment }}" disabled="{{ postDisabled }}" style="background:{{ postButtonBg }}; color:{{ postButtonColor }}; border:none; padding:{{ d.btnPad }}; min-height:44px; border-radius:8px; font-size:14px; font-weight:700; font-family:inherit; cursor:{{ postButtonCursor }};">Post comment</button>
+        </div>
+      </div>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:18px;">
+      <sc-for list="{{ chatterItems }}" as="it" hint-placeholder-count="5">
+        <div style="display:flex; gap:12px;">
+          <div style="width:36px; height:36px; border-radius:50%; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; background:{{ it.avatarBg }}; color:{{ it.avatarColor }};">{{ it.initials }}</div>
+          <div style="flex:1;">
+            <sc-if value="{{ it.isLog }}" hint-placeholder-val="{{ false }}">
+              <div style="font-size:13.5px; line-height:1.5; color:{{ t.textSecondary }};"><span style="font-weight:600; color:{{ t.textPrimary }};">{{ it.who }}</span> {{ it.text }} · {{ it.time }}</div>
+            </sc-if>
+            <sc-if value="{{ it.isComment }}" hint-placeholder-val="{{ false }}">
+              <div>
+                <div style="display:flex; align-items:baseline; gap:8px; margin-bottom:3px; flex-wrap:wrap;">
+                  <span style="font-size:14px; font-weight:700;">{{ it.who }}</span>
+                  <span style="font-size:13px; color:{{ t.textTertiary }};">{{ it.time }}</span>
+                </div>
+                <div style="font-size:14.5px; color:{{ t.textPrimary }}; line-height:1.5;">{{ it.message }}</div>
+              </div>
+            </sc-if>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-top:20px; padding-top:16px; border-top:1px solid {{ t.borderLight }};">
+      <span style="font-size:13px; color:{{ t.textSecondary }};">{{ chatterPageLabel }}</span>
+      <div style="display:flex; align-items:center; gap:4px;">
+        <button onClick="{{ chatterPrevPage }}" disabled="{{ chatterAtFirst }}" style="background:transparent; border:1px solid {{ t.border }}; border-radius:8px; padding:0 14px; min-height:40px; font-family:inherit; font-size:13.5px; font-weight:600; color:{{ chatterPrevColor }}; cursor:{{ chatterPrevCursor }};" style-hover="background:{{ t.surfaceHover }};">‹ Prev</button>
+        <sc-for list="{{ chatterPages }}" as="p" hint-placeholder-count="2">
+          <button onClick="{{ p.onClick }}" aria-current="{{ p.current }}" style="min-width:40px; height:40px; padding:0 4px; border:none; border-radius:8px; font-family:'JetBrains Mono',monospace; font-size:13.5px; font-weight:600; cursor:pointer; background:{{ p.bg }}; color:{{ p.color }};" style-hover="background:{{ p.hoverBg }};">{{ p.n }}</button>
+        </sc-for>
+        <button onClick="{{ chatterNextPage }}" disabled="{{ chatterAtLast }}" style="background:transparent; border:1px solid {{ t.border }}; border-radius:8px; padding:0 14px; min-height:40px; font-family:inherit; font-size:13.5px; font-weight:600; color:{{ chatterNextColor }}; cursor:{{ chatterNextCursor }};" style-hover="background:{{ t.surfaceHover }};">Next ›</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- EMPTY STATE -->
+  <div style="font-size:12px; font-weight:700; letter-spacing:0.08em; color:{{ t.textTertiary }}; margin-bottom:6px;">EMPTY STATE</div>
+  <div style="font-size:14px; line-height:1.55; color:{{ t.textSecondary }}; margin-bottom:18px; max-width:720px;">An empty screen explains what belongs here and offers the one action that fills it.</div>
+  <div style="border:1px dashed {{ t.border }}; border-radius:12px; padding:clamp(32px,6vw,56px) 24px; display:flex; flex-direction:column; align-items:center; gap:6px; text-align:center; margin-bottom:56px;">
+    <div style="width:44px; height:44px; border-radius:50%; background:{{ t.surfaceAlt }}; margin-bottom:10px;"></div>
+    <div style="font-size:16.5px; font-weight:700;">No items yet</div>
+    <div style="font-size:14.5px; color:{{ t.textSecondary }}; margin-bottom:16px; max-width:340px; line-height:1.5;">Items you create will appear here, newest first.</div>
+    <button style="background:{{ t.brand }}; color:{{ t.onBrand }}; border:none; padding:{{ d.btnPad }}; min-height:44px; border-radius:8px; font-size:14.5px; font-weight:700; font-family:inherit; cursor:pointer;" style-hover="background:{{ t.brandHover }};">Create new</button>
+  </div>
+
+  <!-- RULES -->
+  <div style="font-size:12px; font-weight:700; letter-spacing:0.08em; color:{{ t.textTertiary }}; margin-bottom:6px;">GROUND RULES</div>
+  <div style="font-size:14px; line-height:1.55; color:{{ t.textSecondary }}; margin-bottom:18px; max-width:720px;">If a decision is not covered above, these settle it.</div>
+  <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr)); gap:16px;">
+    <sc-for list="{{ groundRules }}" as="g" hint-placeholder-count="6">
+      <div style="background:{{ t.surface }}; border:1px solid {{ t.border }}; border-radius:12px; padding:20px;">
+        <div style="font-size:15px; font-weight:700; margin-bottom:6px;">{{ g.title }}</div>
+        <div style="font-size:14px; line-height:1.55; color:{{ t.textSecondary }}; text-wrap:pretty;">{{ g.body }}</div>
+      </div>
+    </sc-for>
+  </div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;dark&quot;,&quot;options&quot;:[&quot;dark&quot;,&quot;light&quot;],&quot;tsType&quot;:&quot;'dark'|'light'&quot;,&quot;section&quot;:&quot;Theme&quot;},&quot;density&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;comfortable&quot;,&quot;options&quot;:[&quot;comfortable&quot;,&quot;compact&quot;],&quot;tsType&quot;:&quot;'comfortable'|'compact'&quot;,&quot;section&quot;:&quot;Theme&quot;},&quot;brandHue&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:265,&quot;min&quot;:0,&quot;max&quot;:360,&quot;step&quot;:5,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Theme&quot;}}">
+class Component extends DCLogic {
+  state = {
+    theme: (this.props.theme === 'light' || this.props.theme === 'dark') ? this.props.theme : 'dark',
+    activeTab: 'active',
+    activeNav: 'Items',
+    navQuery: '',
+    navClosedGroups: { People: true, Reports: true, Setup: true },
+    mobileMenuOpen: true,
+    conditions: [
+      { field: 'category', op: 'is', value: 'Design', joiner: 'AND' },
+      { field: 'status', op: 'is', value: 'Blocked', joiner: 'OR' },
+    ],
+    searchDraft: '',
+    pendingField: null,
+    suggestOpen: false,
+    groupLevels: ['owner', 'status'],
+    closedGroups: {},
+    tableSortKey: 'id',
+    tableSortDir: 'asc',
+    stepEditable: true,
+    currentStep: 2,
+    modalW: 460,
+    modalH: 400,
+    page: 47,
+    pageSize: 25,
+    jumpDraft: '',
+    fldText: 'Website redesign',
+    fldLong: '',
+    fldSel: 'Design',
+    fldDate: '2026-09-15',
+    fldDateTime: '2026-09-15T09:30',
+    fldNum: 12,
+    tags: ['urgent', 'q3'],
+    tagDraft: '',
+    radio: 'standard',
+    checks: { brief: true, owner: true, budget: false },
+    switchOn: true,
+    phoneCode: '+62',
+    phoneNum: '812 3456 7890',
+    lookupOne: 'CUS-0142',
+    lookupOneQuery: '',
+    lookupOneOpen: false,
+    lookupOneClosedNote: true,
+    lookupMany: ['REC-2026-0003'],
+    lookupManyQuery: '',
+    lookupManyOpen: false,
+    files: [{ name: 'brand-guidelines-v4.pdf', size: '2.4 MB', ext: 'PDF' }],
+    images: [{ name: 'cover-shot.jpg', ratio: '1600×900' }],
+    commentDraft: '',
+    chatterPage: 1,
+    chatterItems: [
+      { type: 'log', who: 'System', text: 'changed status from Active to In review', time: '2h ago' },
+      { type: 'comment', who: 'Maya Chen', time: '3h ago', message: 'Reviewed the draft, looks good. Left two comments on the file.' },
+      { type: 'comment', who: 'Diego Ruiz', time: 'Yesterday', message: 'Can we push the review to Thursday? Waiting on legal sign-off.' },
+      { type: 'log', who: 'System', text: 'assigned this to Maya Chen', time: '2d ago' },
+      { type: 'log', who: 'System', text: 'created this item', time: '3d ago' },
+    ],
+  };
+
+  tokens(theme) {
+    const hue = Number(this.props.brandHue ?? 265);
+    const light = {
+      bg: 'oklch(0.985 0.004 250)', surface: 'oklch(1 0 0)', surfaceAlt: 'oklch(0.965 0.006 250)',
+      surfaceHover: 'oklch(0.945 0.007 250)', border: 'oklch(0.86 0.008 250)', borderLight: 'oklch(0.92 0.006 250)',
+      textPrimary: 'oklch(0.2 0.012 250)', textSecondary: 'oklch(0.42 0.012 250)', textTertiary: 'oklch(0.52 0.01 250)',
+      brand: `oklch(0.53 0.16 ${hue})`, brandHover: `oklch(0.46 0.17 ${hue})`, onBrand: 'oklch(0.99 0 0)',
+      brandTint: `oklch(0.53 0.16 ${hue} / 0.12)`,
+      danger: 'oklch(0.52 0.18 25)', dangerHover: 'oklch(0.44 0.18 25)', onDanger: 'oklch(0.99 0 0)',
+      dangerTint: 'oklch(0.55 0.17 25 / 0.1)', dangerText: 'oklch(0.4 0.17 25)',
+      scrim: 'oklch(0.2 0.012 250 / 0.35)',
+      status: {
+        draft: { dot: 'oklch(0.52 0.015 265)', text: 'oklch(0.38 0.015 265)', bg: 'oklch(0.55 0.015 265 / 0.1)' },
+        active: { dot: 'oklch(0.52 0.14 230)', text: 'oklch(0.4 0.14 230)', bg: 'oklch(0.55 0.14 230 / 0.1)' },
+        review: { dot: 'oklch(0.52 0.13 290)', text: 'oklch(0.4 0.13 290)', bg: 'oklch(0.55 0.13 290 / 0.1)' },
+        blocked: { dot: 'oklch(0.6 0.15 70)', text: 'oklch(0.4 0.15 70)', bg: 'oklch(0.62 0.15 70 / 0.12)' },
+        done: { dot: 'oklch(0.52 0.14 145)', text: 'oklch(0.36 0.14 145)', bg: 'oklch(0.55 0.14 145 / 0.1)' },
+      }
+    };
+    const dark = {
+      bg: 'oklch(0.17 0.012 250)', surface: 'oklch(0.21 0.012 250)', surfaceAlt: 'oklch(0.25 0.013 250)',
+      surfaceHover: 'oklch(0.28 0.014 250)', border: 'oklch(0.34 0.014 250)', borderLight: 'oklch(0.28 0.013 250)',
+      textPrimary: 'oklch(0.96 0.004 250)', textSecondary: 'oklch(0.78 0.01 250)', textTertiary: 'oklch(0.64 0.012 250)',
+      brand: `oklch(0.7 0.15 ${hue})`, brandHover: `oklch(0.77 0.14 ${hue})`, onBrand: 'oklch(0.15 0.02 265)',
+      brandTint: `oklch(0.7 0.15 ${hue} / 0.2)`,
+      danger: 'oklch(0.68 0.18 25)', dangerHover: 'oklch(0.75 0.16 25)', onDanger: 'oklch(0.16 0.03 25)',
+      dangerTint: 'oklch(0.7 0.17 25 / 0.18)', dangerText: 'oklch(0.86 0.13 25)',
+      scrim: 'oklch(0.05 0.01 250 / 0.55)',
+      status: {
+        draft: { dot: 'oklch(0.7 0.015 265)', text: 'oklch(0.86 0.012 265)', bg: 'oklch(0.68 0.015 265 / 0.16)' },
+        active: { dot: 'oklch(0.72 0.14 230)', text: 'oklch(0.86 0.11 230)', bg: 'oklch(0.7 0.14 230 / 0.18)' },
+        review: { dot: 'oklch(0.74 0.13 290)', text: 'oklch(0.87 0.1 290)', bg: 'oklch(0.72 0.13 290 / 0.18)' },
+        blocked: { dot: 'oklch(0.78 0.15 70)', text: 'oklch(0.89 0.11 70)', bg: 'oklch(0.75 0.15 70 / 0.2)' },
+        done: { dot: 'oklch(0.72 0.14 145)', text: 'oklch(0.86 0.11 145)', bg: 'oklch(0.7 0.14 145 / 0.18)' },
+      }
+    };
+    return theme === 'dark' ? dark : light;
+  }
+
+  fieldDefs() {
+    return [
+      { key: 'id', label: 'ID', pickable: false },
+      { key: 'name', label: 'Name', pickable: false },
+      { key: 'category', label: 'Category', pickable: true },
+      { key: 'status', label: 'Status', pickable: true },
+      { key: 'owner', label: 'Owner', pickable: true },
+      { key: 'updated', label: 'Updated', pickable: false },
+    ];
+  }
+
+  resizeFrom(e, axis) {
+    e.preventDefault();
+    const x0 = e.clientX, y0 = e.clientY;
+    const w0 = this.state.modalW, h0 = this.state.modalH;
+    const move = (ev) => {
+      const next = {};
+      if (axis !== 'y') next.modalW = Math.max(320, Math.min(860, w0 + ev.clientX - x0));
+      if (axis !== 'x') next.modalH = Math.max(260, Math.min(640, h0 + ev.clientY - y0));
+      this.setState(next);
+    };
+    const up = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  }
+
+  density() {
+    const compact = this.props.density === 'compact';
+    return compact
+      ? { rowPad: '10px clamp(16px,3vw,24px)', fieldPad: '8px 12px', btnPad: '8px 16px' }
+      : { rowPad: '16px clamp(16px,3vw,24px)', fieldPad: '10px 14px', btnPad: '11px 20px' };
+  }
+
+  renderVals() {
+    const theme = this.state.theme;
+    const isDark = theme === 'dark';
+    const t = this.tokens(theme);
+    const d = this.density();
+    const S = t.status;
+
+    const howToUse = [
+      { title: 'Pick, do not invent', body: 'If a pattern below fits, use it exactly. New components need a good reason and should be added here once agreed.' },
+      { title: 'Words before colour', body: 'Every state carries a label. Colour supports the label; it never replaces it.' },
+      { title: 'One main action', body: 'Each screen has a single filled button. Secondary things are outlined or plain text.' },
+      { title: 'Works on a phone', body: 'Content reflows into one column, tables scroll sideways, and everything tappable is at least 44px.' },
+    ];
+
+    const surfaceSwatches = [
+      { name: 'Page background', token: 'bg', use: 'Behind everything.', bg: t.bg, border: t.border, isText: false },
+      { name: 'Card surface', token: 'surface', use: 'Panels, tables, dialogs.', bg: t.surface, border: t.border, isText: false },
+      { name: 'Raised surface', token: 'surfaceAlt', use: 'Table headers, quiet fills.', bg: t.surfaceAlt, border: t.border, isText: false },
+      { name: 'Border', token: 'border', use: 'Edges of cards and fields.', bg: t.border, border: t.border, isText: false },
+      { name: 'Border, subtle', token: 'borderLight', use: 'Dividers inside a card.', bg: t.borderLight, border: t.borderLight, isText: false },
+      { name: 'Supporting text', token: 'textSecondary', use: 'Hints and descriptions. Body copy uses textPrimary.', bg: t.surfaceAlt, border: t.border, isText: true, textColor: t.textSecondary },
+    ];
+
+    const brandStatusSwatches = [
+      { name: 'Brand', token: 'brand', use: 'Primary buttons, selected items, links.', swatch: t.brand },
+      { name: 'Draft', token: 'status.draft', use: 'Created but not started.', swatch: S.draft.dot },
+      { name: 'Active', token: 'status.active', use: 'Work in progress.', swatch: S.active.dot },
+      { name: 'In review', token: 'status.review', use: 'Waiting on a person.', swatch: S.review.dot },
+      { name: 'Blocked', token: 'status.blocked', use: 'Needs attention to move.', swatch: S.blocked.dot },
+      { name: 'Done', token: 'status.done', use: 'Finished, nothing left to do.', swatch: S.done.dot },
+    ];
+
+    const typeSamples = [
+      { sample: 'ACME', sampleStyle: 'font-weight:800; font-size:30px; letter-spacing:-0.02em;', meta: 'Public Sans 800 — logo and page titles. One per screen.' },
+      { sample: 'Items dashboard', sampleStyle: 'font-weight:700; font-size:20px;', meta: 'Public Sans 700 — section headings.' },
+      { sample: 'Body text and labels', sampleStyle: 'font-weight:400; font-size:15px;', meta: 'Public Sans 400–600 — everything you read. 15px default, 14px minimum.' },
+      { sample: 'REC-2026-0001', sampleStyle: "font-family:'JetBrains Mono',monospace; font-weight:500; font-size:15px;", meta: 'JetBrains Mono — IDs, dates, anything scanned down a column.' },
+      { sample: 'TABLE HEADER', sampleStyle: 'font-weight:700; font-size:12px; letter-spacing:0.06em;', meta: '12px uppercase — table headers and small captions only. Never for sentences.' },
+    ];
+
+    const buttonRules = [
+      { name: 'Primary', when: 'The one action you most likely want. Never two on a screen.' },
+      { name: 'Secondary', when: 'Useful but optional actions, like Export or Edit.' },
+      { name: 'Plain', when: 'Backing out — Cancel, Close, Skip.' },
+      { name: 'Destructive', when: 'Deleting or cancelling something. Always confirmed in a dialog first.' },
+      { name: 'Unavailable', when: 'Shown, not hidden, so the action stays predictable. Explain why nearby.' },
+    ];
+
+    const fieldStates = [
+      { label: 'Normal', value: 'Website redesign', bg: t.bg, borderColor: t.border, ring: 'none', textColor: t.textPrimary, msg: 'Resting state.', msgColor: t.textTertiary },
+      { label: 'Selected', value: 'Website redesign', bg: t.bg, borderColor: t.brand, ring: `2px solid ${t.brandTint}`, textColor: t.textPrimary, msg: 'Focus ring shows where typing goes, mouse or keyboard.', msgColor: t.textTertiary },
+      { label: 'Needs fixing', value: '', bg: t.bg, borderColor: t.danger, ring: 'none', textColor: t.textPrimary, msg: 'Enter a name so people can find this item.', msgColor: t.dangerText },
+      { label: 'Read only', value: 'REC-2026-0001', bg: t.surfaceAlt, borderColor: t.borderLight, ring: 'none', textColor: t.textTertiary, msg: 'Set automatically, cannot be edited.', msgColor: t.textTertiary },
+    ];
+
+    const statusMeta = [
+      { key: 'draft', label: 'Draft' }, { key: 'active', label: 'Active' }, { key: 'review', label: 'In review' },
+      { key: 'blocked', label: 'Blocked' }, { key: 'done', label: 'Done' },
+    ];
+    const statusList = statusMeta.map(m => ({ label: m.label, dot: S[m.key].dot, text: S[m.key].text, bg: S[m.key].bg }));
+
+    const kpis = [
+      { label: 'DRAFT', value: 12, dot: S.draft.dot },
+      { label: 'ACTIVE', value: 4, dot: S.active.dot },
+      { label: 'IN REVIEW', value: 3, dot: S.review.dot },
+      { label: 'DONE', value: 8, dot: S.done.dot },
+    ];
+
+    const tableHeaderDefs = [
+      { key: 'id', label: 'ID' }, { key: 'name', label: 'NAME' }, { key: 'category', label: 'CATEGORY' },
+      { key: 'status', label: 'STATUS' }, { key: 'owner', label: 'OWNER' }, { key: 'rank', label: 'UPDATED' },
+    ];
+    const tableHeaders = tableHeaderDefs.map(hd => {
+      const active = this.state.tableSortKey === hd.key;
+      const dir = this.state.tableSortDir;
+      return {
+        label: hd.label,
+        title: active ? `Sorted ${dir === 'asc' ? 'A to Z' : 'Z to A'} — click to reverse` : `Sort by ${hd.label.toLowerCase()}`,
+        onClick: () => this.setState(s => ({
+          tableSortKey: hd.key,
+          tableSortDir: s.tableSortKey === hd.key ? (s.tableSortDir === 'asc' ? 'desc' : 'asc') : 'asc',
+        })),
+        arrow: active ? (dir === 'asc' ? '↑' : '↓') : '↑',
+        arrowOpacity: active ? 1 : 0.3,
+        color: active ? t.textPrimary : t.textSecondary,
+      };
+    });
+
+    const rowsData = [
+      { id: 'REC-2026-0001', name: 'Website redesign', category: 'Design', owner: 'Maya Chen', updated: 'Today', rank: 0, key: 'done', status: 'Done' },
+      { id: 'REC-2026-0002', name: 'Q3 marketing plan', category: 'Marketing', owner: 'Diego Ruiz', updated: '2h ago', rank: 1, key: 'blocked', status: 'Blocked' },
+      { id: 'REC-2026-0003', name: 'API migration', category: 'Engineering', owner: 'Sam Okoye', updated: 'Yesterday', rank: 2, key: 'review', status: 'In review' },
+      { id: 'REC-2026-0004', name: 'Customer onboarding', category: 'Product', owner: 'Maya Chen', updated: '3d ago', rank: 3, key: 'active', status: 'Active' },
+      { id: 'REC-2026-0005', name: 'Annual report', category: 'Finance', owner: 'Ana Lima', updated: '—', rank: 4, key: 'draft', status: 'Draft' },
+      { id: 'REC-2026-0006', name: 'Design tokens audit', category: 'Design', owner: 'Sam Okoye', updated: '4d ago', rank: 5, key: 'active', status: 'Active' },
+      { id: 'REC-2026-0007', name: 'Warehouse relabel', category: 'Operations', owner: 'Diego Ruiz', updated: '5d ago', rank: 6, key: 'blocked', status: 'Blocked' },
+      { id: 'REC-2026-0008', name: 'Supplier contracts', category: 'Finance', owner: 'Ana Lima', updated: '1w ago', rank: 7, key: 'review', status: 'In review' },
+    ];
+
+    const fieldDefs = this.fieldDefs();
+    const labelOf = (k) => (fieldDefs.find(f => f.key === k) || { label: 'Any field' }).label;
+    const conds = this.state.conditions;
+    const testCond = (r, c) => {
+      const v = String(c.value).toLowerCase();
+      if (c.field === 'any') return fieldDefs.some(f => String(r[f.key] ?? '').toLowerCase().includes(v));
+      const rv = String(r[c.field] ?? '').toLowerCase();
+      return c.op === 'is' ? rv === v : rv.includes(v);
+    };
+    const orGroups = [];
+    conds.forEach((c, i) => {
+      if (i === 0 || c.joiner === 'OR') orGroups.push([]);
+      orGroups[orGroups.length - 1].push(c);
+    });
+    let filtered = orGroups.length
+      ? rowsData.filter(r => orGroups.some(g => g.every(c => testCond(r, c))))
+      : rowsData.slice();
+    const sortKey = this.state.tableSortKey;
+    const sortDir = this.state.tableSortDir === 'asc' ? 1 : -1;
+    filtered = [...filtered].sort((a, b) => {
+      const av = a[sortKey], bv = b[sortKey];
+      if (typeof av === 'number') return (av - bv) * sortDir;
+      return String(av).localeCompare(String(bv)) * sortDir;
+    });
+
+    const mapRow = (r) => ({
+      id: r.id, name: r.name, category: r.category, owner: r.owner, updated: r.updated, status: r.status,
+      pill: { dot: S[r.key].dot, text: S[r.key].text, bg: S[r.key].bg },
+    });
+
+    const levels = this.state.groupLevels;
+    const isGrouped = levels.length > 0;
+    const closed = this.state.closedGroups;
+    const padY = this.props.density === 'compact' ? '10px' : '16px';
+    const indentOf = (depth) => `calc(clamp(16px,3vw,24px) + ${depth * 22}px)`;
+    const headerStyles = [
+      { bg: t.surfaceHover, size: '14.5px', height: '48px' },
+      { bg: t.surfaceAlt, size: '14px', height: '44px' },
+      { bg: 'transparent', size: '13.5px', height: '42px' },
+    ];
+
+    const allPaths = [];
+    const collectPaths = (rows, depth, prefix) => {
+      if (depth >= levels.length) return;
+      const f = levels[depth];
+      const map = new Map();
+      rows.forEach(r => { const k = String(r[f]); if (!map.has(k)) map.set(k, []); map.get(k).push(r); });
+      [...map.entries()].forEach(([k, rs]) => {
+        const p = `${prefix}/${f}:${k}`;
+        allPaths.push(p);
+        collectPaths(rs, depth + 1, p);
+      });
+    };
+    collectPaths(filtered, 0, '');
+
+    const tableItems = [];
+    const buildItems = (rows, depth, prefix) => {
+      if (depth >= levels.length) {
+        rows.forEach(r => tableItems.push({
+          isGroup: false, isRow: true, row: mapRow(r),
+          indent: indentOf(depth), rowPadY: padY,
+        }));
+        return;
+      }
+      const f = levels[depth];
+      const map = new Map();
+      rows.forEach(r => { const k = String(r[f]); if (!map.has(k)) map.set(k, []); map.get(k).push(r); });
+      [...map.entries()].sort((a, b) => a[0].localeCompare(b[0])).forEach(([k, rs]) => {
+        const path = `${prefix}/${f}:${k}`;
+        const open = !closed[path];
+        const hs = headerStyles[Math.min(depth, headerStyles.length - 1)];
+        tableItems.push({
+          isGroup: true, isRow: false,
+          label: k, fieldLabel: labelOf(f).toUpperCase(),
+          count: `${rs.length} ${rs.length === 1 ? 'record' : 'records'}`,
+          caret: open ? '▾' : '▸',
+          headerBg: hs.bg, labelSize: hs.size, headerHeight: hs.height,
+          accent: depth === 0 ? `3px solid ${t.brand}` : `3px solid ${t.borderLight}`,
+          indent: indentOf(depth),
+          onToggle: () => this.setState(s => ({ closedGroups: { ...s.closedGroups, [path]: open } })),
+        });
+        if (open) buildItems(rs, depth + 1, path);
+      });
+    };
+    buildItems(filtered, 0, '');
+    const allOpen = allPaths.every(p => !closed[p]);
+
+    const draft = this.state.searchDraft.trim();
+    const dl = draft.toLowerCase();
+    const pending = this.state.pendingField;
+    const valuesOf = (k) => [...new Set(rowsData.map(r => String(r[k])))].sort((a, b) => a.localeCompare(b));
+    const recordCount = (n) => `${n} ${n === 1 ? 'record' : 'records'}`;
+    const addCond = (field, op, value) => this.setState(s => ({
+      conditions: [...s.conditions, { field, op, value, joiner: 'AND' }],
+      searchDraft: '', pendingField: null, suggestOpen: false,
+    }));
+    const suggestions = [];
+    if (pending) {
+      valuesOf(pending).filter(v => !dl || v.toLowerCase().includes(dl)).forEach(v => {
+        const n = rowsData.filter(r => String(r[pending]) === v).length;
+        suggestions.push({ tag: labelOf(pending), label: v, hint: recordCount(n), onClick: () => addCond(pending, 'is', v) });
+      });
+    } else if (!draft) {
+      fieldDefs.filter(f => f.pickable).forEach(f => {
+        suggestions.push({
+          tag: 'FILTER', label: `${f.label} is…`, hint: `${valuesOf(f.key).length} values`,
+          onClick: () => this.setState({ pendingField: f.key, searchDraft: '', suggestOpen: true }),
+        });
+      });
+    } else {
+      fieldDefs.filter(f => f.pickable).forEach(f => {
+        valuesOf(f.key).filter(v => v.toLowerCase().includes(dl)).slice(0, 3).forEach(v => {
+          const n = rowsData.filter(r => String(r[f.key]) === v).length;
+          suggestions.push({ tag: f.label, label: v, hint: recordCount(n), onClick: () => addCond(f.key, 'is', v) });
+        });
+      });
+      const anyN = rowsData.filter(r => fieldDefs.some(f => String(r[f.key] ?? '').toLowerCase().includes(dl))).length;
+      suggestions.push({
+        tag: 'ALL', label: `Contains “${draft}”`, hint: recordCount(anyN),
+        onClick: () => addCond('any', 'contains', draft),
+      });
+      suggestions.push({
+        tag: 'NAME', label: `Name contains “${draft}”`,
+        hint: recordCount(rowsData.filter(r => r.name.toLowerCase().includes(dl)).length),
+        onClick: () => addCond('name', 'contains', draft),
+      });
+    }
+    const suggestList = suggestions.map((sg, i) => ({ ...sg, bg: i === 0 ? t.brandTint : 'transparent' }));
+
+    const conditions = conds.map((c, i) => ({
+      fieldLabel: c.field === 'any' ? 'Any field' : labelOf(c.field),
+      opLabel: c.op === 'is' ? 'is' : 'contains',
+      value: c.value,
+      removeLabel: `Remove filter ${labelOf(c.field)} ${c.value}`,
+      showJoiner: i > 0,
+      joiner: c.joiner,
+      joinerTitle: c.joiner === 'AND' ? 'Both must match — click for OR' : 'Either can match — click for AND',
+      joinerBg: c.joiner === 'OR' ? t.surfaceAlt : 'transparent',
+      joinerBorder: c.joiner === 'OR' ? t.border : t.borderLight,
+      joinerColor: c.joiner === 'OR' ? t.textPrimary : t.textSecondary,
+      onToggleJoiner: () => this.setState(s => ({
+        conditions: s.conditions.map((x, j) => j === i ? { ...x, joiner: x.joiner === 'AND' ? 'OR' : 'AND' } : x),
+      })),
+      onRemove: () => this.setState(s => {
+        const next = s.conditions.filter((_, j) => j !== i);
+        if (next.length) next[0] = { ...next[0], joiner: 'AND' };
+        return { conditions: next };
+      }),
+    }));
+
+    const phrase = (c) => `${c.field === 'any' ? 'any field' : labelOf(c.field)} ${c.op === 'is' ? 'is' : 'contains'} ${c.value}`;
+    const queryEcho = conds.length
+      ? `Showing records where ${orGroups.map(g => g.map(phrase).join(' and ')).join(', or ')}.`
+      : 'No filters. Type to search every column, or pick a field to filter on.';
+
+    const available = fieldDefs.filter(f => f.pickable && !levels.includes(f.key));
+    const groupLevels = levels.map((f, i) => ({
+      field: f, levelNo: i + 1, showThen: i > 0,
+      ariaLabel: `Grouping level ${i + 1}`,
+      options: fieldDefs.filter(o => o.pickable && (o.key === f || !levels.includes(o.key))).map(o => ({ value: o.key, label: o.label })),
+      onChange: (e) => this.setState(s => {
+        const next = [...s.groupLevels];
+        next[i] = e.target.value;
+        return { groupLevels: next, closedGroups: {} };
+      }),
+      onRemove: () => this.setState(s => ({ groupLevels: s.groupLevels.filter((_, j) => j !== i), closedGroups: {} })),
+    }));
+
+    const stepLabels = ['Draft', 'Active', 'In review', 'Blocked', 'Done'];
+    const cur = this.state.currentStep;
+    const editable = this.state.stepEditable;
+    const stepperStages = stepLabels.map((label, i) => {
+      const done = i < cur;
+      const current = i === cur;
+      return {
+        label,
+        stateLabel: done ? 'Done' : (current ? 'Now' : (editable ? 'Set to this' : 'Next')),
+        stateColor: current ? t.brand : t.textTertiary,
+        content: done ? '✓' : String(i + 1),
+        circleBg: done ? t.brand : (current ? t.surface : t.surfaceAlt),
+        circleBorder: done ? t.brand : (current ? t.brand : t.border),
+        circleColor: done ? t.onBrand : (current ? t.brand : t.textTertiary),
+        circleShadow: current ? `0 0 0 4px ${t.brandTint}` : 'none',
+        leftLine: i === 0 ? 'transparent' : (i <= cur ? t.brand : t.border),
+        rightLine: i === stepLabels.length - 1 ? 'transparent' : (done ? t.brand : t.border),
+        textColor: i > cur ? t.textSecondary : t.textPrimary,
+        fontWeight: current ? 700 : 500,
+        disabled: !editable,
+        cursor: editable ? 'pointer' : 'default',
+        hoverBg: editable ? t.surfaceHover : 'transparent',
+        title: editable ? (current ? `Already ${label}` : `Set status to ${label}`) : 'Only the record owner can change the status',
+        onClick: () => { if (editable) this.setState({ currentStep: i }); },
+      };
+    });
+    const stepperModes = [
+      { id: true, label: 'Clickable' },
+      { id: false, label: 'Read-only' },
+    ].map(m => ({
+      label: m.label,
+      onClick: () => this.setState({ stepEditable: m.id }),
+      bg: editable === m.id ? t.surface : 'transparent',
+      color: editable === m.id ? t.textPrimary : t.textSecondary,
+      weight: editable === m.id ? 700 : 600,
+    }));
+    const stepperHint = editable
+      ? `Status is ${stepLabels[cur]}. Click any step to change it — earlier steps are marked done.`
+      : `Status is ${stepLabels[cur]}. You do not have permission to change it; ask the record owner.`;
+
+    const tabDefs = [{ id: 'active', label: 'Active' }, { id: 'completed', label: 'Completed' }, { id: 'cancelled', label: 'Cancelled' }];
+    const tabs = tabDefs.map(td => {
+      const on = this.state.activeTab === td.id;
+      return { label: td.label, onClick: () => this.setState({ activeTab: td.id }), color: on ? t.textPrimary : t.textSecondary, borderColor: on ? t.brand : 'transparent', weight: on ? 700 : 600 };
+    });
+
+    const navGroupDefs = [
+      { label: 'WORK', items: ['Dashboard', 'My tasks', 'Inbox', 'Approvals'] },
+      { label: 'RECORDS', items: ['Items', 'Orders', 'Shipments', 'Invoices', 'Customers', 'Suppliers', 'Products', 'Price lists'] },
+      { label: 'PEOPLE', items: ['Team', 'Roles', 'Time off', 'Payroll'] },
+      { label: 'REPORTS', items: ['Overview', 'Sales report', 'Inventory report', 'Aging report', 'Custom reports'] },
+      { label: 'SETUP', items: ['General', 'Fields', 'Automations', 'Templates', 'Integrations', 'Audit log', 'Billing'] },
+    ];
+    const navQ = this.state.navQuery.trim().toLowerCase();
+    const pickNav = (n) => ({
+      name: n,
+      onClick: () => this.setState({ activeNav: n }),
+      bg: this.state.activeNav === n ? t.brandTint : 'transparent',
+      color: this.state.activeNav === n ? t.brand : t.textSecondary,
+      weight: this.state.activeNav === n ? 700 : 600,
+    });
+    const navGroups = navGroupDefs.map(g => {
+      const items = navQ ? g.items.filter(n => n.toLowerCase().includes(navQ)) : g.items;
+      const key = g.label.charAt(0) + g.label.slice(1).toLowerCase();
+      const open = navQ ? true : !this.state.navClosedGroups[key];
+      return {
+        label: g.label,
+        count: items.length,
+        open,
+        caret: open ? '▾' : '▸',
+        onToggle: () => this.setState(s => ({ navClosedGroups: { ...s.navClosedGroups, [key]: open } })),
+        items: items.map(pickNav),
+        _empty: items.length === 0,
+      };
+    }).filter(g => !g._empty);
+    const navRecent = ['Invoices', 'Sales report', 'Approvals'].map(pickNav);
+
+    const alerts = [
+      { label: 'INFO', message: 'Sync is running for 3 items. You can keep working.', dot: S.active.dot, text: S.active.text, bg: S.active.bg },
+      { label: 'DONE', message: 'REC-2026-0001 was marked as done.', dot: S.done.dot, text: S.done.text, bg: S.done.bg },
+      { label: 'HEADS UP', message: 'No activity on this item for two hours.', dot: S.blocked.dot, text: S.blocked.text, bg: S.blocked.bg },
+      { label: 'PROBLEM', message: 'The item could not be saved. Check your connection and try again.', dot: t.danger, text: t.dangerText, bg: t.dangerTint },
+    ];
+
+    const totalRecords = 4812;
+    const pageSize = Number(this.state.pageSize);
+    const totalPages = Math.max(1, Math.ceil(totalRecords / pageSize));
+    const page = Math.min(this.state.page, totalPages);
+    const window2 = new Set([1, totalPages, page, page - 1, page + 1]);
+    if (page <= 3) [2, 3, 4].forEach(n => window2.add(n));
+    if (page >= totalPages - 2) [totalPages - 1, totalPages - 2, totalPages - 3].forEach(n => window2.add(n));
+    const shown = [...window2].filter(n => n >= 1 && n <= totalPages).sort((a, b) => a - b);
+    const pages = [];
+    shown.forEach((n, i) => {
+      if (i > 0 && n - shown[i - 1] > 1) pages.push({ isGap: true, isPage: false, n: '…' });
+      const on = page === n;
+      pages.push({
+        isGap: false, isPage: true, n,
+        current: on ? 'page' : 'false',
+        onClick: () => this.setState({ page: n }),
+        bg: on ? t.brand : 'transparent',
+        color: on ? t.onBrand : t.textSecondary,
+        hoverBg: on ? t.brandHover : t.surfaceHover,
+      });
+    });
+    const firstRecord = (page - 1) * pageSize + 1;
+    const lastRecord = Math.min(totalRecords, page * pageSize);
+    const commitJump = () => {
+      const n = parseInt(this.state.jumpDraft, 10);
+      if (!n || n < 1) { this.setState({ jumpDraft: '' }); return; }
+      this.setState({ page: Math.min(totalPages, n), jumpDraft: '' });
+    };
+
+    const CHATTER_PAGE_SIZE = 3;
+    const chatterTotalPages = Math.max(1, Math.ceil(this.state.chatterItems.length / CHATTER_PAGE_SIZE));
+    const chatterPage = Math.min(this.state.chatterPage, chatterTotalPages);
+    const chatterStart = (chatterPage - 1) * CHATTER_PAGE_SIZE;
+    const chatterItems = this.state.chatterItems.slice(chatterStart, chatterStart + CHATTER_PAGE_SIZE).map(it => ({
+      ...it,
+      initials: it.who.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase(),
+      isLog: it.type === 'log',
+      isComment: it.type === 'comment',
+      avatarBg: it.type === 'log' ? t.surfaceAlt : t.brandTint,
+      avatarColor: it.type === 'log' ? t.textSecondary : t.brand,
+    }));
+    const chatterAtFirst = chatterPage === 1;
+    const chatterAtLast = chatterPage === chatterTotalPages;
+    const chatterPages = Array.from({ length: chatterTotalPages }, (_, i) => {
+      const n = i + 1;
+      const current = n === chatterPage;
+      return {
+        n, current,
+        onClick: () => this.setState({ chatterPage: n }),
+        bg: current ? t.brand : 'transparent', color: current ? t.onBrand : t.textSecondary,
+        hoverBg: current ? t.brand : t.surfaceHover,
+      };
+    });
+    const postDisabled = !this.state.commentDraft.trim();
+
+    const checklistDefs = [
+      { key: 'brief', label: 'Brief approved' },
+      { key: 'owner', label: 'Owner assigned' },
+      { key: 'budget', label: 'Budget confirmed' },
+    ].map(c => {
+      const on = !!this.state.checks[c.key];
+      return {
+        label: c.label,
+        checked: on,
+        color: on ? t.textTertiary : t.textPrimary,
+        strike: on ? 'line-through' : 'none',
+        onChange: () => this.setState(s => ({ checks: { ...s.checks, [c.key]: !s.checks[c.key] } })),
+      };
+    });
+    const checklistDone = checklistDefs.filter(c => c.checked).length;
+
+    const customers = [
+      { id: 'CUS-0142', name: 'Northwind Trading' },
+      { id: 'CUS-0187', name: 'Harbour Logistics' },
+      { id: 'CUS-0203', name: 'Baytown Foods' },
+      { id: 'CUS-0244', name: 'Meridian Supply' },
+      { id: 'CUS-0298', name: 'Kirana Retail Group' },
+    ];
+    const selectedCustomer = customers.find(c => c.id === this.state.lookupOne) || null;
+    const custQ = this.state.lookupOneQuery.trim().toLowerCase();
+    const customerResults = customers.filter(c => !custQ || c.name.toLowerCase().includes(custQ) || c.id.toLowerCase().includes(custQ));
+    const relQ = this.state.lookupManyQuery.trim().toLowerCase();
+    const relatedResults = rowsData.filter(r => !relQ || r.name.toLowerCase().includes(relQ) || r.id.toLowerCase().includes(relQ)).slice(0, 6);
+
+    const groundRules = [
+      { title: 'Say it in plain words', body: 'Labels and messages use the words your users use. No internal codenames, no abbreviations that need explaining.' },
+      { title: 'Never lose someone\u2019s work', body: 'Anything destructive is confirmed in a dialog that names what will be lost. Drafts are kept when a form is closed.' },
+      { title: 'Same thing, same place', body: 'Filters above content, main action top-right, Cancel to the left of Confirm — on every screen.' },
+      { title: 'Show the state', body: 'Loading, empty, error and success all have a visible treatment. Nothing simply does nothing.' },
+      { title: 'Reachable by keyboard', body: 'Everything clickable is a real button or link with a visible focus ring, so power users never need the mouse.' },
+      { title: 'Comfortable at hour six', body: 'Body text 14px or more, 44px targets, muted surfaces, no animation longer than 150ms.' },
+    ];
+
+    return {
+      t, d, theme, isDark,
+      themeLabel: isDark ? 'Dark' : 'Light',
+      trackBg: isDark ? t.brand : t.surfaceAlt,
+      knobTransform: isDark ? 'translateX(22px)' : 'translateX(0px)',
+      toggleTheme: () => this.setState(s => ({ theme: s.theme === 'dark' ? 'light' : 'dark' })),
+      howToUse, surfaceSwatches, brandStatusSwatches, typeSamples, buttonRules, fieldStates,
+      statusList, kpis, stepperStages, stepperModes, stepperHint, tableHeaders, tabs,
+      alerts, pages, groundRules,
+
+      conditions,
+      queryEcho,
+      hasFilters: conds.length > 0 || !!draft || !!pending,
+      clearQuery: () => this.setState({ conditions: [], searchDraft: '', pendingField: null, suggestOpen: false }),
+      searchDraft: this.state.searchDraft,
+      onSearchDraft: (e) => this.setState({ searchDraft: e.target.value, suggestOpen: true }),
+      openSuggest: () => this.setState({ suggestOpen: true }),
+      suggestOpen: this.state.suggestOpen,
+      suggestions: suggestList,
+      suggestEmpty: suggestList.length === 0,
+      suggestHeading: pending ? `${labelOf(pending).toUpperCase()} VALUES` : (draft ? 'SUGGESTIONS' : 'FILTER BY A FIELD'),
+      suggestKeyHint: 'ENTER TO ADD · ESC TO CLOSE',
+      pendingField: !!pending,
+      pendingFieldLabel: pending ? labelOf(pending) : '',
+      clearPendingField: () => this.setState({ pendingField: null, searchDraft: '' }),
+      searchPlaceholder: pending
+        ? `Pick or type a ${labelOf(pending).toLowerCase()}…`
+        : (conds.length ? 'Add another filter…' : 'Search records, or filter by category, status, owner…'),
+      onSearchKey: (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          if (suggestList.length) suggestList[0].onClick();
+          else if (draft) addCond('any', 'contains', draft);
+        } else if (e.key === 'Escape') {
+          this.setState({ suggestOpen: false, pendingField: null, searchDraft: '' });
+        } else if (e.key === 'Backspace' && !this.state.searchDraft) {
+          if (pending) this.setState({ pendingField: null });
+          else this.setState(s => {
+            const next = s.conditions.slice(0, -1);
+            if (next.length) next[0] = { ...next[0], joiner: 'AND' };
+            return { conditions: next };
+          });
+        }
+      },
+
+      isGrouped,
+      groupLevels,
+      canAddLevel: levels.length < 3 && available.length > 0,
+      atLevelLimit: levels.length >= 3,
+      addLevelLabel: levels.length ? '+ Add level' : '+ Group records',
+      addGroupLevel: () => { if (available.length) this.setState(s => ({ groupLevels: [...s.groupLevels, available[0].key], closedGroups: {} })); },
+      tableItems,
+      tableEmpty: filtered.length === 0,
+      tableCount: `Showing ${filtered.length} of ${recordCount(rowsData.length)}${conds.length ? ' (filtered)' : ''}${isGrouped ? ` · grouped by ${levels.map(labelOf).join(' then ')} · ${allPaths.length} groups` : ''}`,
+      toggleAllLabel: allOpen ? 'Collapse all groups' : 'Expand all groups',
+      toggleAllGroups: () => {
+        const next = {};
+        if (allOpen) allPaths.forEach(p => { next[p] = true; });
+        this.setState({ closedGroups: next });
+      },
+
+      navGroups, navRecent,
+      navQuery: this.state.navQuery,
+      onNavQuery: (e) => this.setState({ navQuery: e.target.value }),
+      navNoResults: navGroups.length === 0,
+      activeNav: this.state.activeNav,
+      mobileMenuOpen: this.state.mobileMenuOpen,
+      mobileMenuClosed: !this.state.mobileMenuOpen,
+      toggleMobileMenu: () => this.setState(s => ({ mobileMenuOpen: !s.mobileMenuOpen })),
+
+      modalW: `${this.state.modalW}px`,
+      modalH: `${this.state.modalH}px`,
+      modalSizeLabel: `${this.state.modalW} × ${this.state.modalH}`,
+      resetModalSize: () => this.setState({ modalW: 460, modalH: 400 }),
+      startResizeX: (e) => this.resizeFrom(e, 'x'),
+      startResizeY: (e) => this.resizeFrom(e, 'y'),
+      startResizeXY: (e) => this.resizeFrom(e, 'xy'),
+
+      page,
+      pageSize: String(pageSize),
+      onPageSize: (e) => this.setState({ pageSize: Number(e.target.value), page: 1 }),
+      atFirst: page === 1,
+      atLast: page === totalPages,
+      navBtnColor: page === 1 ? t.textTertiary : t.textSecondary,
+      nextBtnColor: page === totalPages ? t.textTertiary : t.textSecondary,
+      prevCursor: page === 1 ? 'not-allowed' : 'pointer',
+      nextCursor: page === totalPages ? 'not-allowed' : 'pointer',
+      pageLabel: `Page ${page.toLocaleString()} of ${totalPages.toLocaleString()}`,
+      rangeLabel: `Records ${firstRecord.toLocaleString()}–${lastRecord.toLocaleString()} of ${totalRecords.toLocaleString()}`,
+      jumpDraft: this.state.jumpDraft,
+      onJumpDraft: (e) => this.setState({ jumpDraft: e.target.value.replace(/[^0-9]/g, '') }),
+      onJumpKey: (e) => { if (e.key === 'Enter') commitJump(); },
+      goToPage: commitJump,
+      firstPage: () => this.setState({ page: 1 }),
+      lastPage: () => this.setState({ page: totalPages }),
+      prevPage: () => this.setState({ page: Math.max(1, page - 1) }),
+      nextPage: () => this.setState({ page: Math.min(totalPages, page + 1) }),
+
+      fldText: this.state.fldText,
+      onFldText: (e) => this.setState({ fldText: e.target.value }),
+      fldLong: this.state.fldLong,
+      onFldLong: (e) => this.setState({ fldLong: e.target.value }),
+      fldLongCount: `${this.state.fldLong.length}/2000`,
+      fldSel: this.state.fldSel,
+      onFldSel: (e) => this.setState({ fldSel: e.target.value }),
+      fldDate: this.state.fldDate,
+      onFldDate: (e) => this.setState({ fldDate: e.target.value }),
+      fldDateTime: this.state.fldDateTime,
+      onFldDateTime: (e) => this.setState({ fldDateTime: e.target.value }),
+      fldNum: this.state.fldNum,
+      onFldNum: (e) => this.setState({ fldNum: e.target.value === '' ? '' : Number(e.target.value) }),
+      incNum: () => this.setState(s => ({ fldNum: Number(s.fldNum || 0) + 1 })),
+      decNum: () => this.setState(s => ({ fldNum: Math.max(0, Number(s.fldNum || 0) - 1) })),
+      tags: this.state.tags.map((label, i) => ({
+        label,
+        onRemove: () => this.setState(s => ({ tags: s.tags.filter((_, j) => j !== i) })),
+      })),
+      tagDraft: this.state.tagDraft,
+      onTagDraft: (e) => this.setState({ tagDraft: e.target.value }),
+      onTagKey: (e) => {
+        if (e.key === 'Enter' || e.key === ',') {
+          e.preventDefault();
+          const v = this.state.tagDraft.trim();
+          if (!v || this.state.tags.includes(v)) { this.setState({ tagDraft: '' }); return; }
+          this.setState(s => ({ tags: [...s.tags, v], tagDraft: '' }));
+        } else if (e.key === 'Backspace' && !this.state.tagDraft) {
+          this.setState(s => ({ tags: s.tags.slice(0, -1) }));
+        }
+      },
+      radioOptions: [
+        { id: 'low', label: 'Low' }, { id: 'standard', label: 'Standard' }, { id: 'high', label: 'High' },
+      ].map(o => ({
+        label: o.label,
+        checked: this.state.radio === o.id,
+        onChange: () => this.setState({ radio: o.id }),
+      })),
+      checklist: checklistDefs,
+      checklistCount: `${checklistDone} of ${checklistDefs.length} done. Order is fixed, so the same step is always in the same place.`,
+      switchOn: this.state.switchOn,
+      switchLabel: this.state.switchOn ? 'Email me about this item' : 'No emails about this item',
+      switchTrack: this.state.switchOn ? t.brand : t.surfaceAlt,
+      switchBorder: this.state.switchOn ? t.brand : t.border,
+      switchKnobBg: this.state.switchOn ? t.onBrand : t.surface,
+      switchKnob: this.state.switchOn ? 'translateX(18px)' : 'translateX(0px)',
+      toggleSwitch: () => this.setState(s => ({ switchOn: !s.switchOn })),
+      phoneCode: this.state.phoneCode,
+      onPhoneCode: (e) => this.setState({ phoneCode: e.target.value }),
+      phoneNum: this.state.phoneNum,
+      onPhoneNum: (e) => this.setState({ phoneNum: e.target.value }),
+      lookupOne: !!selectedCustomer,
+      lookupOneLabel: selectedCustomer ? selectedCustomer.name : 'Choose a customer…',
+      lookupOneId: selectedCustomer ? selectedCustomer.id : '',
+      lookupOneColor: selectedCustomer ? t.textPrimary : t.textTertiary,
+      lookupOneWeight: selectedCustomer ? 600 : 400,
+      lookupOneBorder: this.state.lookupOneOpen ? t.brand : t.border,
+      clearLookupOne: (e) => { e.stopPropagation(); this.setState({ lookupOne: null }); },
+      lookupOneQuery: this.state.lookupOneQuery,
+      onLookupOneQuery: (e) => this.setState({ lookupOneQuery: e.target.value }),
+      openLookupOne: () => this.setState(s => ({ lookupOneOpen: !s.lookupOneOpen, lookupOneQuery: '' })),
+      closeLookupOne: () => this.setState({ lookupOneOpen: false, lookupOneQuery: '' }),
+      onLookupOneKey: (e) => {
+        if (e.key === 'Escape') this.setState({ lookupOneOpen: false, lookupOneQuery: '' });
+        else if (e.key === 'Enter' && customerResults.length) {
+          e.preventDefault();
+          this.setState({ lookupOne: customerResults[0].id, lookupOneQuery: '', lookupOneOpen: false });
+        }
+      },
+      lookupOneOpen: this.state.lookupOneOpen,
+      lookupOneResults: customerResults.map((c, i) => ({
+        id: c.id, name: c.name,
+        bg: c.id === this.state.lookupOne ? t.brandTint : (i === 0 && this.state.lookupOneQuery ? t.surfaceHover : 'transparent'),
+        onClick: () => this.setState({ lookupOne: c.id, lookupOneQuery: '', lookupOneOpen: false }),
+      })),
+      lookupOneNoResults: customerResults.length === 0,
+      lookupManyQuery: this.state.lookupManyQuery,
+      onLookupManyQuery: (e) => this.setState({ lookupManyQuery: e.target.value }),
+      toggleLookupMany: () => this.setState(s => ({ lookupManyOpen: !s.lookupManyOpen, lookupManyQuery: '' })),
+      closeLookupMany: () => this.setState({ lookupManyOpen: false, lookupManyQuery: '' }),
+      onLookupManyKey: (e) => { if (e.key === 'Escape') this.setState({ lookupManyOpen: false, lookupManyQuery: '' }); },
+      lookupManyOpen: this.state.lookupManyOpen,
+      lookupManyBorder: this.state.lookupManyOpen ? t.brand : t.border,
+      lookupManyLabel: this.state.lookupMany.length
+        ? this.state.lookupMany.length + (this.state.lookupMany.length === 1 ? ' item selected' : ' items selected')
+        : 'Choose items…',
+      lookupManyColor: this.state.lookupMany.length ? t.textPrimary : t.textTertiary,
+      lookupManyWeight: this.state.lookupMany.length ? 600 : 400,
+      lookupManyNoResults: relatedResults.length === 0,
+      lookupManyChips: this.state.lookupMany.map(id => {
+        const rec = rowsData.find(r => r.id === id);
+        return {
+          id, name: rec ? rec.name : id,
+          onRemove: () => this.setState(s => ({ lookupMany: s.lookupMany.filter(x => x !== id) })),
+        };
+      }),
+      lookupManyResults: relatedResults.map(r => {
+        const on = this.state.lookupMany.includes(r.id);
+        return {
+          id: r.id, name: r.name,
+          tick: on ? '✓' : '',
+          bg: on ? t.brandTint : 'transparent',
+          boxBorder: on ? t.brand : t.border,
+          boxBg: on ? t.brand : 'transparent',
+          onClick: () => this.setState(s => ({
+            lookupMany: on ? s.lookupMany.filter(x => x !== r.id) : [...s.lookupMany, r.id],
+          })),
+        };
+      }),
+      files: this.state.files.map((f, i) => ({
+        name: f.name, ext: f.ext, meta: f.ext + ' · ' + f.size,
+        removeLabel: 'Remove ' + f.name,
+        onRemove: () => this.setState(s => ({ files: s.files.filter((_, j) => j !== i) })),
+      })),
+      hasFiles: this.state.files.length > 0,
+      fileHint: this.state.files.length
+        ? this.state.files.length + (this.state.files.length === 1 ? ' file' : ' files') + ' attached. One per row with its size, so a wrong upload is easy to spot and remove.'
+        : 'Nothing attached yet. One file per row once uploaded, with its size.',
+      addFile: () => this.setState(s => {
+        const pool = [
+          { name: 'contract-signed.pdf', size: '840 KB', ext: 'PDF' },
+          { name: 'q3-budget.xlsx', size: '126 KB', ext: 'XLSX' },
+          { name: 'handover-notes.docx', size: '38 KB', ext: 'DOCX' },
+        ];
+        return { files: [...s.files, pool[s.files.length % pool.length]] };
+      }),
+      images: this.state.images.map((im, i) => ({
+        name: im.name, ratio: im.ratio,
+        removeLabel: 'Remove ' + im.name,
+        onRemove: () => this.setState(s => ({ images: s.images.filter((_, j) => j !== i) })),
+      })),
+      imageHint: 'Shown as thumbnails, not filenames — pictures get checked by eye. JPG or PNG, 5 MB each.',
+      addImage: () => this.setState(s => {
+        const pool = [
+          { name: 'detail-01.jpg', ratio: '1200×800' },
+          { name: 'floorplan.png', ratio: '900×900' },
+          { name: 'site-photo.jpg', ratio: '2048×1365' },
+        ];
+        return { images: [...s.images, pool[s.images.length % pool.length]] };
+      }),
+      commentDraft: this.state.commentDraft,
+      onCommentDraftChange: (e) => this.setState({ commentDraft: e.target.value }),
+      postHint: postDisabled ? 'Everyone on this item will be notified.' : 'Posting as You.',
+      postComment: () => {
+        const msg = this.state.commentDraft.trim();
+        if (!msg) return;
+        this.setState(s => ({
+          commentDraft: '',
+          chatterPage: 1,
+          chatterItems: [{ type: 'comment', who: 'You', time: 'Just now', message: msg }, ...s.chatterItems],
+        }));
+      },
+      postDisabled,
+      postButtonBg: postDisabled ? t.surfaceAlt : t.brand,
+      postButtonColor: postDisabled ? t.textTertiary : t.onBrand,
+      postButtonCursor: postDisabled ? 'not-allowed' : 'pointer',
+      chatterItems,
+      chatterPageLabel: `Page ${chatterPage} of ${chatterTotalPages}`,
+      chatterPages,
+      chatterAtFirst,
+      chatterAtLast,
+      chatterPrevColor: chatterAtFirst ? t.textTertiary : t.textSecondary,
+      chatterNextColor: chatterAtLast ? t.textTertiary : t.textSecondary,
+      chatterPrevCursor: chatterAtFirst ? 'not-allowed' : 'pointer',
+      chatterNextCursor: chatterAtLast ? 'not-allowed' : 'pointer',
+      chatterPrevPage: () => this.setState(s => ({ chatterPage: Math.max(1, s.chatterPage - 1) })),
+      chatterNextPage: () => this.setState(s => ({ chatterPage: Math.min(chatterTotalPages, s.chatterPage + 1) })),
+    };
+  }
+}
+</script>
+</body>
+</html>

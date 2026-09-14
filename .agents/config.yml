@@ -7,18 +7,20 @@
 # ─────────────────────────────────────────────────────────────────────────────
 
 project:
-  name: "<PROJECT_NAME>"
+  name: "SiGula"
   # One line: what this software does, and for whom.
-  summary: "<ONE_LINE_SUMMARY>"
+  summary: "Tracks customer reorder cycles for a Yogyakarta sugar/food-ingredient distributor's sales team, flags overdue accounts, and nudges salesmen over WhatsApp to follow up."
   # poc | internal-tool | client-project | product | library
-  kind: "<PROJECT_KIND>"
+  kind: "internal-tool"
 
 # ── Track ────────────────────────────────────────────────────────────────────
 # Which rigor profile applies. Defined in .agents/workflow/tracks/<id>.yml
 #   poc         → fast, disposable, minimal gates
 #   production  → full SDLC, every gate enforced
 # Add your own by dropping a new file in that directory. Nothing else changes.
-track: poc
+# NOTE: full production rigor, but the first release is a single-team pilot —
+# see .agents/context/project.md for the pilot-then-rollout framing.
+track: production
 
 # ── Phases ───────────────────────────────────────────────────────────────────
 # Active phases, in order. Remove one and the agent stops routing work through
@@ -42,29 +44,29 @@ language:
 
 # ── Paths ────────────────────────────────────────────────────────────────────
 paths:
-  docs: docs                    # human-facing deliverables
+  docs: docs
   prd: docs/prd
   frd: docs/frd
   tdd: docs/tdd
   adr: docs/adr
-  src: src
+  src: app
   tests: tests
   state: .agents/work/STATE.md
-  notes: .agents/work/notes     # scratch, transient, safe to delete
+  notes: .agents/work/notes
 
 # ── Commands ─────────────────────────────────────────────────────────────────
 # How to actually run things. An empty string means NOT CONFIGURED: the agent
 # must ask you rather than guess a command and run it.
 commands:
-  install: ""
-  dev: ""
-  build: ""
-  test: ""
-  test_one: ""            # single-test form, e.g. "pytest {file}::{name}"
-  lint: ""
+  install: "npm install"
+  dev: "npm run dev"
+  build: "npm run build"
+  test: "npm test"
+  test_one: "npx vitest run {file}"
+  lint: ""                  # no ESLint locked yet
   format: ""
-  typecheck: ""
-  migrate: ""
+  typecheck: "npm run typecheck"
+  migrate: ""               # schema bootstraps on first boot via migrate.server.ts
   deploy_staging: ""
   deploy_production: ""
 
@@ -97,7 +99,7 @@ debt:
   # your head is a ledger that has stopped being managed.
   review_threshold: 15
   # Where to grep for DEBT-NNN markers when reconciling ledger against code.
-  scan_paths: [src, tests]
+  scan_paths: [app, tests]
 
 # ── Overrides ────────────────────────────────────────────────────────────────
 # Anything here beats the active track's default. Delete a key to fall back.

@@ -1,0 +1,1817 @@
+import React, { useState, useEffect, useMemo, useCallback } from "react";
+import {
+  Users, UserCog, Package, AlertTriangle, CheckCircle2, XCircle, RefreshCw,
+  Upload, Download, ArrowRightLeft, MessageCircle, Send, Clock, ChevronRight,
+  Search, RotateCcw, Building2, TrendingUp, ShieldCheck, Sparkles, ListChecks,
+  CalendarClock, ArrowLeft, Filter, FileSpreadsheet, Undo2, FileText
+} from "lucide-react";
+import * as XLSX from "xlsx";
+
+/* ============================================================
+   SEED DATA — diambil dari Order_Tracker_2026.xlsx yang diupload
+   ============================================================ */
+const SEED_SALESMEN = [{"id": "SLM-001", "nama": "HANIF", "supervisor_id": null, "nomor_wa": "", "status": "Aktif"}, {"id": "SLM-002", "nama": "FAHMI", "supervisor_id": null, "nomor_wa": "", "status": "Aktif"}, {"id": "SLM-003", "nama": "ERIYA", "supervisor_id": null, "nomor_wa": "", "status": "Aktif"}, {"id": "SLM-004", "nama": "AKHMAD FAZA", "supervisor_id": null, "nomor_wa": "", "status": "Aktif"}, {"id": "SLM-005", "nama": "DAFFA", "supervisor_id": null, "nomor_wa": "", "status": "Aktif"}, {"id": "SLM-006", "nama": "ADNA", "supervisor_id": null, "nomor_wa": "", "status": "Aktif"}, {"id": "SLM-007", "nama": "ARKAN", "supervisor_id": null, "nomor_wa": "", "status": "Aktif"}, {"id": "SLM-008", "nama": "ANIROTUN", "supervisor_id": null, "nomor_wa": "", "status": "Aktif"}, {"id": "SLM-009", "nama": "WANTO", "supervisor_id": null, "nomor_wa": "", "status": "Aktif"}];
+const SEED_CUSTOMERS = [{"id": "CUST-10001", "nama": "AROMA", "salesman_id": "SLM-001", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-05-09"}, {"id": "CUST-10002", "nama": "AROMA 1", "salesman_id": "SLM-001", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-11"}, {"id": "CUST-10003", "nama": "BAKMI NIKMAT RASA", "salesman_id": "SLM-001", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-06-08"}, {"id": "CUST-10004", "nama": "BAKPIA 35 - PARMINTO", "salesman_id": "SLM-001", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-06-26"}, {"id": "CUST-10005", "nama": "BAKSO PAK JENGGOT", "salesman_id": "SLM-001", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-27"}, {"id": "CUST-10006", "nama": "BERKAH ARUM MANIS - PURWOKERTO", "salesman_id": "SLM-001", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-04-27"}, {"id": "CUST-10007", "nama": "BOLU EMPRIT SUKA MAJU", "salesman_id": "SLM-001", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-05-16"}, {"id": "CUST-10008", "nama": "CAFÉ BASA BASI", "salesman_id": "SLM-001", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-15"}, {"id": "CUST-10009", "nama": "CV SKN - SUKINO", "salesman_id": "SLM-001", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-04"}, {"id": "CUST-10010", "nama": "DALMAN GULA MERAH - LAKBOK", "salesman_id": "SLM-001", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-04-17"}, {"id": "CUST-10011", "nama": "DOYOK", "salesman_id": "SLM-001", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-19"}, {"id": "CUST-10012", "nama": "Gula Batu \"Bu Harti\" - SUHARTI", "salesman_id": "SLM-001", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-02-16"}, {"id": "CUST-10013", "nama": "GULA MERAH AHLUN - LAKBOK", "salesman_id": "SLM-001", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-04-18"}, {"id": "CUST-10014", "nama": "GULA MERAH EFI ALFIAH - CILACAP", "salesman_id": "SLM-001", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-04-22"}, {"id": "CUST-10015", "nama": "GULA MERAH PAWITNO / BERKAH MANIS JAYA - KEBUMEN", "salesman_id": "SLM-001", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-03-31"}, {"id": "CUST-10016", "nama": "INDOWARUNG SEDAYU", "salesman_id": "SLM-001", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-07"}, {"id": "CUST-10017", "nama": "KOKO SAKERA WONOSOBO", "salesman_id": "SLM-001", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-06-12"}, {"id": "CUST-10018", "nama": "LUMPIA BU TATIK", "salesman_id": "SLM-001", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-22"}, {"id": "CUST-10019", "nama": "MAMAD GULA MERAH", "salesman_id": "SLM-001", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-02-13"}, {"id": "CUST-10020", "nama": "MASSIMO GELATO - SACCO INDONESIA - CV HARRUS MAKMUR", "salesman_id": "SLM-001", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-06"}, {"id": "CUST-10021", "nama": "MY KUE", "salesman_id": "SLM-001", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-05-28"}, {"id": "CUST-10022", "nama": "ONDE-ONDE MBAH SIMPING - BU ASIH", "salesman_id": "SLM-001", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-14"}, {"id": "CUST-10023", "nama": "RASIKIN", "salesman_id": "SLM-001", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-16"}, {"id": "CUST-10024", "nama": "ROTI ASLI - CATERING ASLI", "salesman_id": "SLM-001", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-22"}, {"id": "CUST-10025", "nama": "ROTI RAJAWALI - JARMINI - UD BERKAT", "salesman_id": "SLM-001", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-29"}, {"id": "CUST-10026", "nama": "SENDOK SUMPIT BNR", "salesman_id": "SLM-001", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-02-10"}, {"id": "CUST-10027", "nama": "SRABI PRATAMA", "salesman_id": "SLM-001", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-03-02"}, {"id": "CUST-10028", "nama": "SUHERMAN (GKP)", "salesman_id": "SLM-001", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-03"}, {"id": "CUST-10029", "nama": "SUNDAY'S CAKE", "salesman_id": "SLM-001", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-15"}, {"id": "CUST-10030", "nama": "TEH POCI GANA", "salesman_id": "SLM-001", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-04-21"}, {"id": "CUST-10031", "nama": "TOKO AWIDA - KUDU DUKUH", "salesman_id": "SLM-001", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-03-05"}, {"id": "CUST-10032", "nama": "TOKO BAHAN KUE GEDHE", "salesman_id": "SLM-001", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-03-07"}, {"id": "CUST-10033", "nama": "TOKO KENDAR GODEAN - ROTI ASIH", "salesman_id": "SLM-001", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-05-14"}, {"id": "CUST-10034", "nama": "TOKO PAITUT - PASTY", "salesman_id": "SLM-001", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-02-19"}, {"id": "CUST-10035", "nama": "TUSWATI LAKBOK - GARUT", "salesman_id": "SLM-001", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-19"}, {"id": "CUST-10036", "nama": "UD SAG", "salesman_id": "SLM-001", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-03-17"}, {"id": "CUST-10037", "nama": "WEDANG UWUH MAHARANI", "salesman_id": "SLM-001", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-13"}, {"id": "CUST-10038", "nama": "WEDANG UWUH MBAH SUDI - SIDO MAKMUR - PARJIYANA", "salesman_id": "SLM-001", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-20"}, {"id": "CUST-10039", "nama": "WEDANG UWUH SEKAR JAWI", "salesman_id": "SLM-001", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-03-04"}, {"id": "CUST-10040", "nama": "WINGKO SEMAR JOGJA", "salesman_id": "SLM-001", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-19"}, {"id": "CUST-10041", "nama": "WORO GULA MERAH - CILONGOK", "salesman_id": "SLM-001", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-13"}, {"id": "CUST-10042", "nama": "RUSMAN /ANEKA GULA", "salesman_id": "SLM-001", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-12"}, {"id": "CUST-10043", "nama": "ROTI AMANAH", "salesman_id": "SLM-001", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-22"}, {"id": "CUST-10044", "nama": "TEH DESA LUSIANA", "salesman_id": "SLM-001", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-18"}, {"id": "CUST-10045", "nama": "ABON DAUN EMAS", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-06-26"}, {"id": "CUST-10046", "nama": "ABON SURYA - SURYA HOME INDUSTRY", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-21"}, {"id": "CUST-10047", "nama": "ALIT TOKO", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-06-15"}, {"id": "CUST-10048", "nama": "AMORE GELATO / BUNGA ESKRIM INDONESIA", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-05"}, {"id": "CUST-10049", "nama": "ANUGRAH TOKO & BAKERY", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-18"}, {"id": "CUST-10050", "nama": "APOSO CAKE & PASTISSERIE - BELLA", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-14"}, {"id": "CUST-10051", "nama": "APRILIA CHIFFON CAKE", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-14"}, {"id": "CUST-10052", "nama": "BAKPIA & WINGKO BU YATI", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-22"}, {"id": "CUST-10053", "nama": "BAKPIA 525 / LISA", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-06"}, {"id": "CUST-10054", "nama": "BAKPIA 750", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-06-05"}, {"id": "CUST-10055", "nama": "BAKPIA ARISTI", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-08"}, {"id": "CUST-10056", "nama": "BAKPIA DJAVA", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-19"}, {"id": "CUST-10057", "nama": "BAKPIA PATHOK 232 - WIWIK", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-21"}, {"id": "CUST-10058", "nama": "BAKPIA SATRIO JOYO", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-19"}, {"id": "CUST-10059", "nama": "BAKPIA WONG", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-22"}, {"id": "CUST-10060", "nama": "BANANANIA", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-10"}, {"id": "CUST-10061", "nama": "BLOOMERY", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-11"}, {"id": "CUST-10062", "nama": "BOLU KUWO", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-05-06"}, {"id": "CUST-10063", "nama": "CHEZ MOI KALASAN", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-14"}, {"id": "CUST-10064", "nama": "CHIFFON QU", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-21"}, {"id": "CUST-10065", "nama": "CV ISMA MANDIRI - OSAMILK", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-30"}, {"id": "CUST-10066", "nama": "CV SINARFOOD HEALTHINDO - SUKOHARJO", "salesman_id": "SLM-002", "tipe_customer": "Baru", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-02-05"}, {"id": "CUST-10067", "nama": "CV SINARFOOD MAXTER - SUKOHARJO", "salesman_id": "SLM-002", "tipe_customer": "Baru", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-02-05"}, {"id": "CUST-10068", "nama": "CV. USAHA KITA BERSAMA - BOJONEGORO", "salesman_id": "SLM-002", "tipe_customer": "Baru", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-06-05"}, {"id": "CUST-10069", "nama": "D'ENDOG", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-21"}, {"id": "CUST-10070", "nama": "EDI SANTOSO - TOKO SEMBAKO PALAGAN", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-18"}, {"id": "CUST-10071", "nama": "ENTING-ENTING JAHE \"GALUH AJI\"", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-28"}, {"id": "CUST-10072", "nama": "ESTHY CAKE & BAKERY - PT FIIRZA BERKAH BERSAMA", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-18"}, {"id": "CUST-10073", "nama": "FAVOR PATISSERIE PIZZERIA & EATERY", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-03"}, {"id": "CUST-10074", "nama": "FIRMANSYAH  - YANGKO AM", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-13"}, {"id": "CUST-10075", "nama": "FITRI PASAR GANJURAN", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-06-19"}, {"id": "CUST-10076", "nama": "FURAYHANA BAKERY", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-05"}, {"id": "CUST-10077", "nama": "GANKU RICE & NOODLES", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-04-30"}, {"id": "CUST-10078", "nama": "GEPLAK SYIFA - PAK SUWARDI", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-05-05"}, {"id": "CUST-10079", "nama": "GRIYA BAKPIA", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-14"}, {"id": "CUST-10080", "nama": "GULA BATU 347 - DIMAS - SAMIDI", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-22"}, {"id": "CUST-10081", "nama": "GULA BATU CETAK \"MBAH AMO\"", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-22"}, {"id": "CUST-10082", "nama": "GULA BATU PAK NARPO", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-21"}, {"id": "CUST-10083", "nama": "HIKARU BAKE HOUSE", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-22"}, {"id": "CUST-10084", "nama": "JOGLO NUSANTARA CATERING", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-22"}, {"id": "CUST-10085", "nama": "KIOS ATI RAJA (TITIK)", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-16"}, {"id": "CUST-10086", "nama": "KUSMIYATI - PASAR GANJURAN", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-05"}, {"id": "CUST-10087", "nama": "LEGEND COFFE", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-03"}, {"id": "CUST-10088", "nama": "MADA JAYA", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-04"}, {"id": "CUST-10089", "nama": "MEKAR JAYA TOKO", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-04-21"}, {"id": "CUST-10090", "nama": "MISS BAKE BAKERY", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-21"}, {"id": "CUST-10091", "nama": "MOCCI SAKURA", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-01"}, {"id": "CUST-10092", "nama": "MOSCELLA ES KRIM", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-19"}, {"id": "CUST-10093", "nama": "MYOSOTIS CAFÉ", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-04-10"}, {"id": "CUST-10094", "nama": "NUNA CAKE AND BAKERY - OMAH ROTI", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-07"}, {"id": "CUST-10095", "nama": "NURI NAVA SKIN", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-05-15"}, {"id": "CUST-10096", "nama": "OMAHE BAKPIA - TELO UNGU - BAMBANG", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-03-30"}, {"id": "CUST-10097", "nama": "ONDE-ONDE MAS ADI", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-06"}, {"id": "CUST-10098", "nama": "PT AKSAMALA ADI ANDANA - VITABUMIN", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-06-30"}, {"id": "CUST-10099", "nama": "QONITA BAKERY - ONGGOBAYAN", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-28"}, {"id": "CUST-10100", "nama": "ROTI DAN SNACK JOSSRI", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-10"}, {"id": "CUST-10101", "nama": "ROTI FLAMBOYAN", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-06-24"}, {"id": "CUST-10102", "nama": "ROTI ISTANA", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-07"}, {"id": "CUST-10103", "nama": "ROTI PATRAM JAYA", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-19"}, {"id": "CUST-10104", "nama": "ROYAL SIRUP", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-10"}, {"id": "CUST-10105", "nama": "SEMBAKO IMAM", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-06-02"}, {"id": "CUST-10106", "nama": "SEMBAKO MALIKMART - BU TARI", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-05-25"}, {"id": "CUST-10107", "nama": "SEMBAKO SERUNI - PLERET", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-03-30"}, {"id": "CUST-10108", "nama": "SETYO REJO SEMBAKO - CONDONGCATUR", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-04-25"}, {"id": "CUST-10109", "nama": "SPESIAL PUDING KELAPA MUDA", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-15"}, {"id": "CUST-10110", "nama": "SRC DADANG", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-14"}, {"id": "CUST-10111", "nama": "SUMBER ARGA SEJAHTERA - BENTENGAN - AGUNG WIDODO", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-04-30"}, {"id": "CUST-10112", "nama": "TOKO FAJAR (BU TARI) - PASAR BANTUL", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-05-21"}, {"id": "CUST-10113", "nama": "TOKO JINAH - WARJINAH - PASAR BANTUL", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-19"}, {"id": "CUST-10114", "nama": "TOKO MAHKOTA - PASAR BANTUL", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-18"}, {"id": "CUST-10115", "nama": "TOKO MALIKA JAYA RAYA", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-10"}, {"id": "CUST-10116", "nama": "TOKO RAHMA - NUNUNG", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-27"}, {"id": "CUST-10117", "nama": "TOKO RAYA MART", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-30"}, {"id": "CUST-10118", "nama": "TOKO SEMBAKO  QORI - BP GROSIR", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-06-08"}, {"id": "CUST-10119", "nama": "TOKO SULIS PASAR BANTUL", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-06-27"}, {"id": "CUST-10120", "nama": "TOKO TEKUN MULYO - ENDANG", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-28"}, {"id": "CUST-10121", "nama": "TOP'S KUE DAN ROTI", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-22"}, {"id": "CUST-10122", "nama": "VIEND'S CAKE", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-21"}, {"id": "CUST-10123", "nama": "VIVI BAKPIA 72", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-18"}, {"id": "CUST-10124", "nama": "WEDANG UWUH EDI - EDI KUSWANTO / SEGER WARAS", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-20"}, {"id": "CUST-10125", "nama": "WINGKO & BAKPIA PRASOJO", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-19"}, {"id": "CUST-10126", "nama": "WIN'S CAKE", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-06"}, {"id": "CUST-10127", "nama": "WS MEDARI JL MAGELANG", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-06-26"}, {"id": "CUST-10128", "nama": "WS PUTRA KOTAGEDE", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-06-26"}, {"id": "CUST-10129", "nama": "YANGKO HW", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-06-10"}, {"id": "CUST-10130", "nama": "YANGKO MATARAM", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-06-05"}, {"id": "CUST-10131", "nama": "YANGKO PELANGI", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-29"}, {"id": "CUST-10132", "nama": "YANGKO WAHYU", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-20"}, {"id": "CUST-10133", "nama": "YOGYA SUPLAY", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-07"}, {"id": "CUST-10134", "nama": "YUSUF - TOKO SALMA", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-18"}, {"id": "CUST-10135", "nama": "BAKPIA & YANGKO ANISA", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-22"}, {"id": "CUST-10136", "nama": "TEH DESA DANIEL", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-22"}, {"id": "CUST-10137", "nama": "VITALA NATURA NUSANTARA", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-10"}, {"id": "CUST-10138", "nama": "NUSA ETTA WAHIDA PT (PAK KOKO )", "salesman_id": "SLM-002", "tipe_customer": "Baru", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-12"}, {"id": "CUST-10139", "nama": "CV USAHA KITA BERSAMA BOJONEGORO", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-13"}, {"id": "CUST-10140", "nama": "GUBUG REMPAH - YOHANES DWI SUBIYANTORO", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-18"}, {"id": "CUST-10141", "nama": "KARTIKA BAKERY CHIFFON CAKE", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-19"}, {"id": "CUST-10142", "nama": "BAKPIA KENCANA - AMBARKETAWANG", "salesman_id": "SLM-002", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-22"}, {"id": "CUST-10143", "nama": "\"SEMPE ARUMMANIS\" HAJI ARDI", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-18"}, {"id": "CUST-10144", "nama": "AGRINDO SUPRAFOOD", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-05-29"}, {"id": "CUST-10145", "nama": "ALDO SIMPEL SIRUP", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-19"}, {"id": "CUST-10146", "nama": "AMANDA JOGJA - PT BOGA RASA KULINER", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-18"}, {"id": "CUST-10147", "nama": "AMANDA SURABAYA - PT BOGA RASA KULINER", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-30"}, {"id": "CUST-10148", "nama": "ARIANA ARUMANIS", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-05"}, {"id": "CUST-10149", "nama": "AY-HWA / HENDRA SIRUP LIMUN", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-11"}, {"id": "CUST-10150", "nama": "BAKPIA 125", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-05-12"}, {"id": "CUST-10151", "nama": "BAKPIA 145", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-07"}, {"id": "CUST-10152", "nama": "BAKPIA 23", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-15"}, {"id": "CUST-10153", "nama": "BAKPIA 234 - YENNY", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-05"}, {"id": "CUST-10154", "nama": "BAKPIA 63", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-29"}, {"id": "CUST-10155", "nama": "BAKPIA HANI", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-18"}, {"id": "CUST-10156", "nama": "BAKPIA JOGKEM", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-22"}, {"id": "CUST-10157", "nama": "BAKPIA MAHKOTA RASA", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-10"}, {"id": "CUST-10158", "nama": "BAKPIA MERLINO", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-11"}, {"id": "CUST-10159", "nama": "BAKPIA PATHOK TERBIT - YUDI", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-30"}, {"id": "CUST-10160", "nama": "BAKPIA SAYAJO - BU DINA", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-06-02"}, {"id": "CUST-10161", "nama": "BAMBANG THR", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-18"}, {"id": "CUST-10162", "nama": "BETTA SWALAYAN", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-05-19"}, {"id": "CUST-10163", "nama": "BIMO BAHAN KUE - SEMBAKO", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-07"}, {"id": "CUST-10164", "nama": "BOLU EMPRIT PRIYO", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-10"}, {"id": "CUST-10165", "nama": "CATERING SARI DEWI", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-06"}, {"id": "CUST-10166", "nama": "CHAMIL SABOGA AKSATA - CV BINTANG WALET", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-04-21"}, {"id": "CUST-10167", "nama": "CIPTO ROTI", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-10"}, {"id": "CUST-10168", "nama": "CV ANUGRAH SUKSES MANDIRI / TELAGA RASA - MUKHLIS", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-16"}, {"id": "CUST-10169", "nama": "CV KATMINDO TEKNOLOGI INOVASI", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-07"}, {"id": "CUST-10170", "nama": "CV NATURA UTAMA (good yoghurt)", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-22"}, {"id": "CUST-10171", "nama": "CV OMO FOOD INDONESIA - JASMINE CAKERY", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-05"}, {"id": "CUST-10172", "nama": "CV PAKBRIK POWDER SOLO", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-14"}, {"id": "CUST-10173", "nama": "CV SERELIA PRIMA NUTRISIA", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-22"}, {"id": "CUST-10174", "nama": "DARIS ETAWA - SEVEN ON SEVEN - KARYANA", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-14"}, {"id": "CUST-10175", "nama": "DEWI ARTI ARUM MANIS", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-16"}, {"id": "CUST-10176", "nama": "DIMAS - SIRUP TAWON", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-01-03"}, {"id": "CUST-10177", "nama": "DIPO BAKERY", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-21"}, {"id": "CUST-10178", "nama": "DM 3", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-15"}, {"id": "CUST-10179", "nama": "DM BARU", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-20"}, {"id": "CUST-10180", "nama": "DM PIYUNGAN - CV DM AMANAH", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-06-13"}, {"id": "CUST-10181", "nama": "ENTING GEPUK GEDUNG", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-18"}, {"id": "CUST-10182", "nama": "ETTA INDOTAMA - wiwid etawa", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-11"}, {"id": "CUST-10183", "nama": "FITRI GULA MERAH / SIPUR - KEBUMEN", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-16"}, {"id": "CUST-10184", "nama": "GEPLAK KELAPA MUDA MBAK PUR", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-15"}, {"id": "CUST-10185", "nama": "GEPLAK SANTI", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-11"}, {"id": "CUST-10186", "nama": "GITA FOOD PT", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-06"}, {"id": "CUST-10187", "nama": "HARTO JEC", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-06-18"}, {"id": "CUST-10188", "nama": "INO SKIN INTERNATIONAL", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-05"}, {"id": "CUST-10189", "nama": "JASMINE BAKERY", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-21"}, {"id": "CUST-10190", "nama": "KAFFA FOOD", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-28"}, {"id": "CUST-10191", "nama": "KALIS BERKAT BERSAMA - KALIS DONUTS", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-21"}, {"id": "CUST-10192", "nama": "KAYLA BAKERY", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-04"}, {"id": "CUST-10193", "nama": "KOFFIKU / FREYSEA INDO CITRA", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-06-20"}, {"id": "CUST-10194", "nama": "LUMBUNG PARI - HARIYANTO WEDANG UWUH", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-15"}, {"id": "CUST-10195", "nama": "MARINA ROTI", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-06-02"}, {"id": "CUST-10196", "nama": "MONICA SUSU POANG", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-04-30"}, {"id": "CUST-10197", "nama": "MOUNT MERAPI BAKE HOUSE", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-03-26"}, {"id": "CUST-10198", "nama": "MUMTAZ BAKERY", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-18"}, {"id": "CUST-10199", "nama": "MURNI BAKERY", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-20"}, {"id": "CUST-10200", "nama": "NUN BAKERY", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-22"}, {"id": "CUST-10201", "nama": "OLINDA ROTI", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-22"}, {"id": "CUST-10202", "nama": "OMA OPA OPERASIONAL", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-15"}, {"id": "CUST-10203", "nama": "PAIJI ETAWA", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-11"}, {"id": "CUST-10204", "nama": "PAMELA 1", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-02-28"}, {"id": "CUST-10205", "nama": "PAMELA 7", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-01-22"}, {"id": "CUST-10206", "nama": "PAPA COOKIES BANJARNEGARA - CV MITRA PREMIXINDO UTAMA", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-25"}, {"id": "CUST-10207", "nama": "PAPA COOKIES JOGJA - CV MATARAM PANGAN SEJAHTERA", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-15"}, {"id": "CUST-10208", "nama": "PAPA COOKIES TEGAL - CV CIPUMULANG WAHANA PANGAN", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-14"}, {"id": "CUST-10209", "nama": "PERMEN LOLY POP - MAHKOTA RASA - SEMARANG", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-09"}, {"id": "CUST-10210", "nama": "PISTACHIO BAKERY / WISATA POTRET DJOKDJA / CV BOGA SUMBER ARTA SEJATI", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-21"}, {"id": "CUST-10211", "nama": "PT ENEREL KOSMETIKA BIOTECH", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-03-16"}, {"id": "CUST-10212", "nama": "PT SERA FOOD INDONESIA", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-19"}, {"id": "CUST-10213", "nama": "PT TISSAN NUGRAHA GLOBALINDO", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-07"}, {"id": "CUST-10214", "nama": "PT WEBE GIRH BIOTEKNOLOGI", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-04-22"}, {"id": "CUST-10215", "nama": "RIRIN LOLY POP - MALANG", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-12"}, {"id": "CUST-10216", "nama": "ROTI BOLANG BALING PAK RAHMAT", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-15"}, {"id": "CUST-10217", "nama": "ROTI LUWES AMDON - PAK HAN", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-20"}, {"id": "CUST-10218", "nama": "ROTI MERANI", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-20"}, {"id": "CUST-10219", "nama": "ROTI UKEL - ARIFAH", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-05-23"}, {"id": "CUST-10220", "nama": "SANI GUNA ETAWA - SENO ETAWA", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-02"}, {"id": "CUST-10221", "nama": "SARANA BOGA UTAMA - EVI SABOGA", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-15"}, {"id": "CUST-10222", "nama": "SEKOTENG TBH", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-08"}, {"id": "CUST-10223", "nama": "SEMBAKO 3 PUTRA", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-06-18"}, {"id": "CUST-10224", "nama": "SEMBAKO ANTOK - BERBAH", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-03-11"}, {"id": "CUST-10225", "nama": "SEMBAKO LHI", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-05-12"}, {"id": "CUST-10226", "nama": "SEMBAKO SRI PRAMBANAN", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-05-20"}, {"id": "CUST-10227", "nama": "SEMBAKO TIMBUL JAYA  - SITI PLERET", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-19"}, {"id": "CUST-10228", "nama": "SEMBAKO WIWIT", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-04-27"}, {"id": "CUST-10229", "nama": "SERABI NOTOKUSUMAN NY. LIDIA", "salesman_id": "SLM-003", "tipe_customer": "Baru", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-15"}, {"id": "CUST-10230", "nama": "SOLUSKY", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-18"}, {"id": "CUST-10231", "nama": "SUDARMINTO - PERMEN JAHE - NGANJUK", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-06-16"}, {"id": "CUST-10232", "nama": "SUSI GULA MERAH CILACAP", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-05-11"}, {"id": "CUST-10233", "nama": "TAMTO MANDIRI ETAWA", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-07"}, {"id": "CUST-10234", "nama": "TOKO 361", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-21"}, {"id": "CUST-10235", "nama": "TOKO AKHMADI", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-03-26"}, {"id": "CUST-10236", "nama": "TOKO BU DARMINI", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-13"}, {"id": "CUST-10237", "nama": "TOKO HANDAYANI - PAK BASUKI PIYUNGAN", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-02-18"}, {"id": "CUST-10238", "nama": "TOKO MAS SATYA", "salesman_id": "SLM-003", "tipe_customer": "Baru", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-02-24"}, {"id": "CUST-10239", "nama": "TOKO POJOK", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-03-17"}, {"id": "CUST-10240", "nama": "TOKO PROGO", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-31"}, {"id": "CUST-10241", "nama": "TOKO SUCI PIYUNGAN", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-18"}, {"id": "CUST-10242", "nama": "TRITUNGGAL SINARJAYA - HENDRA WAX", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-06-11"}, {"id": "CUST-10243", "nama": "UMSKEY - EFMA PENDI ETAWA", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-11"}, {"id": "CUST-10244", "nama": "UNI PEKALONGAN - TEH JAWA", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-05-29"}, {"id": "CUST-10245", "nama": "WEDANG CANTING - MUH SYIFA", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-02-13"}, {"id": "CUST-10246", "nama": "WEDANG UWUH DAWUH", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-22"}, {"id": "CUST-10247", "nama": "YAMTI GULA JAWA", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-18"}, {"id": "CUST-10248", "nama": "YANGKO DRM", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-18"}, {"id": "CUST-10249", "nama": "YANGKO MIRA / ANEKA RASA", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-31"}, {"id": "CUST-10250", "nama": "YANGKO NGUDI ROSO", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-06-19"}, {"id": "CUST-10251", "nama": "YANGKO RIMA", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-21"}, {"id": "CUST-10252", "nama": "YANGKO SOFYAN", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-11"}, {"id": "CUST-10253", "nama": "YANGKO STW", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-15"}, {"id": "CUST-10254", "nama": "YANGKO VEGA", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-19"}, {"id": "CUST-10255", "nama": "YULI - SUPER PUDING", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-31"}, {"id": "CUST-10256", "nama": "SARI MEKAR - TURAH", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-01"}, {"id": "CUST-10257", "nama": "RESTORAN BUMA - BEBEK SANJAY", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-21"}, {"id": "CUST-10258", "nama": "ASHIFUDIN LUMORA", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-08"}, {"id": "CUST-10259", "nama": "MY GELATO", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-05"}, {"id": "CUST-10260", "nama": "PAMELA 3", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-06-22"}, {"id": "CUST-10261", "nama": "PAMELA 9", "salesman_id": "SLM-003", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-09"}, {"id": "CUST-10262", "nama": "ABON GANDEM MAREM", "salesman_id": "SLM-004", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-06-01"}, {"id": "CUST-10263", "nama": "ANISSA MART", "salesman_id": "SLM-004", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-12"}, {"id": "CUST-10264", "nama": "ANWAR H KEBUMEN - RAHMAN GULA MERAH MELATI", "salesman_id": "SLM-004", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-02-25"}, {"id": "CUST-10265", "nama": "AYAM PENYET SURABAYA", "salesman_id": "SLM-004", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-06-05"}, {"id": "CUST-10266", "nama": "BAKPIA DANIK 234", "salesman_id": "SLM-004", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-07"}, {"id": "CUST-10267", "nama": "BAKPIA JIWA JOGJA", "salesman_id": "SLM-004", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-10"}, {"id": "CUST-10268", "nama": "BAKPIA KEDATON", "salesman_id": "SLM-004", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-05"}, {"id": "CUST-10269", "nama": "BAKPIA MENUK", "salesman_id": "SLM-004", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-18"}, {"id": "CUST-10270", "nama": "BAKPIA PANGERAN", "salesman_id": "SLM-004", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-08"}, {"id": "CUST-10271", "nama": "Bakpia Ruly/999", "salesman_id": "SLM-004", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-04-13"}, {"id": "CUST-10272", "nama": "BERLY BREAD", "salesman_id": "SLM-004", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-06-29"}, {"id": "CUST-10273", "nama": "CAKE IN LOVE", "salesman_id": "SLM-004", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-05-29"}, {"id": "CUST-10274", "nama": "CATUR MART", "salesman_id": "SLM-004", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-01-27"}, {"id": "CUST-10275", "nama": "CHIFFON BU AMBAR - SASYA", "salesman_id": "SLM-004", "tipe_customer": "Baru", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-19"}, {"id": "CUST-10276", "nama": "CV BISMA SEHAT", "salesman_id": "SLM-004", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-19"}, {"id": "CUST-10277", "nama": "CV YOSUA MANDIRI GRUP", "salesman_id": "SLM-004", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-14"}, {"id": "CUST-10278", "nama": "DELIA SHOP 2", "salesman_id": "SLM-004", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-03-14"}, {"id": "CUST-10279", "nama": "DENSYA JUICE", "salesman_id": "SLM-004", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-08"}, {"id": "CUST-10280", "nama": "DOWN TOWN - PT DWI SAUDARA JAYA", "salesman_id": "SLM-004", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-21"}, {"id": "CUST-10281", "nama": "DOYANI BAKERY", "salesman_id": "SLM-004", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-03-14"}, {"id": "CUST-10282", "nama": "ELDER PATISSERIE", "salesman_id": "SLM-004", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-18"}, {"id": "CUST-10283", "nama": "FEBRY GULA MERAH - MAGETAN", "salesman_id": "SLM-004", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-05-09"}, {"id": "CUST-10284", "nama": "HERBA RASA - NGOMBE JAMU", "salesman_id": "SLM-004", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-01-13"}, {"id": "CUST-10285", "nama": "INDOKULAK - PT INDOTOKO PANGAN MAKMUR", "salesman_id": "SLM-004", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-04-25"}, {"id": "CUST-10286", "nama": "KACANG SUKSES", "salesman_id": "SLM-004", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-22"}, {"id": "CUST-10287", "nama": "KENES BAKERY", "salesman_id": "SLM-004", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-21"}, {"id": "CUST-10288", "nama": "KIOS PAK KARNO", "salesman_id": "SLM-004", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-04-22"}, {"id": "CUST-10289", "nama": "KUE DIENG", "salesman_id": "SLM-004", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-01-20"}, {"id": "CUST-10290", "nama": "LOVE PASTRY", "salesman_id": "SLM-004", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-21"}, {"id": "CUST-10291", "nama": "MIROTA GODEAN", "salesman_id": "SLM-004", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-04-06"}, {"id": "CUST-10292", "nama": "MIROTA JL IMOGIRI", "salesman_id": "SLM-004", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-03-11"}, {"id": "CUST-10293", "nama": "MIROTA SUPENO", "salesman_id": "SLM-004", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-03-11"}, {"id": "CUST-10294", "nama": "NUTS INDUSTRY - AMPYANG BU EMY", "salesman_id": "SLM-004", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-21"}, {"id": "CUST-10295", "nama": "PENGERINGAN TEMBAKAU BANDI", "salesman_id": "SLM-004", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-20"}, {"id": "CUST-10296", "nama": "PRAMBARU BAKERY", "salesman_id": "SLM-004", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-20"}, {"id": "CUST-10297", "nama": "PT CAHAYA UTAMA ALAM NUSARICH", "salesman_id": "SLM-004", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-03"}, {"id": "CUST-10298", "nama": "PT DELTA ATSARI PRIMA", "salesman_id": "SLM-004", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-01-24"}, {"id": "CUST-10299", "nama": "PT FATHAN BERKAH ABADI (Alif Bakery)", "salesman_id": "SLM-004", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-01-22"}, {"id": "CUST-10300", "nama": "PT FOR VISION MULIA GLOBAL", "salesman_id": "SLM-004", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-01-13"}, {"id": "CUST-10301", "nama": "PT IMPIAN CIPTA KREASI - ADIFA", "salesman_id": "SLM-004", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-03-26"}, {"id": "CUST-10302", "nama": "PT MIROTA KSM", "salesman_id": "SLM-004", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-04-28"}, {"id": "CUST-10303", "nama": "ROTI GALUNDENG - AGUS SANTOSO", "salesman_id": "SLM-004", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-10"}, {"id": "CUST-10304", "nama": "ROTI LAPIS SUROSO", "salesman_id": "SLM-004", "tipe_customer": "Baru", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-01-24"}, {"id": "CUST-10305", "nama": "SAGON WIYORO", "salesman_id": "SLM-004", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-06-02"}, {"id": "CUST-10306", "nama": "SEMBAKO SIGMA", "salesman_id": "SLM-004", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-05-01"}, {"id": "CUST-10307", "nama": "SENDOK SUMPIT - DUCK KING PAKUWON", "salesman_id": "SLM-004", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-01-21"}, {"id": "CUST-10308", "nama": "SENDOK SUMPIT HASHA", "salesman_id": "SLM-004", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-08"}, {"id": "CUST-10309", "nama": "SRI GETUK", "salesman_id": "SLM-004", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-01-16"}, {"id": "CUST-10310", "nama": "SWALAYAN KAMILA", "salesman_id": "SLM-004", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-04-17"}, {"id": "CUST-10311", "nama": "TABURA", "salesman_id": "SLM-004", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-22"}, {"id": "CUST-10312", "nama": "TOKO KENIK", "salesman_id": "SLM-004", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-02-23"}, {"id": "CUST-10313", "nama": "TOKO LASTRI", "salesman_id": "SLM-004", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-06-22"}, {"id": "CUST-10314", "nama": "TOKO MITRA ABADI CEBONGAN", "salesman_id": "SLM-004", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-02-20"}, {"id": "CUST-10315", "nama": "TOKO RINA", "salesman_id": "SLM-004", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-03-11"}, {"id": "CUST-10316", "nama": "TOKO SRIDIYONO - PASAR GODEAN", "salesman_id": "SLM-004", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-03-27"}, {"id": "CUST-10317", "nama": "TRANS RETAIL INDONESIA - TRANSMART", "salesman_id": "SLM-004", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-01-29"}, {"id": "CUST-10318", "nama": "UGENG (GKP)", "salesman_id": "SLM-004", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-06"}, {"id": "CUST-10319", "nama": "WARUNG BALI", "salesman_id": "SLM-004", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-02-20"}, {"id": "CUST-10320", "nama": "WINGKO WAE", "salesman_id": "SLM-004", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-20"}, {"id": "CUST-10321", "nama": "YANGKO GIANT", "salesman_id": "SLM-004", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-18"}, {"id": "CUST-10322", "nama": "YOGA BANJARNEGARA (GKP)", "salesman_id": "SLM-004", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-05-05"}, {"id": "CUST-10323", "nama": "PAMELA 8", "salesman_id": "SLM-004", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-06-18"}, {"id": "CUST-10324", "nama": "SENDOK SUMPIT - CV CIPTA SEJAHTERA BERJAYA", "salesman_id": "SLM-004", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-02-06"}, {"id": "CUST-10325", "nama": "MANDIRI JAYA - MARYONO", "salesman_id": "SLM-004", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-12"}, {"id": "CUST-10326", "nama": "ABON BERKAH JAYA", "salesman_id": "SLM-005", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-11"}, {"id": "CUST-10327", "nama": "ADIBA GULA BATU", "salesman_id": "SLM-005", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-06"}, {"id": "CUST-10328", "nama": "AINUR ROFIK LOLY POP", "salesman_id": "SLM-005", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-18"}, {"id": "CUST-10329", "nama": "ASTERY GROSERY & ROASTERY", "salesman_id": "SLM-005", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-28"}, {"id": "CUST-10330", "nama": "BAKPIA KENCANA", "salesman_id": "SLM-005", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-18"}, {"id": "CUST-10331", "nama": "BAKPIA KRISNA - CV INDO RASA PRIMA", "salesman_id": "SLM-005", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-21"}, {"id": "CUST-10332", "nama": "BANANA CAKE", "salesman_id": "SLM-005", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-22"}, {"id": "CUST-10333", "nama": "BANANA CIPTA DELI", "salesman_id": "SLM-005", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-22"}, {"id": "CUST-10334", "nama": "BANANA INTI DELI", "salesman_id": "SLM-005", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-22"}, {"id": "CUST-10335", "nama": "BIAS MART - AGUS", "salesman_id": "SLM-005", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-06-15"}, {"id": "CUST-10336", "nama": "BOGA MAKMUR GRACIA PT", "salesman_id": "SLM-005", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-01-14"}, {"id": "CUST-10337", "nama": "CITARASA MENDUNIA - APIKA COOKIES - VIKA", "salesman_id": "SLM-005", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-10"}, {"id": "CUST-10338", "nama": "COKLAT MONGGO", "salesman_id": "SLM-005", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-03"}, {"id": "CUST-10339", "nama": "ENI WONOSARI", "salesman_id": "SLM-005", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-02-26"}, {"id": "CUST-10340", "nama": "ES TEH RIO", "salesman_id": "SLM-005", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-20"}, {"id": "CUST-10341", "nama": "EXELLENT SNACK & BAKERY", "salesman_id": "SLM-005", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-03-30"}, {"id": "CUST-10342", "nama": "FAHMI ALAYDRUS  - MALIO GELATO", "salesman_id": "SLM-005", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-05"}, {"id": "CUST-10343", "nama": "GEPLAK KELAPA MUDA SARIDAL", "salesman_id": "SLM-005", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-05-09"}, {"id": "CUST-10344", "nama": "GEPLAK NGUDI RAOS", "salesman_id": "SLM-005", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-02"}, {"id": "CUST-10345", "nama": "GEPLAK SUTIK", "salesman_id": "SLM-005", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-19"}, {"id": "CUST-10346", "nama": "GETHUK GONDOK SRI RAHAYU", "salesman_id": "SLM-005", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-01"}, {"id": "CUST-10347", "nama": "Gosyen Roti - KUNCI BERKAT MULIA - BUTTER BREAD KALBU", "salesman_id": "SLM-005", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-27"}, {"id": "CUST-10348", "nama": "GULA BATU KEMBANG", "salesman_id": "SLM-005", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-23"}, {"id": "CUST-10349", "nama": "GULA BATU NUR SHOLEH", "salesman_id": "SLM-005", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-04-30"}, {"id": "CUST-10350", "nama": "GULA BATU PAK TUKIMIN", "salesman_id": "SLM-005", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-05-15"}, {"id": "CUST-10351", "nama": "GULA CETAK / GULA JAWA SUMITRA", "salesman_id": "SLM-005", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-02-02"}, {"id": "CUST-10352", "nama": "GULA JAWA BERKAH - MENIK - MUKIJO - PARJO", "salesman_id": "SLM-005", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-20"}, {"id": "CUST-10353", "nama": "HASTA PUSTAKA ANUGERAH SEJAHTERA - CUNTIK", "salesman_id": "SLM-005", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-19"}, {"id": "CUST-10354", "nama": "JM GROUP GULA MERAH", "salesman_id": "SLM-005", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-13"}, {"id": "CUST-10355", "nama": "MAMAHKE", "salesman_id": "SLM-005", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-03"}, {"id": "CUST-10356", "nama": "MIRASA PUTRA - SUMIRAH - JARI", "salesman_id": "SLM-005", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-06"}, {"id": "CUST-10357", "nama": "PIA JUWARA SATOE", "salesman_id": "SLM-005", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-06-22"}, {"id": "CUST-10358", "nama": "PULCHRA ANUGERAH SENTOSA - KOSMETIK", "salesman_id": "SLM-005", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-02"}, {"id": "CUST-10359", "nama": "PUR KEBUMEN", "salesman_id": "SLM-005", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-03"}, {"id": "CUST-10360", "nama": "PUTRA JAYA BERKAH BERSAMA CV -  GULA MERAH", "salesman_id": "SLM-005", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-06"}, {"id": "CUST-10361", "nama": "PUTRA LOLY POP", "salesman_id": "SLM-005", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-19"}, {"id": "CUST-10362", "nama": "ROTI ANEKA", "salesman_id": "SLM-005", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-08"}, {"id": "CUST-10363", "nama": "ROTI ANEKA 1", "salesman_id": "SLM-005", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-08"}, {"id": "CUST-10364", "nama": "ROTI AVANZA", "salesman_id": "SLM-005", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-03-30"}, {"id": "CUST-10365", "nama": "ROTI BU TATIK", "salesman_id": "SLM-005", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-04-09"}, {"id": "CUST-10366", "nama": "ROTI JOSS", "salesman_id": "SLM-005", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-04"}, {"id": "CUST-10367", "nama": "RUMAH MAKAN JOGLO RESODINOMO - EVAN", "salesman_id": "SLM-005", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-01"}, {"id": "CUST-10368", "nama": "SUPRIYONO GULA BATU", "salesman_id": "SLM-005", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-04-04"}, {"id": "CUST-10369", "nama": "SUR", "salesman_id": "SLM-005", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-06-23"}, {"id": "CUST-10370", "nama": "TOKO MBAK VIKA", "salesman_id": "SLM-005", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-03-06"}, {"id": "CUST-10371", "nama": "TOKO MURNI", "salesman_id": "SLM-005", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-23"}, {"id": "CUST-10372", "nama": "UST MART", "salesman_id": "SLM-005", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-02-27"}, {"id": "CUST-10373", "nama": "YANGKO BU CIP", "salesman_id": "SLM-005", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-04"}, {"id": "CUST-10374", "nama": "KONDE MART", "salesman_id": "SLM-005", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-18"}, {"id": "CUST-10375", "nama": "DAPUR ROTI BU HARYATI", "salesman_id": "SLM-005", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-03-30"}, {"id": "CUST-10376", "nama": "KHOLIQ GULA MERAH", "salesman_id": "SLM-005", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-04-23"}, {"id": "CUST-10377", "nama": "WARUNG RESTU BUNDA", "salesman_id": "SLM-005", "tipe_customer": "Baru", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-15"}, {"id": "CUST-10378", "nama": "DIDI GULA MERAH", "salesman_id": "SLM-005", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-13"}, {"id": "CUST-10379", "nama": "ALMA SEMBAKO", "salesman_id": "SLM-006", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-05-02"}, {"id": "CUST-10380", "nama": "BUTTERMAN", "salesman_id": "SLM-006", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-04-23"}, {"id": "CUST-10381", "nama": "IDEAL BAKERY (IBU NURHAYATI) - JAKARTA", "salesman_id": "SLM-006", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-05-11"}, {"id": "CUST-10382", "nama": "IVAN - NOLOGATEN", "salesman_id": "SLM-006", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-22"}, {"id": "CUST-10383", "nama": "KIOS ZENNARA SEMBAKO", "salesman_id": "SLM-006", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-05-18"}, {"id": "CUST-10384", "nama": "SEMBAKO AMANAH", "salesman_id": "SLM-006", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-13"}, {"id": "CUST-10385", "nama": "SEMBAKO ASKA - WISNU", "salesman_id": "SLM-006", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-05-06"}, {"id": "CUST-10386", "nama": "SEMBAKO BIRU LAUT", "salesman_id": "SLM-006", "tipe_customer": "Baru", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-06-17"}, {"id": "CUST-10387", "nama": "SEMBAKO BU UMI - PASAR BUTUH", "salesman_id": "SLM-006", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-25"}, {"id": "CUST-10388", "nama": "SEMBAKO MBAK NISA", "salesman_id": "SLM-006", "tipe_customer": "Baru", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-06-18"}, {"id": "CUST-10389", "nama": "TOKO BINTANG JAYA", "salesman_id": "SLM-006", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-03-04"}, {"id": "CUST-10390", "nama": "TOKO SUMADI", "salesman_id": "SLM-006", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-06-05"}, {"id": "CUST-10391", "nama": "TOKO WULAN - WULAN SUCIATI", "salesman_id": "SLM-006", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-06-29"}, {"id": "CUST-10392", "nama": "TOKO KELONTONG CIPTO", "salesman_id": "SLM-006", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-22"}, {"id": "CUST-10393", "nama": "CV SIFON MAS 1 / PAPA COOKIES - SRAGEN", "salesman_id": "SLM-007", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-01-16"}, {"id": "CUST-10394", "nama": "CV UTAMA KARYA - PENGEMASAN SUSU BUBUK - DALIJO", "salesman_id": "SLM-007", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-06-29"}, {"id": "CUST-10395", "nama": "DUA NAGA KOSMETINDO - CV INDO NAGA FOOD", "salesman_id": "SLM-007", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-02-04"}, {"id": "CUST-10396", "nama": "LARIZO TERANG DJAJA", "salesman_id": "SLM-007", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-13"}, {"id": "CUST-10397", "nama": "MINI MARKET PUTRA SA GIWANGAN", "salesman_id": "SLM-007", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-18"}, {"id": "CUST-10398", "nama": "ROTI LONDON", "salesman_id": "SLM-007", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-01-06"}, {"id": "CUST-10399", "nama": "TEH WARGA- BERAN TRIDADI", "salesman_id": "SLM-007", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-01-12"}, {"id": "CUST-10400", "nama": "TOKO PUTRA SA GIWANGAN", "salesman_id": "SLM-007", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-22"}, {"id": "CUST-10401", "nama": "TOKO WARDI - ADIT GONJEN", "salesman_id": "SLM-007", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-20"}, {"id": "CUST-10402", "nama": "ZWEENA ADI NUGRAHA", "salesman_id": "SLM-007", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-02-03"}, {"id": "CUST-10403", "nama": "PAPA COOKIES SRAGEN - CV. Premixindo Utama", "salesman_id": "SLM-007", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-08"}, {"id": "CUST-10404", "nama": "PAPA COOKIES BOJONEGORO - CV PREMIXINDO", "salesman_id": "SLM-007", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-01-16"}, {"id": "CUST-10405", "nama": "AGUS", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-05-26"}, {"id": "CUST-10406", "nama": "ANGKRINGAN FAJAR", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-06"}, {"id": "CUST-10407", "nama": "ANTOK", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-20"}, {"id": "CUST-10408", "nama": "ARINI - L'MART", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-05-19"}, {"id": "CUST-10409", "nama": "ARMONIA NUANSA TIGA (MOU GELATO)", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-04-14"}, {"id": "CUST-10410", "nama": "ARYANI", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-13"}, {"id": "CUST-10411", "nama": "ASIH", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-06-22"}, {"id": "CUST-10412", "nama": "BAKPAO TULEN YOGYA - EGGI SURIA", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-06-27"}, {"id": "CUST-10413", "nama": "BAKPIA 234 - TUTI", "salesman_id": "SLM-008", "tipe_customer": "Baru", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-18"}, {"id": "CUST-10414", "nama": "BAKSO DAN ES BUAH PK", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-18"}, {"id": "CUST-10415", "nama": "BINTARI", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-05-28"}, {"id": "CUST-10416", "nama": "BLUE", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-04-21"}, {"id": "CUST-10417", "nama": "BURHAN", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-22"}, {"id": "CUST-10418", "nama": "CV EVARA SATYA - ARISTA", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-04-27"}, {"id": "CUST-10419", "nama": "DESTI", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-18"}, {"id": "CUST-10420", "nama": "DUCHON", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-12"}, {"id": "CUST-10421", "nama": "DWI SADONO", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-22"}, {"id": "CUST-10422", "nama": "ES TELER NEISYA", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-03-25"}, {"id": "CUST-10423", "nama": "GANI", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-05-19"}, {"id": "CUST-10424", "nama": "GREAT", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-10"}, {"id": "CUST-10425", "nama": "GULA JAWA PAK CIP", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-15"}, {"id": "CUST-10426", "nama": "HARYANTI", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-06-01"}, {"id": "CUST-10427", "nama": "HENDRI", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-06-02"}, {"id": "CUST-10428", "nama": "IGUN", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-18"}, {"id": "CUST-10429", "nama": "IKA", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-20"}, {"id": "CUST-10430", "nama": "IKA SOROSUTAN", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-04"}, {"id": "CUST-10431", "nama": "INTAN MART", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-05-09"}, {"id": "CUST-10432", "nama": "JADI", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-14"}, {"id": "CUST-10433", "nama": "JORDAN", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-14"}, {"id": "CUST-10434", "nama": "KAKKOI RESTO - PT KELUARGA BERLIMPAH REJEKI", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-20"}, {"id": "CUST-10435", "nama": "KHARISMA PRIMA ABADI - KECAP PRIMASARI", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-06-02"}, {"id": "CUST-10436", "nama": "LANJAR", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-05-26"}, {"id": "CUST-10437", "nama": "LASMI", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-11"}, {"id": "CUST-10438", "nama": "LELA", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-16"}, {"id": "CUST-10439", "nama": "LINDA", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-01"}, {"id": "CUST-10440", "nama": "MARSONO", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-01"}, {"id": "CUST-10441", "nama": "MBAK YULI", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-04-21"}, {"id": "CUST-10442", "nama": "MELI", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-06-18"}, {"id": "CUST-10443", "nama": "MUD", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-12"}, {"id": "CUST-10444", "nama": "MUGI / MUGIHARJO", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-29"}, {"id": "CUST-10445", "nama": "MUR", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-06-26"}, {"id": "CUST-10446", "nama": "NANANG", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-28"}, {"id": "CUST-10447", "nama": "NANDA", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-05-25"}, {"id": "CUST-10448", "nama": "NANIK", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-21"}, {"id": "CUST-10449", "nama": "NICO", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-24"}, {"id": "CUST-10450", "nama": "OLA", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-14"}, {"id": "CUST-10451", "nama": "PAK NYOTO", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-21"}, {"id": "CUST-10452", "nama": "PAK SUPRI", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-22"}, {"id": "CUST-10453", "nama": "PARTI", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-19"}, {"id": "CUST-10454", "nama": "PARYANI", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-14"}, {"id": "CUST-10455", "nama": "PUNAM", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-04-11"}, {"id": "CUST-10456", "nama": "RAHAYU", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-10"}, {"id": "CUST-10457", "nama": "RENO", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-07"}, {"id": "CUST-10458", "nama": "REOG", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-22"}, {"id": "CUST-10459", "nama": "RITA", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-14"}, {"id": "CUST-10460", "nama": "RIYANTO", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-19"}, {"id": "CUST-10461", "nama": "SAIFUL ANWAR", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-04-29"}, {"id": "CUST-10462", "nama": "SANTA MARIA", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-04-11"}, {"id": "CUST-10463", "nama": "SEMBAKO SRI LESTARI", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-04"}, {"id": "CUST-10464", "nama": "SIGIT", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-19"}, {"id": "CUST-10465", "nama": "SOMO", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-05"}, {"id": "CUST-10466", "nama": "SRABI MOROTUMAN", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-05-11"}, {"id": "CUST-10467", "nama": "SRI BABADAN", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-05-18"}, {"id": "CUST-10468", "nama": "SUMARTINI", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-05-12"}, {"id": "CUST-10469", "nama": "SUMIRAT", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-05-21"}, {"id": "CUST-10470", "nama": "SUPRIHATIN", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-04-07"}, {"id": "CUST-10471", "nama": "SURATMAN", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-08"}, {"id": "CUST-10472", "nama": "SUTINI", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-21"}, {"id": "CUST-10473", "nama": "TOKO ANDA JAYA", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-22"}, {"id": "CUST-10474", "nama": "TOKO JAGO", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-21"}, {"id": "CUST-10475", "nama": "TOKO KURNIA JAYA", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-04-13"}, {"id": "CUST-10476", "nama": "TOKO MEKAR - HERMANTO", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-04-30"}, {"id": "CUST-10477", "nama": "TOKO RAIF", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-19"}, {"id": "CUST-10478", "nama": "TOKO TONI", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-19"}, {"id": "CUST-10479", "nama": "TUNAI", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-04-08"}, {"id": "CUST-10480", "nama": "TUTIK", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-18"}, {"id": "CUST-10481", "nama": "VIOLET", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-06-24"}, {"id": "CUST-10482", "nama": "WAGIMAN", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-14"}, {"id": "CUST-10483", "nama": "WANDI", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-18"}, {"id": "CUST-10484", "nama": "WARUNG BU TUTIK", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-21"}, {"id": "CUST-10485", "nama": "WIDODO", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-05-02"}, {"id": "CUST-10486", "nama": "YANTI", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-06-03"}, {"id": "CUST-10487", "nama": "YANTO", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-04-20"}, {"id": "CUST-10488", "nama": "YATI", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-25"}, {"id": "CUST-10489", "nama": "YETI", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-04-09"}, {"id": "CUST-10490", "nama": "YUSUF GAYAM", "salesman_id": "SLM-008", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-03"}, {"id": "CUST-10491", "nama": "AZMI BAKERY - PT INTIBOGA SUKSES MAKMUR", "salesman_id": "SLM-009", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-05"}, {"id": "CUST-10492", "nama": "BAKPIA NIKI ECO", "salesman_id": "SLM-009", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-16"}, {"id": "CUST-10493", "nama": "BEDJO BEKERY", "salesman_id": "SLM-009", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-03-30"}, {"id": "CUST-10494", "nama": "BOLU EKO", "salesman_id": "SLM-009", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-03-12"}, {"id": "CUST-10495", "nama": "CENGKIR MAS - WIDARTO", "salesman_id": "SLM-009", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-04-17"}, {"id": "CUST-10496", "nama": "CIPTA RASA", "salesman_id": "SLM-009", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-29"}, {"id": "CUST-10497", "nama": "DHARJOSOEWARNO", "salesman_id": "SLM-009", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-13"}, {"id": "CUST-10498", "nama": "EDI PASAR NGANGKRUK", "salesman_id": "SLM-009", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-06-16"}, {"id": "CUST-10499", "nama": "GCO", "salesman_id": "SLM-009", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-22"}, {"id": "CUST-10500", "nama": "GIYARTI - TOKO SYAQILA", "salesman_id": "SLM-009", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-04-07"}, {"id": "CUST-10501", "nama": "GULA BATU \"AJI\" - SENO", "salesman_id": "SLM-009", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-03-12"}, {"id": "CUST-10502", "nama": "JANU PUTRA", "salesman_id": "SLM-009", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-06-25"}, {"id": "CUST-10503", "nama": "MC SWALAYAN", "salesman_id": "SLM-009", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-13"}, {"id": "CUST-10504", "nama": "MJ MART", "salesman_id": "SLM-009", "tipe_customer": "Baru", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-20"}, {"id": "CUST-10505", "nama": "MUMUN", "salesman_id": "SLM-009", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-22"}, {"id": "CUST-10506", "nama": "NAUFAL FRESH SALACCA", "salesman_id": "SLM-009", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-03-09"}, {"id": "CUST-10507", "nama": "NUGROHO KULON PROGO", "salesman_id": "SLM-009", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-28"}, {"id": "CUST-10508", "nama": "PURNAMA BANTUL", "salesman_id": "SLM-009", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-19"}, {"id": "CUST-10509", "nama": "PURNAMA GEDONGAN", "salesman_id": "SLM-009", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-18"}, {"id": "CUST-10510", "nama": "PURNAMA GODEAN", "salesman_id": "SLM-009", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-13"}, {"id": "CUST-10511", "nama": "RAJA TELUR", "salesman_id": "SLM-009", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-25"}, {"id": "CUST-10512", "nama": "SEMBAKO AZAN", "salesman_id": "SLM-009", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-19"}, {"id": "CUST-10513", "nama": "SEMBAKO MANDALA", "salesman_id": "SLM-009", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-06-18"}, {"id": "CUST-10514", "nama": "SEMBAKO MARTO", "salesman_id": "SLM-009", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-03-28"}, {"id": "CUST-10515", "nama": "SEMBAKO MENIK", "salesman_id": "SLM-009", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-03-09"}, {"id": "CUST-10516", "nama": "SRI PARMAN PASAR GODEAN", "salesman_id": "SLM-009", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-06-15"}, {"id": "CUST-10517", "nama": "TAMI BERAS", "salesman_id": "SLM-009", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-19"}, {"id": "CUST-10518", "nama": "TEMPO GELATO - UD BANGUN JAYA", "salesman_id": "SLM-009", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-15"}, {"id": "CUST-10519", "nama": "TIRTA BIRU", "salesman_id": "SLM-009", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-31"}, {"id": "CUST-10520", "nama": "TOKO ALIFIA BANTUL", "salesman_id": "SLM-009", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-22"}, {"id": "CUST-10521", "nama": "TOKO BERGAN / BU RAHMA", "salesman_id": "SLM-009", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-27"}, {"id": "CUST-10522", "nama": "TOKO BLENDER - TRI IKA  BERBAH", "salesman_id": "SLM-009", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-02-21"}, {"id": "CUST-10523", "nama": "TOKO GROSIR PATALAN BARU", "salesman_id": "SLM-009", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-27"}, {"id": "CUST-10524", "nama": "TOKO HADI SEMBAKO", "salesman_id": "SLM-009", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-02-07"}, {"id": "CUST-10525", "nama": "TOKO JODO - PASAR BANTUL", "salesman_id": "SLM-009", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-03-09"}, {"id": "CUST-10526", "nama": "TOKO MERLY - KADISOKA", "salesman_id": "SLM-009", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-22"}, {"id": "CUST-10527", "nama": "TOKO PUTU RESO", "salesman_id": "SLM-009", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-17"}, {"id": "CUST-10528", "nama": "TOKO RAJIL - BU SULIS PIYUNGAN", "salesman_id": "SLM-009", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-02-17"}, {"id": "CUST-10529", "nama": "TOKO SARI AGUNG", "salesman_id": "SLM-009", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-06-18"}, {"id": "CUST-10530", "nama": "TOKO WR / TOKO ASTA", "salesman_id": "SLM-009", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-06-15"}, {"id": "CUST-10531", "nama": "UNIK PUNDONG", "salesman_id": "SLM-009", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-20"}, {"id": "CUST-10532", "nama": "YANGKO SGT", "salesman_id": "SLM-009", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-15"}, {"id": "CUST-10533", "nama": "CV DIPONEGORO", "salesman_id": "SLM-009", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-22"}, {"id": "CUST-10534", "nama": "DINDA SEMBAKO - BADRAN", "salesman_id": "SLM-009", "tipe_customer": "Baru", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-07-31"}, {"id": "CUST-10535", "nama": "MIROTA GEJAYAN", "salesman_id": "SLM-009", "tipe_customer": "Lama", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-05"}, {"id": "CUST-10536", "nama": "TOSERBA SRI REJEKI - MINGGIR SLEMAN", "salesman_id": "SLM-009", "tipe_customer": "Baru", "order_cycle_days": 30, "status_customer": "Aktif", "last_order_date": "2026-08-21"}];
+
+const SEED_SUPERVISORS = [
+  { id: "SUP-1", nama: "Toni", nomor_wa: "" },
+  { id: "SUP-2", nama: "Rudi", nomor_wa: "" },
+  { id: "SUP-3", nama: "Heri", nomor_wa: "" },
+  { id: "SUP-4", nama: "Cicapa", nomor_wa: "" },
+];
+
+const REASON_LABELS = { 1: "Kalah Harga", 2: "Stok Masih Ada", 3: "Sudah Bangkrut" };
+const REASON_COLORS = {
+  1: "bg-amber-100 text-amber-800 border-amber-300",
+  2: "bg-sky-100 text-sky-800 border-sky-300",
+  3: "bg-stone-200 text-stone-600 border-stone-400",
+};
+
+const STORAGE_KEY = "sigula-state-v1";
+
+/* ---------------- helpers ---------------- */
+function fmtDate(d) {
+  if (!d) return "-";
+  const dt = new Date(d + "T00:00:00");
+  return dt.toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" });
+}
+function daysBetween(a, b) {
+  const A = new Date(a + "T00:00:00");
+  const B = new Date(b + "T00:00:00");
+  return Math.round((B - A) / 86400000);
+}
+function addDays(dateStr, n) {
+  const d = new Date(dateStr + "T00:00:00");
+  d.setDate(d.getDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+function uid(prefix) {
+  return prefix + "-" + Math.random().toString(36).slice(2, 9);
+}
+function classNames(...a) {
+  return a.filter(Boolean).join(" ");
+}
+
+/* ---------------- small UI atoms ---------------- */
+function Badge({ children, tone = "slate" }) {
+  const tones = {
+    slate: "bg-slate-100 text-slate-700 border-slate-300",
+    teal: "bg-teal-100 text-teal-800 border-teal-300",
+    amber: "bg-amber-100 text-amber-800 border-amber-300",
+    red: "bg-rose-100 text-rose-700 border-rose-300",
+    stone: "bg-stone-200 text-stone-600 border-stone-400",
+    green: "bg-emerald-100 text-emerald-800 border-emerald-300",
+  };
+  return (
+    <span className={classNames("inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium", tones[tone])}>
+      {children}
+    </span>
+  );
+}
+
+function Card({ children, className = "" }) {
+  return (
+    <div className={classNames("rounded-xl border border-slate-200 bg-white shadow-sm", className)}>
+      {children}
+    </div>
+  );
+}
+
+function StatTile({ label, value, sub, tone = "slate", icon: Icon }) {
+  const toneMap = {
+    slate: "text-slate-900",
+    teal: "text-teal-700",
+    amber: "text-amber-700",
+    red: "text-rose-700",
+  };
+  return (
+    <Card className="p-4 flex items-start justify-between">
+      <div>
+        <div className="text-xs uppercase tracking-wide text-slate-400 font-semibold">{label}</div>
+        <div className={classNames("text-2xl font-bold tabular-nums mt-1", toneMap[tone])}>{value}</div>
+        {sub && <div className="text-xs text-slate-400 mt-1">{sub}</div>}
+      </div>
+      {Icon && (
+        <div className={classNames("h-9 w-9 rounded-lg flex items-center justify-center shrink-0",
+          tone === "teal" ? "bg-teal-50" : tone === "amber" ? "bg-amber-50" : tone === "red" ? "bg-rose-50" : "bg-slate-50")}>
+          <Icon className={classNames("h-5 w-5", toneMap[tone])} />
+        </div>
+      )}
+    </Card>
+  );
+}
+
+function Button({ children, onClick, variant = "primary", size = "md", className = "", disabled, type = "button" }) {
+  const base = "inline-flex items-center justify-center gap-1.5 rounded-lg font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed";
+  const sizes = { sm: "text-xs px-2.5 py-1.5", md: "text-sm px-3.5 py-2" };
+  const variants = {
+    primary: "bg-teal-700 text-white hover:bg-teal-800",
+    secondary: "bg-white text-slate-700 border border-slate-300 hover:bg-slate-50",
+    ghost: "text-slate-600 hover:bg-slate-100",
+    danger: "bg-rose-600 text-white hover:bg-rose-700",
+    amber: "bg-amber-600 text-white hover:bg-amber-700",
+  };
+  return (
+    <button type={type} onClick={onClick} disabled={disabled}
+      className={classNames(base, sizes[size], variants[variant], className)}>
+      {children}
+    </button>
+  );
+}
+
+/* ============================================================
+   APP
+   ============================================================ */
+export default function App() {
+  const [loaded, setLoaded] = useState(false);
+  const [salesmen, setSalesmen] = useState(SEED_SALESMEN);
+  const [supervisors, setSupervisors] = useState(SEED_SUPERVISORS);
+  const [customers, setCustomers] = useState(SEED_CUSTOMERS);
+  const [reasonLog, setReasonLog] = useState([]);
+  const [mutationLog, setMutationLog] = useState([]);
+  const [statusLog, setStatusLog] = useState([]);
+  const [notificationLog, setNotificationLog] = useState([]);
+  const [orderHistoryLog, setOrderHistoryLog] = useState(() =>
+    SEED_CUSTOMERS.filter((c) => c.last_order_date).map((c) => ({
+      id: uid("ORD"),
+      customer_id: c.id,
+      tanggal_order: c.last_order_date,
+      sumber: "Data Awal (Excel)",
+      tanggal_input: "2026-08-22",
+    }))
+  );
+  const [simDate, setSimDate] = useState("2026-08-22");
+  const [pendingImport, setPendingImport] = useState(null);
+
+  const [role, setRole] = useState("admin"); // admin | supervisor | salesman | management
+  const [activeSupervisorId, setActiveSupervisorId] = useState(SEED_SUPERVISORS[0].id);
+  const [activeSalesmanId, setActiveSalesmanId] = useState(SEED_SALESMEN[0].id);
+
+  const [toast, setToast] = useState(null);
+
+  /* -------- load from persistent storage on mount -------- */
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await window.storage.get(STORAGE_KEY, true);
+        if (res && res.value) {
+          const data = JSON.parse(res.value);
+          setSalesmen(data.salesmen || SEED_SALESMEN);
+          setSupervisors(data.supervisors || SEED_SUPERVISORS);
+          setCustomers(data.customers || SEED_CUSTOMERS);
+          setReasonLog(data.reasonLog || []);
+          setMutationLog(data.mutationLog || []);
+          setStatusLog(data.statusLog || []);
+          setNotificationLog(data.notificationLog || []);
+          setOrderHistoryLog(data.orderHistoryLog || orderHistoryLog);
+          setSimDate(data.simDate || "2026-08-22");
+        }
+      } catch (e) {
+        // no existing data yet — fine, seed defaults stay
+      }
+      setLoaded(true);
+    })();
+  }, []);
+
+  /* -------- autosave (debounced) -------- */
+  useEffect(() => {
+    if (!loaded) return;
+    const t = setTimeout(async () => {
+      try {
+        await window.storage.set(STORAGE_KEY, JSON.stringify({
+          salesmen, supervisors, customers, reasonLog, mutationLog, statusLog, notificationLog, orderHistoryLog, simDate,
+        }), true);
+      } catch (e) { /* ignore */ }
+    }, 500);
+    return () => clearTimeout(t);
+  }, [salesmen, supervisors, customers, reasonLog, mutationLog, statusLog, notificationLog, orderHistoryLog, simDate, loaded]);
+
+  function notify(msg) {
+    setToast(msg);
+    const duration = Math.min(7000, Math.max(2600, msg.length * 45));
+    setTimeout(() => setToast(null), duration);
+  }
+
+  function resetAllData() {
+    if (!window.confirm("Reset semua data ke data awal (dari file Excel asli)? Perubahan yang sudah dibuat akan hilang.")) return;
+    setSalesmen(SEED_SALESMEN);
+    setSupervisors(SEED_SUPERVISORS);
+    setCustomers(SEED_CUSTOMERS);
+    setReasonLog([]);
+    setMutationLog([]);
+    setStatusLog([]);
+    setNotificationLog([]);
+    setOrderHistoryLog(
+      SEED_CUSTOMERS.filter((c) => c.last_order_date).map((c) => ({
+        id: uid("ORD"),
+        customer_id: c.id,
+        tanggal_order: c.last_order_date,
+        sumber: "Data Awal (Excel)",
+        tanggal_input: "2026-08-22",
+      }))
+    );
+    setSimDate("2026-08-22");
+    notify("Data direset ke kondisi awal.");
+  }
+
+  /* -------- derived: enrich customers with computed fields -------- */
+  const enrichedCustomers = useMemo(() => {
+    return customers.map((c) => {
+      const daysSince = c.last_order_date ? daysBetween(c.last_order_date, simDate) : null;
+      const overdue = daysSince === null ? true : daysSince > c.order_cycle_days;
+      const flagNotifikasi = c.status_customer === "Aktif" && overdue; // eligible utk dinotifikasi (belum tentu sudah dikirim)
+      const sm = salesmen.find((s) => s.id === c.salesman_id);
+      return {
+        ...c,
+        daysSince,
+        overdue,
+        flagNotifikasi,
+        pendingReminder: !!c.notified, // sudah di-trigger Admin & belum ditindaklanjuti
+        salesmanNama: sm ? sm.nama : "-",
+        supervisorId: sm ? sm.supervisor_id : null,
+      };
+    });
+  }, [customers, salesmen, simDate]);
+
+  const supervisorOf = useCallback(
+    (supId) => salesmen.filter((s) => s.supervisor_id === supId),
+    [salesmen]
+  );
+
+  /* -------- actions -------- */
+  function advanceDay(n = 1) {
+    setSimDate((d) => addDays(d, n));
+    notify(`Tanggal simulasi maju ${n} hari. Notifikasi TIDAK terkirim otomatis — Admin perlu menekan tombol "Kirim Notifikasi" di Panel Admin.`);
+  }
+
+  /** Trigger manual oleh Admin: kirim notifikasi ke semua salesman (dan ringkasannya ke supervisor)
+   * untuk customer yang saat ini eligible (Aktif & sudah melewati siklus order) dan belum pernah
+   * dinotifikasi sejak terakhir kali ditindaklanjuti. */
+  function triggerNotifications() {
+    const toNotify = enrichedCustomers.filter((c) => c.flagNotifikasi && !c.notified);
+    if (toNotify.length === 0) {
+      notify("Tidak ada customer baru yang perlu dinotifikasi saat ini — semua sudah pernah dikirim atau masih dalam siklus normal.");
+      return;
+    }
+    const perSalesman = {};
+    toNotify.forEach((c) => {
+      perSalesman[c.salesman_id] = (perSalesman[c.salesman_id] || 0) + 1;
+    });
+    const affectedSalesmanIds = Object.keys(perSalesman);
+    const affectedSupervisorIds = [
+      ...new Set(
+        affectedSalesmanIds
+          .map((smId) => salesmen.find((s) => s.id === smId)?.supervisor_id)
+          .filter(Boolean)
+      ),
+    ];
+
+    const salesmenMissingPhone = affectedSalesmanIds
+      .map((id) => salesmen.find((s) => s.id === id))
+      .filter((s) => s && !s.nomor_wa);
+    const supervisorsMissingPhone = affectedSupervisorIds
+      .map((id) => supervisors.find((s) => s.id === id))
+      .filter((s) => s && !s.nomor_wa);
+
+    setCustomers((prev) =>
+      prev.map((c) => (toNotify.some((t) => t.id === c.id) ? { ...c, notified: true } : c))
+    );
+    setNotificationLog((prev) => [
+      {
+        id: uid("NTF"),
+        tanggal: simDate,
+        totalCustomers: toNotify.length,
+        perSalesman,
+        salesmanCount: affectedSalesmanIds.length,
+        supervisorIds: affectedSupervisorIds,
+        triggeredBy: "Admin",
+      },
+      ...prev,
+    ]);
+    let msg = `Notifikasi terkirim ke ${affectedSalesmanIds.length} salesman (${toNotify.length} customer) via WhatsApp` +
+      (affectedSupervisorIds.length ? `, dan ringkasannya diteruskan ke ${affectedSupervisorIds.length} supervisor terkait.` : ".");
+    if (salesmenMissingPhone.length > 0 || supervisorsMissingPhone.length > 0) {
+      const parts = [];
+      if (salesmenMissingPhone.length) parts.push(`${salesmenMissingPhone.length} salesman (${salesmenMissingPhone.map((s) => s.nama).join(", ")})`);
+      if (supervisorsMissingPhone.length) parts.push(`${supervisorsMissingPhone.length} supervisor (${supervisorsMissingPhone.map((s) => s.nama).join(", ")})`);
+      msg += ` ⚠️ Perhatian: nomor WA belum diisi untuk ${parts.join(" dan ")} — notifikasi ke mereka tidak akan benar-benar terkirim di produksi. Lengkapi di Master Salesman/Supervisor.`;
+    }
+    notify(msg);
+  }
+
+  function updateCustomer(id, patch) {
+    setCustomers((prev) => prev.map((c) => (c.id === id ? { ...c, ...patch } : c)));
+  }
+
+  function assignSupervisor(salesmanId, supervisorId) {
+    setSalesmen((prev) => prev.map((s) => (s.id === salesmanId ? { ...s, supervisor_id: supervisorId } : s)));
+    notify("Supervisor untuk salesman berhasil diperbarui.");
+  }
+
+  function updateSalesmanPhone(salesmanId, phone) {
+    setSalesmen((prev) => prev.map((s) => (s.id === salesmanId ? { ...s, nomor_wa: phone } : s)));
+  }
+
+  function updateSupervisorPhone(supervisorId, phone) {
+    setSupervisors((prev) => prev.map((s) => (s.id === supervisorId ? { ...s, nomor_wa: phone } : s)));
+  }
+
+  function toggleSalesmanStatus(salesmanId) {
+    setSalesmen((prev) =>
+      prev.map((s) => (s.id === salesmanId ? { ...s, status: s.status === "Aktif" ? "Inactive" : "Aktif" } : s))
+    );
+  }
+
+  function mutateCustomer(customerId, newSalesmanId) {
+    const cust = customers.find((c) => c.id === customerId);
+    if (!cust || cust.salesman_id === newSalesmanId) return;
+    setMutationLog((prev) => [
+      { id: uid("MUT"), customer_id: customerId, dari: cust.salesman_id, ke: newSalesmanId, tanggal: simDate, oleh: "Admin" },
+      ...prev,
+    ]);
+    updateCustomer(customerId, { salesman_id: newSalesmanId });
+    notify("Customer berhasil dimutasi ke salesman baru.");
+  }
+
+  function setCycleDays(customerId, days) {
+    updateCustomer(customerId, { order_cycle_days: Math.max(1, Number(days) || 1) });
+  }
+
+  function submitReason(customerId, kode) {
+    const cust = customers.find((c) => c.id === customerId);
+    setReasonLog((prev) => [
+      { id: uid("RSN"), customer_id: customerId, salesman_id: cust.salesman_id, tanggal: simDate, kode_alasan: kode },
+      ...prev,
+    ]);
+    if (kode === 3) {
+      updateCustomer(customerId, { status_customer: "Inactive", handled_on: simDate, notified: false });
+      setStatusLog((prev) => [
+        { id: uid("STL"), customer_id: customerId, tipe: "Inactive", tanggal: simDate, oleh: `Salesman (${cust.salesman_id})` },
+        ...prev,
+      ]);
+      notify(`${cust.nama} ditandai Inactive (Sudah Bangkrut). Tidak akan dinotifikasi lagi.`);
+    } else {
+      updateCustomer(customerId, { handled_on: simDate, notified: false });
+      notify(`Alasan "${REASON_LABELS[kode]}" tercatat untuk ${cust.nama}. Customer ini akan masuk lagi ke daftar kalau Admin trigger notifikasi berikutnya dan masih melewati siklus.`);
+    }
+  }
+
+  function recordNewOrder(customerId) {
+    const cust = customers.find((c) => c.id === customerId);
+    const wasInactive = cust.status_customer === "Inactive";
+    updateCustomer(customerId, { last_order_date: simDate, status_customer: "Aktif", handled_on: null, notified: false });
+    setOrderHistoryLog((prev) => [
+      { id: uid("ORD"), customer_id: customerId, tanggal_order: simDate, sumber: "Manual (dicatat Salesman)", tanggal_input: simDate },
+      ...prev,
+    ]);
+    if (wasInactive) {
+      setStatusLog((prev) => [
+        { id: uid("STL"), customer_id: customerId, tipe: "Reaktivasi Otomatis (order baru)", tanggal: simDate, oleh: "Sistem" },
+        ...prev,
+      ]);
+      notify(`${cust.nama} order lagi → status otomatis kembali Aktif.`);
+    } else {
+      notify(`Order baru tercatat untuk ${cust.nama}.`);
+    }
+  }
+
+  function manualReactivate(customerId) {
+    const cust = customers.find((c) => c.id === customerId);
+    updateCustomer(customerId, { status_customer: "Aktif", handled_on: null, notified: false });
+    setStatusLog((prev) => [
+      { id: uid("STL"), customer_id: customerId, tipe: "Reaktivasi Manual", tanggal: simDate, oleh: "Supervisor" },
+      ...prev,
+    ]);
+    notify(`${cust.nama} diaktifkan kembali secara manual oleh Supervisor.`);
+  }
+
+  /* -------- excel export -------- */
+  function exportExcel(rows, filename, sheetName = "Data") {
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+    XLSX.writeFile(wb, filename);
+    notify(`File ${filename} sedang diunduh.`);
+  }
+
+  function exportSupervisorReport(supId) {
+    const supName = supervisors.find((s) => s.id === supId)?.nama || "Supervisor";
+    const teamIds = supervisorOf(supId).map((s) => s.id);
+    const teamCustomers = enrichedCustomers.filter((c) => teamIds.includes(c.salesman_id));
+
+    const summaryRows = supervisorOf(supId).map((s) => {
+      const cs = enrichedCustomers.filter((c) => c.salesman_id === s.id);
+      return {
+        Salesman: s.nama,
+        "Status Salesman": s.status,
+        "Total Customer": cs.length,
+        Aktif: cs.filter((c) => c.status_customer === "Aktif").length,
+        Inactive: cs.filter((c) => c.status_customer === "Inactive").length,
+        "Perlu Follow Up": cs.filter((c) => c.flagNotifikasi).length,
+      };
+    });
+    const detailRows = teamCustomers.map((c) => ({
+      Customer: c.nama,
+      Salesman: c.salesmanNama,
+      "Tipe Customer": c.tipe_customer,
+      "Tgl Order Terakhir": c.last_order_date || "-",
+      "Hari Belum Order": c.daysSince ?? "-",
+      "Siklus Normal (hari)": c.order_cycle_days,
+      Status: c.status_customer,
+      "Perlu Follow Up": c.flagNotifikasi ? "Ya" : "Tidak",
+    }));
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(summaryRows), "Ringkasan Salesman");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(detailRows), "Detail Customer");
+    XLSX.writeFile(wb, `Laporan_${supName}_${simDate}.xlsx`);
+    notify("Laporan Excel sedang diunduh.");
+  }
+
+  function exportManagementReport() {
+    const perSupervisor = supervisors.map((sup) => {
+      const teamIds = supervisorOf(sup.id).map((s) => s.id);
+      const cs = enrichedCustomers.filter((c) => teamIds.includes(c.salesman_id));
+      return {
+        Supervisor: sup.nama,
+        "Jml Salesman": supervisorOf(sup.id).length,
+        "Total Customer": cs.length,
+        Aktif: cs.filter((c) => c.status_customer === "Aktif").length,
+        Inactive: cs.filter((c) => c.status_customer === "Inactive").length,
+        "Perlu Follow Up": cs.filter((c) => c.flagNotifikasi).length,
+      };
+    });
+    const reasonCounts = { 1: 0, 2: 0, 3: 0 };
+    reasonLog.forEach((r) => (reasonCounts[r.kode_alasan] = (reasonCounts[r.kode_alasan] || 0) + 1));
+    const reasonRows = Object.keys(REASON_LABELS).map((k) => ({
+      Alasan: REASON_LABELS[k],
+      "Jumlah Kejadian": reasonCounts[k] || 0,
+    }));
+    const salesmanRows = salesmen.map((s) => {
+      const cs = enrichedCustomers.filter((c) => c.salesman_id === s.id);
+      const flagged = cs.filter((c) => c.flagNotifikasi).length;
+      const responded = reasonLog.filter((r) => r.salesman_id === s.id).length;
+      return {
+        Salesman: s.nama,
+        Supervisor: supervisors.find((sp) => sp.id === s.supervisor_id)?.nama || "-",
+        "Total Customer": cs.length,
+        "Perlu Follow Up": flagged,
+        "Alasan Terinput (all-time)": responded,
+      };
+    });
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(perSupervisor), "Per Supervisor");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(salesmanRows), "Per Salesman");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(reasonRows), "Breakdown Alasan");
+    XLSX.writeFile(wb, `Summary_Report_Management_${simDate}.xlsx`);
+    notify("Summary report untuk management sedang diunduh.");
+  }
+
+  /* -------- excel import (migrasi, format sheet-per-salesman) -------- */
+  function parseImportFile(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const wb = XLSX.read(evt.target.result, { type: "array", cellDates: true });
+        const unknownSheets = []; // sheet yang tidak cocok dengan salesman manapun di master data
+        const newCustomers = []; // { sheetName, salesmanId (null jika sheet unknown), nama, tipe, lastOrder }
+        const updatedCustomers = []; // { existingId, nama, salesmanNama, oldDate, newDate, wasInactive }
+        let unchanged = 0;
+
+        wb.SheetNames.forEach((sheetName) => {
+          const ws = wb.Sheets[sheetName];
+          const rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false });
+          let headerIdx = -1;
+          for (let i = 0; i < Math.min(rows.length, 8); i++) {
+            if (rows[i] && rows[i].some((cell) => String(cell).trim() === "Nama Konsumen")) {
+              headerIdx = i;
+              break;
+            }
+          }
+          if (headerIdx === -1) return;
+          const header = rows[headerIdx].map((h) => String(h || "").trim());
+          const colName = header.indexOf("Nama Konsumen");
+          const colStatus = header.indexOf("Status (Lama/Baru)");
+          const colTgl = header.indexOf("Tgl Terakhir Order");
+
+          const matchedSalesman = salesmen.find((s) => s.nama.toUpperCase() === sheetName.toUpperCase());
+          if (!matchedSalesman && !unknownSheets.includes(sheetName)) {
+            unknownSheets.push(sheetName);
+          }
+
+          for (let i = headerIdx + 1; i < rows.length; i++) {
+            const row = rows[i];
+            if (!row || !row[colName]) continue;
+            const nama = String(row[colName]).trim();
+            const statusRaw = colStatus >= 0 ? String(row[colStatus] || "") : "";
+            const tipe = statusRaw.toLowerCase().includes("baru") ? "Baru" : "Lama";
+            let lastOrder = null;
+            if (colTgl >= 0 && row[colTgl]) {
+              const parsed = new Date(row[colTgl]);
+              if (!isNaN(parsed.getTime())) lastOrder = parsed.toISOString().slice(0, 10);
+            }
+
+            if (!matchedSalesman) {
+              newCustomers.push({ sheetName, salesmanId: null, nama, tipe, lastOrder });
+              continue;
+            }
+
+            const existing = customers.find(
+              (c) => c.nama.toLowerCase() === nama.toLowerCase() && c.salesman_id === matchedSalesman.id
+            );
+            if (!existing) {
+              newCustomers.push({ sheetName, salesmanId: matchedSalesman.id, nama, tipe, lastOrder });
+            } else if (lastOrder && lastOrder !== existing.last_order_date) {
+              updatedCustomers.push({
+                existingId: existing.id,
+                nama: existing.nama,
+                salesmanNama: matchedSalesman.nama,
+                oldDate: existing.last_order_date,
+                newDate: lastOrder,
+                tipe,
+                wasInactive: existing.status_customer === "Inactive",
+              });
+            } else {
+              unchanged++;
+            }
+          }
+        });
+
+        setPendingImport({
+          fileName: file.name,
+          unknownSheets,
+          newCustomers,
+          updatedCustomers,
+          unchanged,
+        });
+      } catch (err) {
+        notify("Gagal membaca file. Pastikan format sesuai template (sheet per salesman, kolom 'Nama Konsumen' dst).");
+      }
+    };
+    reader.readAsArrayBuffer(file);
+    e.target.value = "";
+  }
+
+  function cancelImport() {
+    setPendingImport(null);
+    notify("Import dibatalkan. Perbarui Master Data dulu jika perlu, lalu upload ulang.");
+  }
+
+  function confirmImport(treatUnknownSheetsAsNewSalesman) {
+    if (!pendingImport) return;
+    const { unknownSheets, newCustomers, updatedCustomers } = pendingImport;
+
+    if (unknownSheets.length > 0 && !treatUnknownSheetsAsNewSalesman) {
+      notify("Import dibatalkan karena masih ada sheet yang belum dikenali. Perbaiki dulu di Master Salesman, atau pilih 'Tambahkan sebagai salesman baru'.");
+      setPendingImport(null);
+      return;
+    }
+
+    const salesmenCopy = [...salesmen];
+    const customersCopy = [...customers];
+    const statusLogAdditions = [];
+    const orderHistoryAdditions = [];
+    let nextCustSeq = customers.length + 1;
+
+    const sheetToSalesmanId = {};
+    unknownSheets.forEach((sheetName) => {
+      const newSm = { id: uid("SLM"), nama: sheetName.toUpperCase(), supervisor_id: null, nomor_wa: "", status: "Aktif" };
+      salesmenCopy.push(newSm);
+      sheetToSalesmanId[sheetName] = newSm.id;
+    });
+
+    newCustomers.forEach((nc) => {
+      const salesmanId = nc.salesmanId || sheetToSalesmanId[nc.sheetName];
+      const newId = `CUST-IMP-${nextCustSeq++}`;
+      customersCopy.push({
+        id: newId,
+        nama: nc.nama,
+        salesman_id: salesmanId,
+        tipe_customer: nc.tipe,
+        order_cycle_days: 30,
+        status_customer: "Aktif",
+        last_order_date: nc.lastOrder,
+      });
+      if (nc.lastOrder) {
+        orderHistoryAdditions.push({
+          id: uid("ORD"), customer_id: newId, tanggal_order: nc.lastOrder,
+          sumber: "Import Excel (customer baru)", tanggal_input: simDate,
+        });
+      }
+    });
+
+    updatedCustomers.forEach((uc) => {
+      const idx = customersCopy.findIndex((c) => c.id === uc.existingId);
+      if (idx < 0) return;
+      customersCopy[idx] = {
+        ...customersCopy[idx],
+        last_order_date: uc.newDate,
+        tipe_customer: uc.tipe,
+        status_customer: "Aktif",
+        notified: false,
+      };
+      orderHistoryAdditions.push({
+        id: uid("ORD"), customer_id: uc.existingId, tanggal_order: uc.newDate,
+        sumber: "Import Excel", tanggal_input: simDate,
+      });
+      if (uc.wasInactive) {
+        statusLogAdditions.push({
+          id: uid("STL"), customer_id: uc.existingId,
+          tipe: "Reaktivasi Otomatis (order baru dari import Excel)",
+          tanggal: simDate, oleh: "Sistem (Import)",
+        });
+      }
+    });
+
+    setSalesmen(salesmenCopy);
+    setCustomers(customersCopy);
+    if (statusLogAdditions.length) setStatusLog((prev) => [...statusLogAdditions, ...prev]);
+    if (orderHistoryAdditions.length) setOrderHistoryLog((prev) => [...orderHistoryAdditions, ...prev]);
+
+    const reactivatedCount = updatedCustomers.filter((u) => u.wasInactive).length;
+    notify(
+      `Import diterapkan: ${newCustomers.length} customer baru, ${updatedCustomers.length} diperbarui tanggal ordernya` +
+      (reactivatedCount ? ` (${reactivatedCount} otomatis kembali Aktif)` : "") +
+      `, ${pendingImport.unchanged} tidak berubah` +
+      (unknownSheets.length ? `, ${unknownSheets.length} salesman baru ditambahkan (${unknownSheets.join(", ")}) — atur supervisornya di tab Master Salesman.` : ".")
+    );
+    setPendingImport(null);
+  }
+
+  if (!loaded) {
+    return (
+      <div className="min-h-[500px] flex items-center justify-center text-slate-400 text-sm">
+        Memuat data...
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-[700px] bg-slate-50 text-slate-800 font-sans">
+      <TopBar
+        role={role} setRole={setRole}
+        simDate={simDate} advanceDay={advanceDay}
+        resetAllData={resetAllData}
+        activeSupervisorId={activeSupervisorId} setActiveSupervisorId={setActiveSupervisorId}
+        activeSalesmanId={activeSalesmanId} setActiveSalesmanId={setActiveSalesmanId}
+        salesmen={salesmen} supervisors={supervisors}
+      />
+
+      <div className="max-w-7xl mx-auto px-4 py-6">
+        {role === "admin" && (
+          <AdminView
+            salesmen={salesmen} supervisors={supervisors} customers={enrichedCustomers}
+            mutationLog={mutationLog} statusLog={statusLog} notificationLog={notificationLog} orderHistoryLog={orderHistoryLog}
+            assignSupervisor={assignSupervisor}
+            toggleSalesmanStatus={toggleSalesmanStatus}
+            mutateCustomer={mutateCustomer}
+            setCycleDays={setCycleDays}
+            handleImportFile={parseImportFile}
+            pendingImport={pendingImport}
+            confirmImport={confirmImport}
+            cancelImport={cancelImport}
+            triggerNotifications={triggerNotifications}
+            updateSalesmanPhone={updateSalesmanPhone}
+            updateSupervisorPhone={updateSupervisorPhone}
+          />
+        )}
+        {role === "supervisor" && (
+          <SupervisorView
+            supervisorId={activeSupervisorId}
+            supervisors={supervisors}
+            salesmen={supervisorOf(activeSupervisorId)}
+            customers={enrichedCustomers}
+            notificationLog={notificationLog}
+            manualReactivate={manualReactivate}
+            exportReport={() => exportSupervisorReport(activeSupervisorId)}
+          />
+        )}
+        {role === "salesman" && (
+          <SalesmanView
+            salesman={salesmen.find((s) => s.id === activeSalesmanId)}
+            customers={enrichedCustomers.filter((c) => c.salesman_id === activeSalesmanId)}
+            simDate={simDate}
+            submitReason={submitReason}
+            recordNewOrder={recordNewOrder}
+          />
+        )}
+        {role === "management" && (
+          <ManagementView
+            supervisors={supervisors}
+            salesmen={salesmen}
+            customers={enrichedCustomers}
+            reasonLog={reasonLog}
+            statusLog={statusLog}
+            supervisorOf={supervisorOf}
+            exportReport={exportManagementReport}
+          />
+        )}
+      </div>
+
+      {toast && (
+        <div className="fixed bottom-5 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-sm px-4 py-2.5 rounded-lg shadow-lg max-w-md text-center z-50">
+          {toast}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ============================================================
+   TOP BAR
+   ============================================================ */
+function TopBar({ role, setRole, simDate, advanceDay, resetAllData, activeSupervisorId, setActiveSupervisorId, activeSalesmanId, setActiveSalesmanId, salesmen, supervisors }) {
+  const roles = [
+    { id: "admin", label: "Admin", icon: UserCog },
+    { id: "supervisor", label: "Supervisor", icon: Building2 },
+    { id: "salesman", label: "Salesman", icon: Users },
+    { id: "management", label: "Management", icon: TrendingUp },
+  ];
+  return (
+    <div className="bg-teal-800 text-white sticky top-0 z-40 shadow-md">
+      <div className="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center gap-3 justify-between">
+        <div className="flex items-center gap-2">
+          <div className="h-8 w-8 rounded-lg bg-amber-400 flex items-center justify-center shrink-0">
+            <Package className="h-4.5 w-4.5 text-teal-900" strokeWidth={2.5} />
+          </div>
+          <div className="leading-tight">
+            <div className="font-bold text-sm tracking-tight">SiGula</div>
+            <div className="text-[10px] text-teal-200 -mt-0.5">Sales Monitoring System</div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1.5 bg-teal-900/50 rounded-lg p-1">
+          {roles.map((r) => {
+            const Icon = r.icon;
+            const active = role === r.id;
+            return (
+              <button
+                key={r.id}
+                onClick={() => setRole(r.id)}
+                className={classNames(
+                  "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors",
+                  active ? "bg-white text-teal-800" : "text-teal-100 hover:bg-teal-900/60"
+                )}
+              >
+                <Icon className="h-3.5 w-3.5" /> {r.label}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="flex items-center gap-2">
+          {role === "supervisor" && (
+            <select
+              value={activeSupervisorId}
+              onChange={(e) => setActiveSupervisorId(e.target.value)}
+              className="text-xs rounded-md bg-teal-900/50 border border-teal-600 text-white px-2 py-1.5"
+            >
+              {supervisors.map((s) => <option key={s.id} value={s.id} className="text-slate-800">{s.nama}</option>)}
+            </select>
+          )}
+          {role === "salesman" && (
+            <select
+              value={activeSalesmanId}
+              onChange={(e) => setActiveSalesmanId(e.target.value)}
+              className="text-xs rounded-md bg-teal-900/50 border border-teal-600 text-white px-2 py-1.5"
+            >
+              {salesmen.map((s) => <option key={s.id} value={s.id} className="text-slate-800">{s.nama}</option>)}
+            </select>
+          )}
+
+          <div className="flex items-center gap-1.5 bg-teal-900/50 rounded-md px-2 py-1.5 border border-teal-600">
+            <CalendarClock className="h-3.5 w-3.5 text-amber-300" />
+            <span className="text-xs font-semibold tabular-nums">{fmtDate(simDate)}</span>
+          </div>
+          <Button size="sm" variant="amber" onClick={() => advanceDay(1)}>
+            <Clock className="h-3.5 w-3.5" /> +1 Hari
+          </Button>
+          <Button size="sm" variant="ghost" className="text-teal-100 hover:bg-teal-900/60" onClick={resetAllData}>
+            <Undo2 className="h-3.5 w-3.5" /> Reset
+          </Button>
+        </div>
+      </div>
+      <div className="bg-amber-50 text-amber-900 text-[11px] px-4 py-1 border-t border-teal-900/20 text-center">
+        Simulasi &amp; prototipe: notifikasi <b>tidak</b> terkirim otomatis — Admin menekan tombol "Kirim Notifikasi" kapan pun ia mau (Panel Admin). Tombol <b>+1 Hari</b> hanya memajukan tanggal simulasi. Notifikasi WA di sini ditampilkan sebagai mock — implementasi produksi memakai Meta Cloud API.
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   ADMIN VIEW
+   ============================================================ */
+function AdminView({ salesmen, supervisors, customers, mutationLog, statusLog, notificationLog, orderHistoryLog, assignSupervisor, toggleSalesmanStatus, mutateCustomer, setCycleDays, handleImportFile, pendingImport, confirmImport, cancelImport, triggerNotifications, updateSalesmanPhone, updateSupervisorPhone }) {
+  const [tab, setTab] = useState("notify");
+  const tabs = [
+    { id: "notify", label: "Kirim Notifikasi", icon: Send },
+    { id: "salesman", label: "Master Salesman", icon: Users },
+    { id: "supervisor", label: "Master Supervisor", icon: Building2 },
+    { id: "customer", label: "Master Customer", icon: Package },
+    { id: "import", label: "Import Excel", icon: Upload },
+    { id: "log", label: "Log Audit", icon: ListChecks },
+  ];
+  return (
+    <div>
+      <SectionHeader title="Panel Admin" subtitle="Kelola master data, mutasi customer, dan mapping salesman ↔ supervisor." icon={ShieldCheck} />
+      <div className="flex gap-1.5 mb-5 border-b border-slate-200">
+        {tabs.map((t) => {
+          const Icon = t.icon;
+          return (
+            <button key={t.id} onClick={() => setTab(t.id)}
+              className={classNames(
+                "flex items-center gap-1.5 px-3.5 py-2 text-sm font-medium border-b-2 -mb-px transition-colors",
+                tab === t.id ? "border-teal-700 text-teal-800" : "border-transparent text-slate-500 hover:text-slate-700"
+              )}>
+              <Icon className="h-4 w-4" /> {t.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {tab === "notify" && <AdminNotifyTab salesmen={salesmen} customers={customers} notificationLog={notificationLog} triggerNotifications={triggerNotifications} />}
+      {tab === "salesman" && <AdminSalesmanTab salesmen={salesmen} supervisors={supervisors} customers={customers} assignSupervisor={assignSupervisor} toggleSalesmanStatus={toggleSalesmanStatus} updateSalesmanPhone={updateSalesmanPhone} />}
+      {tab === "supervisor" && <AdminSupervisorTab supervisors={supervisors} salesmen={salesmen} updateSupervisorPhone={updateSupervisorPhone} />}
+      {tab === "customer" && <AdminCustomerTab salesmen={salesmen} customers={customers} mutateCustomer={mutateCustomer} setCycleDays={setCycleDays} />}
+      {tab === "import" && <AdminImportTab handleImportFile={handleImportFile} pendingImport={pendingImport} confirmImport={confirmImport} cancelImport={cancelImport} />}
+      {tab === "log" && <AdminLogTab mutationLog={mutationLog} statusLog={statusLog} orderHistoryLog={orderHistoryLog} customers={customers} salesmen={salesmen} />}
+    </div>
+  );
+}
+
+function AdminNotifyTab({ salesmen, customers, notificationLog, triggerNotifications }) {
+  const eligible = customers.filter((c) => c.flagNotifikasi && !c.notified);
+  const alreadyPending = customers.filter((c) => c.notified);
+
+  const perSalesmanPreview = useMemo(() => {
+    const map = {};
+    eligible.forEach((c) => {
+      map[c.salesman_id] = (map[c.salesman_id] || 0) + 1;
+    });
+    return salesmen
+      .map((s) => ({ salesman: s, count: map[s.id] || 0 }))
+      .filter((r) => r.count > 0)
+      .sort((a, b) => b.count - a.count);
+  }, [eligible, salesmen]);
+
+  return (
+    <div className="grid lg:grid-cols-3 gap-4">
+      <Card className="p-5 lg:col-span-2">
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <div className="font-semibold text-slate-800 flex items-center gap-1.5">
+              <Send className="h-4 w-4 text-teal-700" /> Trigger Notifikasi Manual
+            </div>
+            <p className="text-sm text-slate-500 mt-1 max-w-lg">
+              Sistem <b>tidak</b> mengirim notifikasi otomatis. Notifikasi WhatsApp hanya terkirim
+              ke salesman (dan ringkasannya diteruskan ke supervisor terkait) setelah Admin menekan
+              tombol di bawah ini — kapan pun Admin mau.
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3 mt-4">
+          <StatTile label="Siap Dinotifikasi" value={eligible.length} sub="belum pernah dikirim" tone="red" icon={AlertTriangle} />
+          <StatTile label="Sudah Dikirim, Menunggu Tindak Lanjut" value={alreadyPending.length} tone="amber" icon={Clock} />
+        </div>
+
+        {perSalesmanPreview.length > 0 ? (
+          <div className="mt-4 border border-slate-200 rounded-lg overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
+                <tr>
+                  <th className="text-left px-3 py-2 font-semibold">Salesman</th>
+                  <th className="text-left px-3 py-2 font-semibold">Nomor WA</th>
+                  <th className="text-left px-3 py-2 font-semibold">Customer akan dinotif</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {perSalesmanPreview.map((r) => (
+                  <tr key={r.salesman.id}>
+                    <td className="px-3 py-2 font-medium text-slate-700">{r.salesman.nama}</td>
+                    <td className="px-3 py-2">
+                      {r.salesman.nomor_wa
+                        ? <span className="text-slate-500 text-xs">{r.salesman.nomor_wa}</span>
+                        : <Badge tone="red">Nomor belum diisi</Badge>}
+                    </td>
+                    <td className="px-3 py-2"><Badge tone="red">{r.count} customer</Badge></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="mt-4 text-sm text-slate-400 border border-dashed border-slate-200 rounded-lg p-4 text-center">
+            Tidak ada customer baru yang perlu dinotifikasi saat ini.
+          </div>
+        )}
+
+        <Button
+          className="mt-4"
+          disabled={eligible.length === 0}
+          onClick={triggerNotifications}
+        >
+          <Send className="h-4 w-4" />
+          Kirim Notifikasi Sekarang{eligible.length > 0 ? ` (${perSalesmanPreview.length} salesman, ${eligible.length} customer)` : ""}
+        </Button>
+      </Card>
+
+      <Card className="p-4">
+        <div className="font-semibold text-sm text-slate-700 mb-3 flex items-center gap-1.5">
+          <ListChecks className="h-4 w-4" /> Riwayat Pengiriman
+        </div>
+        {notificationLog.length === 0 ? (
+          <div className="text-xs text-slate-400">Belum pernah ada notifikasi yang dikirim.</div>
+        ) : (
+          <div className="space-y-3 max-h-96 overflow-auto">
+            {notificationLog.map((l) => (
+              <div key={l.id} className="text-xs border-b border-slate-100 pb-2.5">
+                <div className="font-medium text-slate-700">{fmtDate(l.tanggal)}</div>
+                <div className="text-slate-400 mt-0.5">
+                  {l.totalCustomers} customer · {l.salesmanCount} salesman · {l.supervisorIds.length} supervisor diberi ringkasan
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+    </div>
+  );
+}
+
+function AdminSalesmanTab({ salesmen, supervisors, customers, assignSupervisor, toggleSalesmanStatus, updateSalesmanPhone }) {
+  return (
+    <Card className="overflow-hidden">
+      <table className="w-full text-sm">
+        <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
+          <tr>
+            <th className="text-left px-4 py-2.5 font-semibold">Salesman</th>
+            <th className="text-left px-4 py-2.5 font-semibold">Kode</th>
+            <th className="text-left px-4 py-2.5 font-semibold">Nomor WA</th>
+            <th className="text-left px-4 py-2.5 font-semibold">Supervisor</th>
+            <th className="text-left px-4 py-2.5 font-semibold">Jml Customer</th>
+            <th className="text-left px-4 py-2.5 font-semibold">Status</th>
+            <th className="text-left px-4 py-2.5 font-semibold">Aksi</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-100">
+          {salesmen.map((s) => {
+            const cnt = customers.filter((c) => c.salesman_id === s.id).length;
+            return (
+              <tr key={s.id} className="hover:bg-slate-50/60">
+                <td className="px-4 py-2.5 font-medium text-slate-800">{s.nama}</td>
+                <td className="px-4 py-2.5 text-slate-400 text-xs font-mono">{s.id}</td>
+                <td className="px-4 py-2.5">
+                  <input
+                    type="text"
+                    value={s.nomor_wa || ""}
+                    onChange={(e) => updateSalesmanPhone(s.id, e.target.value)}
+                    placeholder="08xxxxxxxxxx"
+                    className={classNames(
+                      "text-xs border rounded-md px-2 py-1 w-32",
+                      s.nomor_wa ? "border-slate-300" : "border-rose-300 bg-rose-50"
+                    )}
+                  />
+                </td>
+                <td className="px-4 py-2.5">
+                  <select
+                    value={s.supervisor_id || ""}
+                    onChange={(e) => assignSupervisor(s.id, e.target.value || null)}
+                    className="text-xs rounded-md border border-slate-300 px-2 py-1 bg-white"
+                  >
+                    <option value="">— belum diatur —</option>
+                    {supervisors.map((sup) => <option key={sup.id} value={sup.id}>{sup.nama}</option>)}
+                  </select>
+                </td>
+                <td className="px-4 py-2.5 tabular-nums">{cnt}</td>
+                <td className="px-4 py-2.5">
+                  <Badge tone={s.status === "Aktif" ? "green" : "stone"}>{s.status}</Badge>
+                </td>
+                <td className="px-4 py-2.5">
+                  <Button size="sm" variant="secondary" onClick={() => toggleSalesmanStatus(s.id)}>
+                    {s.status === "Aktif" ? "Nonaktifkan" : "Aktifkan"}
+                  </Button>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </Card>
+  );
+}
+
+function AdminSupervisorTab({ supervisors, salesmen, updateSupervisorPhone }) {
+  return (
+    <Card className="overflow-hidden max-w-2xl">
+      <table className="w-full text-sm">
+        <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
+          <tr>
+            <th className="text-left px-4 py-2.5 font-semibold">Supervisor</th>
+            <th className="text-left px-4 py-2.5 font-semibold">Kode</th>
+            <th className="text-left px-4 py-2.5 font-semibold">Nomor WA</th>
+            <th className="text-left px-4 py-2.5 font-semibold">Jml Salesman</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-100">
+          {supervisors.map((sup) => {
+            const cnt = salesmen.filter((s) => s.supervisor_id === sup.id).length;
+            return (
+              <tr key={sup.id} className="hover:bg-slate-50/60">
+                <td className="px-4 py-2.5 font-medium text-slate-800">{sup.nama}</td>
+                <td className="px-4 py-2.5 text-slate-400 text-xs font-mono">{sup.id}</td>
+                <td className="px-4 py-2.5">
+                  <input
+                    type="text"
+                    value={sup.nomor_wa || ""}
+                    onChange={(e) => updateSupervisorPhone(sup.id, e.target.value)}
+                    placeholder="08xxxxxxxxxx"
+                    className={classNames(
+                      "text-xs border rounded-md px-2 py-1 w-40",
+                      sup.nomor_wa ? "border-slate-300" : "border-rose-300 bg-rose-50"
+                    )}
+                  />
+                </td>
+                <td className="px-4 py-2.5 tabular-nums">{cnt}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+      <div className="px-4 py-3 text-xs text-slate-400 border-t border-slate-100">
+        Nomor WA supervisor dipakai untuk meneruskan ringkasan notifikasi (bukan detail per customer) saat Admin trigger notifikasi ke tim mereka.
+      </div>
+    </Card>
+  );
+}
+
+function AdminCustomerTab({ salesmen, customers, mutateCustomer, setCycleDays }) {
+  const [q, setQ] = useState("");
+  const [page, setPage] = useState(0);
+  const pageSize = 25;
+
+  const filtered = useMemo(() => {
+    if (!q.trim()) return customers;
+    const s = q.toLowerCase();
+    return customers.filter((c) => c.nama.toLowerCase().includes(s) || c.salesmanNama.toLowerCase().includes(s));
+  }, [customers, q]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const pageRows = filtered.slice(page * pageSize, page * pageSize + pageSize);
+
+  return (
+    <div>
+      <div className="flex items-center gap-2 mb-3">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="h-3.5 w-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+          <input
+            value={q}
+            onChange={(e) => { setQ(e.target.value); setPage(0); }}
+            placeholder="Cari nama customer atau salesman..."
+            className="w-full text-sm border border-slate-300 rounded-lg pl-8 pr-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-600/30 focus:border-teal-600"
+          />
+        </div>
+        <div className="text-xs text-slate-400">{filtered.length} customer</div>
+      </div>
+
+      <Card className="overflow-hidden">
+        <table className="w-full text-sm">
+          <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
+            <tr>
+              <th className="text-left px-3 py-2.5 font-semibold">Customer</th>
+              <th className="text-left px-3 py-2.5 font-semibold">Tipe</th>
+              <th className="text-left px-3 py-2.5 font-semibold">Salesman</th>
+              <th className="text-left px-3 py-2.5 font-semibold">Siklus (hari)</th>
+              <th className="text-left px-3 py-2.5 font-semibold">Status</th>
+              <th className="text-left px-3 py-2.5 font-semibold">Mutasi ke</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {pageRows.map((c) => (
+              <tr key={c.id} className="hover:bg-slate-50/60">
+                <td className="px-3 py-2 font-medium text-slate-800">{c.nama}
+                  <div className="text-[10px] text-slate-400 font-mono">{c.id}</div>
+                </td>
+                <td className="px-3 py-2"><Badge tone={c.tipe_customer === "Baru" ? "teal" : "slate"}>{c.tipe_customer}</Badge></td>
+                <td className="px-3 py-2 text-slate-600">{c.salesmanNama}</td>
+                <td className="px-3 py-2">
+                  <input
+                    type="number" min={1}
+                    value={c.order_cycle_days}
+                    onChange={(e) => setCycleDays(c.id, e.target.value)}
+                    className="w-16 text-xs border border-slate-300 rounded-md px-2 py-1 tabular-nums"
+                  />
+                </td>
+                <td className="px-3 py-2"><Badge tone={c.status_customer === "Aktif" ? "green" : "stone"}>{c.status_customer}</Badge></td>
+                <td className="px-3 py-2">
+                  <select
+                    value={c.salesman_id}
+                    onChange={(e) => mutateCustomer(c.id, e.target.value)}
+                    className="text-xs rounded-md border border-slate-300 px-2 py-1 bg-white"
+                  >
+                    {salesmen.map((s) => <option key={s.id} value={s.id}>{s.nama}</option>)}
+                  </select>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </Card>
+
+      <div className="flex items-center justify-between mt-3 text-xs text-slate-500">
+        <span>Halaman {page + 1} dari {totalPages}</span>
+        <div className="flex gap-1.5">
+          <Button size="sm" variant="secondary" disabled={page === 0} onClick={() => setPage((p) => p - 1)}>Sebelumnya</Button>
+          <Button size="sm" variant="secondary" disabled={page >= totalPages - 1} onClick={() => setPage((p) => p + 1)}>Berikutnya</Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AdminImportTab({ handleImportFile, pendingImport, confirmImport, cancelImport }) {
+  return (
+    <div className="max-w-3xl space-y-4">
+      <Card className="p-6">
+        <div className="flex items-start gap-3">
+          <div className="h-10 w-10 rounded-lg bg-amber-50 flex items-center justify-center shrink-0">
+            <FileSpreadsheet className="h-5 w-5 text-amber-700" />
+          </div>
+          <div>
+            <div className="font-semibold text-slate-800">Import / Update Data dari Excel</div>
+            <p className="text-sm text-slate-500 mt-1">
+              Format yang didukung sama seperti <code className="bg-slate-100 px-1 rounded">Order_Tracker_2026.xlsx</code>:
+              1 sheet per salesman, dengan kolom <b>Nama Konsumen</b>, <b>Status (Lama/Baru)</b>, dan <b>Tgl Terakhir Order</b>.
+            </p>
+            <ul className="text-xs text-slate-500 mt-3 space-y-1 list-disc list-inside">
+              <li>File akan <b>dianalisis dulu</b> — sistem menampilkan ringkasan apa saja yang akan berubah sebelum benar-benar diterapkan.</li>
+              <li>Kalau ada sheet (nama salesman) yang tidak dikenali, atau ada customer yang belum ada di master data, Anda akan diberi <b>peringatan</b> untuk meninjau/memperbarui master data dulu sebelum melanjutkan.</li>
+              <li>Data lama tidak pernah hilang — hanya diperbarui (tanggal order) atau ditambah (customer baru), tidak pernah ditimpa diam-diam.</li>
+            </ul>
+            <label className="inline-flex items-center gap-2 mt-4 cursor-pointer">
+              <span className="inline-flex items-center gap-1.5 rounded-lg bg-teal-700 text-white text-sm px-3.5 py-2 font-medium hover:bg-teal-800">
+                <Upload className="h-4 w-4" /> Pilih File Excel untuk Dianalisis
+              </span>
+              <input type="file" accept=".xlsx,.xls" className="hidden" onChange={handleImportFile} />
+            </label>
+          </div>
+        </div>
+      </Card>
+
+      {pendingImport && <ImportPreviewPanel pendingImport={pendingImport} confirmImport={confirmImport} cancelImport={cancelImport} />}
+    </div>
+  );
+}
+
+function ImportPreviewPanel({ pendingImport, confirmImport, cancelImport }) {
+  const { fileName, unknownSheets, newCustomers, updatedCustomers, unchanged } = pendingImport;
+  const hasUnknownSheets = unknownSheets.length > 0;
+
+  const newByKnownSalesman = newCustomers.filter((c) => c.salesmanId);
+  const newByUnknownSheet = newCustomers.filter((c) => !c.salesmanId);
+
+  return (
+    <Card className={classNames("p-5 border-2", hasUnknownSheets ? "border-rose-300" : "border-amber-300")}>
+      <div className="flex items-center gap-2 mb-1">
+        <AlertTriangle className={classNames("h-5 w-5", hasUnknownSheets ? "text-rose-600" : "text-amber-600")} />
+        <div className="font-semibold text-slate-800">Preview Import — "{fileName}"</div>
+      </div>
+      <p className="text-sm text-slate-500 mb-4">Belum ada perubahan diterapkan. Tinjau dulu ringkasan di bawah ini.</p>
+
+      {hasUnknownSheets && (
+        <div className="mb-4 bg-rose-50 border border-rose-200 rounded-lg p-3.5">
+          <div className="font-semibold text-sm text-rose-800 flex items-center gap-1.5">
+            <AlertTriangle className="h-4 w-4" /> {unknownSheets.length} sheet tidak dikenali sebagai salesman terdaftar
+          </div>
+          <div className="text-xs text-rose-700 mt-1.5">
+            Nama sheet: <b>{unknownSheets.join(", ")}</b>
+          </div>
+          <p className="text-xs text-rose-700 mt-2">
+            Ini bisa berarti: <b>(a)</b> memang salesman baru, atau <b>(b)</b> nama salesman lama berubah/salah ketik di file
+            (misal "Hanif" jadi "Hanif S"). Kalau kasus (b), <b>jangan lanjutkan</b> — batalkan dulu, perbaiki nama salesman
+            di tab Master Salesman (atau perbaiki nama sheet di file Excel-nya), baru upload ulang.
+          </p>
+        </div>
+      )}
+
+      <div className="grid sm:grid-cols-3 gap-3 mb-4">
+        <StatTile label="Customer Baru" value={newCustomers.length} sub="belum ada di master data" tone="amber" icon={Users} />
+        <StatTile label="Akan Diperbarui" value={updatedCustomers.length} sub="tanggal order berubah" tone="teal" icon={RefreshCw} />
+        <StatTile label="Tidak Berubah" value={unchanged} sub="data sudah sama" tone="slate" icon={CheckCircle2} />
+      </div>
+
+      {newByKnownSalesman.length > 0 && (
+        <div className="mb-3">
+          <div className="text-xs font-semibold text-slate-600 mb-1.5">Customer baru (salesman sudah dikenal):</div>
+          <div className="max-h-40 overflow-auto border border-slate-200 rounded-lg">
+            <table className="w-full text-xs">
+              <tbody className="divide-y divide-slate-100">
+                {newByKnownSalesman.slice(0, 30).map((c, i) => (
+                  <tr key={i}>
+                    <td className="px-3 py-1.5 text-slate-700">{c.nama}</td>
+                    <td className="px-3 py-1.5 text-slate-400">{c.sheetName}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {newByKnownSalesman.length > 30 && (
+              <div className="text-xs text-slate-400 px-3 py-1.5">...dan {newByKnownSalesman.length - 30} lainnya.</div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {newByUnknownSheet.length > 0 && (
+        <div className="mb-3">
+          <div className="text-xs font-semibold text-rose-700 mb-1.5">Customer di sheet yang tidak dikenali (ikut tertahan sampai sheet-nya diklarifikasi):</div>
+          <div className="max-h-32 overflow-auto border border-rose-200 rounded-lg">
+            <table className="w-full text-xs">
+              <tbody className="divide-y divide-rose-100">
+                {newByUnknownSheet.slice(0, 20).map((c, i) => (
+                  <tr key={i}>
+                    <td className="px-3 py-1.5 text-slate-700">{c.nama}</td>
+                    <td className="px-3 py-1.5 text-rose-500">{c.sheetName}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {newByUnknownSheet.length > 20 && (
+              <div className="text-xs text-slate-400 px-3 py-1.5">...dan {newByUnknownSheet.length - 20} lainnya.</div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {updatedCustomers.length > 0 && (
+        <div className="mb-4">
+          <div className="text-xs font-semibold text-slate-600 mb-1.5">Contoh perubahan tanggal order:</div>
+          <div className="max-h-32 overflow-auto border border-slate-200 rounded-lg">
+            <table className="w-full text-xs">
+              <tbody className="divide-y divide-slate-100">
+                {updatedCustomers.slice(0, 15).map((c, i) => (
+                  <tr key={i}>
+                    <td className="px-3 py-1.5 text-slate-700">{c.nama}</td>
+                    <td className="px-3 py-1.5 text-slate-400">{fmtDate(c.oldDate)} → {fmtDate(c.newDate)}</td>
+                    {c.wasInactive && <td className="px-3 py-1.5"><Badge tone="green">Reaktivasi</Badge></td>}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {updatedCustomers.length > 15 && (
+              <div className="text-xs text-slate-400 px-3 py-1.5">...dan {updatedCustomers.length - 15} lainnya.</div>
+            )}
+          </div>
+        </div>
+      )}
+
+      <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-100">
+        <Button variant="secondary" onClick={cancelImport}>
+          <Undo2 className="h-4 w-4" /> Batal — Saya Mau Cek Master Data Dulu
+        </Button>
+        {hasUnknownSheets ? (
+          <Button variant="amber" onClick={() => confirmImport(true)}>
+            <Send className="h-4 w-4" /> Tetap Lanjutkan (Tambahkan {unknownSheets.length} Sebagai Salesman Baru)
+          </Button>
+        ) : (
+          <Button variant="primary" onClick={() => confirmImport(false)}>
+            <Send className="h-4 w-4" /> Terapkan Import
+          </Button>
+        )}
+      </div>
+    </Card>
+  );
+}
+
+function AdminLogTab({ mutationLog, statusLog, orderHistoryLog, customers, salesmen }) {
+  const custName = (id) => customers.find((c) => c.id === id)?.nama || id;
+  const smName = (id) => salesmen.find((s) => s.id === id)?.nama || id;
+  return (
+    <div className="grid md:grid-cols-3 gap-4">
+      <Card className="p-4">
+        <div className="font-semibold text-sm text-slate-700 mb-2 flex items-center gap-1.5"><ArrowRightLeft className="h-4 w-4" /> Log Mutasi Customer</div>
+        {mutationLog.length === 0 && <div className="text-xs text-slate-400">Belum ada mutasi.</div>}
+        <div className="space-y-2 max-h-96 overflow-auto">
+          {mutationLog.map((l) => (
+            <div key={l.id} className="text-xs border-b border-slate-100 pb-2">
+              <div className="font-medium text-slate-700">{custName(l.customer_id)}</div>
+              <div className="text-slate-400">{smName(l.dari)} → {smName(l.ke)} · {fmtDate(l.tanggal)} · oleh {l.oleh}</div>
+            </div>
+          ))}
+        </div>
+      </Card>
+      <Card className="p-4">
+        <div className="font-semibold text-sm text-slate-700 mb-2 flex items-center gap-1.5"><RefreshCw className="h-4 w-4" /> Log Perubahan Status</div>
+        {statusLog.length === 0 && <div className="text-xs text-slate-400">Belum ada perubahan status.</div>}
+        <div className="space-y-2 max-h-96 overflow-auto">
+          {statusLog.map((l) => (
+            <div key={l.id} className="text-xs border-b border-slate-100 pb-2">
+              <div className="font-medium text-slate-700">{custName(l.customer_id)} — {l.tipe}</div>
+              <div className="text-slate-400">{fmtDate(l.tanggal)} · oleh {l.oleh}</div>
+            </div>
+          ))}
+        </div>
+      </Card>
+      <Card className="p-4">
+        <div className="font-semibold text-sm text-slate-700 mb-2 flex items-center gap-1.5"><FileSpreadsheet className="h-4 w-4" /> Riwayat Order (Histori Lengkap)</div>
+        <div className="text-xs text-slate-400 mb-2">Total {orderHistoryLog.length} catatan order tersimpan — tidak pernah ditimpa/dihapus, hanya bertambah.</div>
+        {orderHistoryLog.length === 0 && <div className="text-xs text-slate-400">Belum ada data order.</div>}
+        <div className="space-y-2 max-h-96 overflow-auto">
+          {orderHistoryLog.slice(0, 50).map((l) => (
+            <div key={l.id} className="text-xs border-b border-slate-100 pb-2">
+              <div className="font-medium text-slate-700">{custName(l.customer_id)} — order {fmtDate(l.tanggal_order)}</div>
+              <div className="text-slate-400">via {l.sumber} · dicatat {fmtDate(l.tanggal_input)}</div>
+            </div>
+          ))}
+          {orderHistoryLog.length > 50 && (
+            <div className="text-xs text-slate-400 pt-1">...dan {orderHistoryLog.length - 50} catatan lainnya (tersimpan, hanya tidak ditampilkan semua di sini).</div>
+          )}
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+/* ============================================================
+   SUPERVISOR VIEW
+   ============================================================ */
+function SupervisorView({ supervisorId, supervisors, salesmen, customers, notificationLog, manualReactivate, exportReport }) {
+  const [drill, setDrill] = useState(null);
+  const supName = supervisors.find((s) => s.id === supervisorId)?.nama;
+  const teamIds = salesmen.map((s) => s.id);
+  const teamCustomers = customers.filter((c) => teamIds.includes(c.salesman_id));
+
+  const totalAktif = teamCustomers.filter((c) => c.status_customer === "Aktif").length;
+  const totalInactive = teamCustomers.filter((c) => c.status_customer === "Inactive").length;
+  const totalFlag = teamCustomers.filter((c) => c.flagNotifikasi).length;
+
+  const teamNotifications = notificationLog
+    .filter((l) => l.supervisorIds.includes(supervisorId))
+    .map((l) => {
+      const teamCount = teamIds.reduce((sum, smId) => sum + (l.perSalesman[smId] || 0), 0);
+      return { ...l, teamCount };
+    })
+    .filter((l) => l.teamCount > 0);
+
+  if (drill) {
+    const sm = salesmen.find((s) => s.id === drill);
+    const rows = customers
+      .filter((c) => c.salesman_id === drill)
+      .slice()
+      .sort((a, b) => {
+        const ov = (c) => (c.daysSince === null ? 9999 : c.daysSince - c.order_cycle_days);
+        return ov(b) - ov(a);
+      });
+    return (
+      <div>
+        <button onClick={() => setDrill(null)} className="text-sm text-teal-700 font-medium flex items-center gap-1 mb-4 hover:underline">
+          <ArrowLeft className="h-4 w-4" /> Kembali ke ringkasan tim
+        </button>
+        <SectionHeader title={`Detail Customer — ${sm?.nama}`} subtitle="Diurutkan dari yang paling jauh melewati siklus order normalnya." icon={Users} />
+        <Card className="overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
+              <tr>
+                <th className="text-left px-3 py-2.5 font-semibold">Customer</th>
+                <th className="text-left px-3 py-2.5 font-semibold">Tipe</th>
+                <th className="text-left px-3 py-2.5 font-semibold">Hari / Siklus</th>
+                <th className="text-left px-3 py-2.5 font-semibold">Status</th>
+                <th className="text-left px-3 py-2.5 font-semibold">Aksi</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {rows.map((c) => (
+                <tr key={c.id} className="hover:bg-slate-50/60">
+                  <td className="px-3 py-2.5 font-medium text-slate-800">{c.nama}</td>
+                  <td className="px-3 py-2.5"><Badge tone={c.tipe_customer === "Baru" ? "teal" : "slate"}>{c.tipe_customer}</Badge></td>
+                  <td className="px-3 py-2.5 tabular-nums">
+                    {c.daysSince === null ? (
+                      <span className="text-slate-400">belum ada data</span>
+                    ) : (
+                      <span className={c.overdue ? "text-rose-600 font-semibold" : "text-slate-600"}>
+                        {c.daysSince} / {c.order_cycle_days} hari
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-3 py-2.5"><Badge tone={c.status_customer === "Aktif" ? "green" : "stone"}>{c.status_customer}</Badge></td>
+                  <td className="px-3 py-2.5">
+                    {c.status_customer === "Inactive" && (
+                      <Button size="sm" variant="secondary" onClick={() => manualReactivate(c.id)}>
+                        <RotateCcw className="h-3.5 w-3.5" /> Aktifkan Kembali
+                      </Button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1">
+        <SectionHeader title={`Dashboard Supervisor — ${supName}`} subtitle="Ringkasan performa tim dalam menangani follow-up customer." icon={Building2} />
+        <Button variant="secondary" onClick={exportReport}><Download className="h-4 w-4" /> Download Excel</Button>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+        <StatTile label="Customer Aktif" value={totalAktif} tone="teal" icon={CheckCircle2} />
+        <StatTile label="Customer Inactive" value={totalInactive} tone="slate" icon={XCircle} />
+        <StatTile label="Perlu Follow Up" value={totalFlag} sub="sudah melewati siklus order" tone="red" icon={AlertTriangle} />
+      </div>
+
+      <Card className="p-4 mb-6">
+        <div className="font-semibold text-sm text-slate-700 mb-2 flex items-center gap-1.5">
+          <Send className="h-4 w-4 text-teal-700" /> Notifikasi Terkirim ke Tim Ini
+        </div>
+        {teamNotifications.length === 0 ? (
+          <div className="text-xs text-slate-400">Belum ada notifikasi yang dikirim Admin ke tim ini.</div>
+        ) : (
+          <div className="space-y-1.5">
+            {teamNotifications.slice(0, 5).map((l) => (
+              <div key={l.id} className="flex items-center justify-between text-xs border-b border-slate-50 pb-1.5">
+                <span className="text-slate-600">{fmtDate(l.tanggal)} · dikirim oleh {l.triggeredBy}</span>
+                <Badge tone="amber">{l.teamCount} customer di tim ini</Badge>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+
+      <Card className="overflow-hidden">
+        <table className="w-full text-sm">
+          <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
+            <tr>
+              <th className="text-left px-4 py-2.5 font-semibold">Salesman</th>
+              <th className="text-left px-4 py-2.5 font-semibold">Total Customer</th>
+              <th className="text-left px-4 py-2.5 font-semibold">Aktif</th>
+              <th className="text-left px-4 py-2.5 font-semibold">Inactive</th>
+              <th className="text-left px-4 py-2.5 font-semibold">Perlu Follow Up</th>
+              <th className="text-left px-4 py-2.5 font-semibold"></th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {salesmen.map((s) => {
+              const cs = customers.filter((c) => c.salesman_id === s.id);
+              const aktif = cs.filter((c) => c.status_customer === "Aktif").length;
+              const inactive = cs.filter((c) => c.status_customer === "Inactive").length;
+              const flag = cs.filter((c) => c.flagNotifikasi).length;
+              return (
+                <tr key={s.id} className="hover:bg-slate-50/60 cursor-pointer" onClick={() => setDrill(s.id)}>
+                  <td className="px-4 py-2.5 font-medium text-slate-800">{s.nama}</td>
+                  <td className="px-4 py-2.5 tabular-nums">{cs.length}</td>
+                  <td className="px-4 py-2.5 tabular-nums text-teal-700">{aktif}</td>
+                  <td className="px-4 py-2.5 tabular-nums text-slate-400">{inactive}</td>
+                  <td className="px-4 py-2.5 tabular-nums">
+                    {flag > 0 ? <Badge tone="red">{flag} perlu ditindak</Badge> : <span className="text-slate-300">-</span>}
+                  </td>
+                  <td className="px-4 py-2.5 text-slate-300"><ChevronRight className="h-4 w-4" /></td>
+                </tr>
+              );
+            })}
+            {salesmen.length === 0 && (
+              <tr><td colSpan={6} className="px-4 py-8 text-center text-sm text-slate-400">Belum ada salesman yang di-mapping ke supervisor ini. Atur di Panel Admin → Master Salesman.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </Card>
+    </div>
+  );
+}
+
+/* ============================================================
+   SALESMAN VIEW  (simulasi tampilan WhatsApp)
+   ============================================================ */
+function SalesmanView({ salesman, customers, simDate, submitReason, recordNewOrder }) {
+  const [openCustomer, setOpenCustomer] = useState(null);
+  const [orderSearch, setOrderSearch] = useState("");
+
+  const reminderList = customers
+    .filter((c) => c.pendingReminder)
+    .sort((a, b) => (b.daysSince ?? 9999) - (a.daysSince ?? 9999));
+
+  const orderCandidates = customers.filter((c) => c.nama.toLowerCase().includes(orderSearch.toLowerCase())).slice(0, 6);
+
+  function exportReminderExcel() {
+    const rows = reminderList.map((c, i) => ({
+      No: i + 1,
+      Customer: c.nama,
+      "Hari Belum Order": c.daysSince ?? "-",
+      "Siklus Normal (hari)": c.order_cycle_days,
+      Status: c.status_customer,
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Reminder Customer");
+    XLSX.writeFile(wb, `Reminder_${salesman?.nama || "Salesman"}_${simDate}.xlsx`);
+  }
+
+  function exportReminderText() {
+    const lines = [];
+    lines.push(`🔔 Reminder Customer Anda [${salesman?.nama || "-"}] — ${fmtDate(simDate)}`);
+    lines.push("");
+    lines.push(`Ada ${reminderList.length} customer yang sudah melewati siklus order normalnya:`);
+    reminderList.forEach((c, i) => {
+      const info = c.daysSince === null ? "belum ada order" : `${c.daysSince} hari (siklus normal ${c.order_cycle_days} hari)`;
+      lines.push(`${i + 1}. ${c.nama} — ${info}`);
+    });
+    lines.push("");
+    lines.push("Balas dengan alasan: Kalah Harga / Stok Masih Ada / Sudah Bangkrut.");
+
+    const text = lines.join("\n");
+    const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `Reminder_${salesman?.nama || "Salesman"}_${simDate}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  return (
+    <div className="grid lg:grid-cols-2 gap-6">
+      <div>
+        <div className="flex items-center justify-between gap-3 flex-wrap mb-1">
+          <SectionHeader title={`Halo, ${salesman?.nama}`} subtitle="Simulasi notifikasi WhatsApp yang kamu terima hari ini." icon={MessageCircle} />
+          {reminderList.length > 0 && (
+            <div className="flex gap-2">
+              <Button size="sm" variant="secondary" onClick={exportReminderText}>
+                <FileText className="h-3.5 w-3.5" /> Download Teks (.txt)
+              </Button>
+              <Button size="sm" variant="secondary" onClick={exportReminderExcel}>
+                <Download className="h-3.5 w-3.5" /> Download Excel
+              </Button>
+            </div>
+          )}
+        </div>
+
+        <div className="bg-[#e9edef] rounded-2xl p-3 border border-slate-200">
+          <div className="bg-white rounded-xl shadow-sm p-4">
+            <div className="flex items-center gap-2 mb-2 pb-2 border-b border-slate-100">
+              <div className="h-8 w-8 rounded-full bg-teal-700 flex items-center justify-center text-white text-xs font-bold shrink-0">SG</div>
+              <div>
+                <div className="text-sm font-semibold text-slate-800">SiGula Notif</div>
+                <div className="text-[10px] text-slate-400">{fmtDate(simDate)}</div>
+              </div>
+            </div>
+
+            {reminderList.length === 0 ? (
+              <div className="text-sm text-slate-500 py-4 text-center">
+                <Sparkles className="h-5 w-5 mx-auto mb-1 text-amber-400" />
+                Belum ada notifikasi. Admin belum menekan tombol "Kirim Notifikasi", atau semua customer yang pernah dinotif sudah ditindaklanjuti.
+              </div>
+            ) : (
+              <>
+                <p className="text-sm text-slate-700">
+                  🔔 Reminder Customer Anda — {reminderList.length} customer sudah melewati siklus order normalnya:
+                </p>
+                <div className="mt-2.5 space-y-1.5 max-h-[520px] overflow-y-auto pr-1">
+                  {reminderList.map((c, i) => (
+                    <button
+                      key={c.id}
+                      onClick={() => setOpenCustomer(c.id)}
+                      className="w-full text-left flex items-start justify-between gap-3 text-sm border border-slate-200 rounded-lg px-3.5 py-2.5 hover:bg-teal-50 hover:border-teal-300 transition-colors"
+                    >
+                      <span className="text-slate-700 leading-snug">{i + 1}. {c.nama}</span>
+                      <span className="text-xs text-rose-600 font-semibold tabular-nums whitespace-nowrap shrink-0">
+                        {c.daysSince === null ? "belum ada order" : `${c.daysSince}h (siklus ${c.order_cycle_days}h)`}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[11px] text-slate-400 mt-2">Tap salah satu customer untuk isi alasan belum order.</p>
+              </>
+            )}
+          </div>
+        </div>
+
+        {openCustomer && (
+          <div className="mt-4 bg-[#e9edef] rounded-2xl p-3 border border-slate-200">
+            <div className="bg-white rounded-xl shadow-sm p-3.5 max-w-sm">
+              {(() => {
+                const c = customers.find((x) => x.id === openCustomer);
+                return (
+                  <>
+                    <p className="text-sm text-slate-700">
+                      <b>{c.nama}</b> — {c.daysSince === null ? "belum tercatat order" : `${c.daysSince} hari belum order (siklus normal ${c.order_cycle_days} hari)`}.<br />
+                      Kenapa belum order lagi?
+                    </p>
+                    <div className="grid grid-cols-1 gap-1.5 mt-3">
+                      {[1, 2, 3].map((k) => (
+                        <button
+                          key={k}
+                          onClick={() => { submitReason(c.id, k); setOpenCustomer(null); }}
+                          className={classNames(
+                            "text-sm text-center rounded-lg border py-2 font-medium hover:opacity-80 transition-opacity",
+                            k === 3 ? "border-rose-300 text-rose-700 bg-rose-50" : "border-teal-300 text-teal-700 bg-teal-50"
+                          )}
+                        >
+                          {REASON_LABELS[k]}
+                        </button>
+                      ))}
+                    </div>
+                    <button onClick={() => setOpenCustomer(null)} className="text-xs text-slate-400 mt-2 hover:underline">Batal</button>
+                  </>
+                );
+              })()}
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div>
+        <SectionHeader title="Catat Order Baru" subtitle="Simulasi ada customer yang order lagi (memicu reaktivasi otomatis jika sebelumnya Inactive)." icon={Send} />
+        <Card className="p-4">
+          <div className="relative mb-3">
+            <Search className="h-3.5 w-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+            <input
+              value={orderSearch}
+              onChange={(e) => setOrderSearch(e.target.value)}
+              placeholder="Cari nama customer..."
+              className="w-full text-sm border border-slate-300 rounded-lg pl-8 pr-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-600/30 focus:border-teal-600"
+            />
+          </div>
+          <div className="space-y-1.5 max-h-80 overflow-auto">
+            {orderCandidates.map((c) => (
+              <div key={c.id} className="flex items-center justify-between text-sm border border-slate-100 rounded-lg px-3 py-2">
+                <div>
+                  <div className="font-medium text-slate-700">{c.nama}</div>
+                  <div className="text-[11px] text-slate-400">
+                    Terakhir order: {fmtDate(c.last_order_date)} · <Badge tone={c.status_customer === "Aktif" ? "green" : "stone"}>{c.status_customer}</Badge>
+                  </div>
+                </div>
+                <Button size="sm" variant="primary" onClick={() => recordNewOrder(c.id)}>Catat Order</Button>
+              </div>
+            ))}
+            {orderCandidates.length === 0 && <div className="text-xs text-slate-400 py-3 text-center">Customer tidak ditemukan.</div>}
+          </div>
+        </Card>
+
+        <Card className="p-4 mt-4">
+          <div className="text-sm font-semibold text-slate-700 mb-2">Daftar Customer Saya ({customers.length})</div>
+          <div className="max-h-64 overflow-auto space-y-1 text-sm">
+            {customers
+              .slice()
+              .sort((a, b) => (b.daysSince ?? 0) - (a.daysSince ?? 0))
+              .map((c) => (
+                <div key={c.id} className="flex items-center justify-between border-b border-slate-50 py-1.5">
+                  <span className="text-slate-600">{c.nama}</span>
+                  <span className="text-xs text-slate-400 tabular-nums">
+                    {c.daysSince === null ? "-" : `${c.daysSince}h`} <Badge tone={c.status_customer === "Aktif" ? "green" : "stone"}>{c.status_customer}</Badge>
+                  </span>
+                </div>
+              ))}
+          </div>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   MANAGEMENT VIEW
+   ============================================================ */
+function ManagementView({ supervisors, salesmen, customers, reasonLog, statusLog, supervisorOf, exportReport }) {
+  const totalAktif = customers.filter((c) => c.status_customer === "Aktif").length;
+  const totalInactive = customers.filter((c) => c.status_customer === "Inactive").length;
+  const totalFlag = customers.filter((c) => c.flagNotifikasi).length;
+  const totalReaktivasi = statusLog.filter((l) => l.tipe.toLowerCase().includes("reaktivasi")).length;
+
+  const reasonCounts = { 1: 0, 2: 0, 3: 0 };
+  reasonLog.forEach((r) => (reasonCounts[r.kode_alasan] = (reasonCounts[r.kode_alasan] || 0) + 1));
+  const totalReasons = reasonLog.length || 1;
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1">
+        <SectionHeader title="Summary Report — Management" subtitle="Ringkasan performa seluruh tim sales secara keseluruhan." icon={TrendingUp} />
+        <Button variant="secondary" onClick={exportReport}><Download className="h-4 w-4" /> Download Excel</Button>
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+        <StatTile label="Total Customer" value={customers.length} tone="slate" icon={Package} />
+        <StatTile label="Aktif" value={totalAktif} tone="teal" icon={CheckCircle2} />
+        <StatTile label="Inactive" value={totalInactive} tone="slate" icon={XCircle} />
+        <StatTile label="Perlu Follow Up" value={totalFlag} tone="red" icon={AlertTriangle} />
+      </div>
+
+      <div className="grid lg:grid-cols-3 gap-4 mb-6">
+        <Card className="p-4 lg:col-span-2">
+          <div className="font-semibold text-sm text-slate-700 mb-3">Performa per Supervisor</div>
+          <table className="w-full text-sm">
+            <thead className="text-slate-400 text-xs uppercase">
+              <tr>
+                <th className="text-left pb-2 font-semibold">Supervisor</th>
+                <th className="text-left pb-2 font-semibold">Salesman</th>
+                <th className="text-left pb-2 font-semibold">Customer</th>
+                <th className="text-left pb-2 font-semibold">Aktif</th>
+                <th className="text-left pb-2 font-semibold">Follow Up</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {supervisors.map((sup) => {
+                const team = supervisorOf(sup.id);
+                const teamIds = team.map((s) => s.id);
+                const cs = customers.filter((c) => teamIds.includes(c.salesman_id));
+                return (
+                  <tr key={sup.id}>
+                    <td className="py-2 font-medium text-slate-800">{sup.nama}</td>
+                    <td className="py-2 tabular-nums text-slate-500">{team.length}</td>
+                    <td className="py-2 tabular-nums text-slate-500">{cs.length}</td>
+                    <td className="py-2 tabular-nums text-teal-700">{cs.filter((c) => c.status_customer === "Aktif").length}</td>
+                    <td className="py-2">
+                      {cs.filter((c) => c.flagNotifikasi).length > 0
+                        ? <Badge tone="red">{cs.filter((c) => c.flagNotifikasi).length}</Badge>
+                        : <span className="text-slate-300 text-xs">-</span>}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </Card>
+
+        <Card className="p-4">
+          <div className="font-semibold text-sm text-slate-700 mb-3">Breakdown Alasan Tidak Order</div>
+          {reasonLog.length === 0 ? (
+            <div className="text-xs text-slate-400">Belum ada data alasan yang diinput salesman.</div>
+          ) : (
+            <div className="space-y-2.5">
+              {[1, 2, 3].map((k) => {
+                const pct = Math.round(((reasonCounts[k] || 0) / totalReasons) * 100);
+                return (
+                  <div key={k}>
+                    <div className="flex justify-between text-xs mb-1">
+                      <span className="text-slate-600">{REASON_LABELS[k]}</span>
+                      <span className="text-slate-400 tabular-nums">{reasonCounts[k] || 0} ({pct}%)</span>
+                    </div>
+                    <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                      <div className={classNames("h-full rounded-full", k === 1 ? "bg-amber-500" : k === 2 ? "bg-sky-500" : "bg-stone-500")} style={{ width: `${pct}%` }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          <div className="mt-4 pt-3 border-t border-slate-100 text-xs text-slate-500 flex items-center gap-1.5">
+            <RefreshCw className="h-3.5 w-3.5 text-teal-600" />
+            <span><b className="text-slate-700">{totalReaktivasi}</b> customer direaktivasi (Inactive → Aktif lagi) sejak sistem berjalan.</span>
+          </div>
+        </Card>
+      </div>
+
+      <Card className="p-4">
+        <div className="font-semibold text-sm text-slate-700 mb-3">Response Rate per Salesman</div>
+        <table className="w-full text-sm">
+          <thead className="text-slate-400 text-xs uppercase">
+            <tr>
+              <th className="text-left pb-2 font-semibold">Salesman</th>
+              <th className="text-left pb-2 font-semibold">Supervisor</th>
+              <th className="text-left pb-2 font-semibold">Perlu Follow Up</th>
+              <th className="text-left pb-2 font-semibold">Alasan Terinput (all-time)</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {salesmen.map((s) => {
+              const flagged = customers.filter((c) => c.salesman_id === s.id && c.flagNotifikasi).length;
+              const responded = reasonLog.filter((r) => r.salesman_id === s.id).length;
+              const supName = supervisors.find((sp) => sp.id === s.supervisor_id)?.nama || "—";
+              return (
+                <tr key={s.id}>
+                  <td className="py-2 font-medium text-slate-800">{s.nama}</td>
+                  <td className="py-2 text-slate-500">{supName}</td>
+                  <td className="py-2 tabular-nums">{flagged > 0 ? <Badge tone="red">{flagged}</Badge> : <span className="text-slate-300">-</span>}</td>
+                  <td className="py-2 tabular-nums text-slate-500">{responded}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </Card>
+    </div>
+  );
+}
+
+/* ============================================================
+   shared
+   ============================================================ */
+function SectionHeader({ title, subtitle, icon: Icon }) {
+  return (
+    <div className="flex items-center gap-3 mb-5">
+      <div className="h-10 w-10 rounded-xl bg-teal-700 flex items-center justify-center shrink-0">
+        <Icon className="h-5 w-5 text-white" />
+      </div>
+      <div>
+        <h1 className="text-lg font-bold text-slate-800 leading-tight">{title}</h1>
+        <p className="text-xs text-slate-400">{subtitle}</p>
+      </div>
+    </div>
+  );
+}
