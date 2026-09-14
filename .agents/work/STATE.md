@@ -7,15 +7,21 @@
 |---|---|
 | Project | SiGula |
 | Track | production |
-| Phase | development |
+| Phase | deployment |
 | Updated | 2026-09-14 |
 
 ## Now
 
+**Production live (2026-09-14):** `https://sigula.ceater.cc` on VPS
+`194.233.71.161` — `/home/sigula/sigula`, podman container `sigula` bound
+`127.0.0.1:3010`, Caddy TLS reverse proxy. Runbook:
+`docs/runbook-sigula.md`. Change seeded demo passwords before sharing widely;
+configure WAHA API key under Admin → Pengaturan (host WAHA at
+`127.0.0.1:3002` / `waha.ceater.cc`).
+
 **Repo hygiene (2026-09-14):** root `README.md`, tightened `.gitignore` /
 `.dockerignore`, `data/.gitkeep`, `engines.node >=22`, `.env.example`
-documented. Remote `origin` → `git@github.com:mcimam/sigula.git` added by
-user; first app commit in progress. Push still needs explicit approval.
+documented. Remote `origin` → `git@github.com:mcimam/sigula.git`.
 
 **Full stack rewrite: Django → React Router 7 (framework mode) JS monolith**
 per user choice (option C, install approved). Recorded as ADR-0003.
@@ -108,7 +114,7 @@ only if a regression slips through without a service-level signal.
 
 | Env | Version | Deployed | Rollback |
 |---|---|---|---|
-
+| production | `5366902` @ `sigula.ceater.cc` | 2026-09-14 | `git checkout <sha> && podman-compose up -d --build` (see runbook) |
 ## Decisions log
 
 | Date | Decision | Where recorded |

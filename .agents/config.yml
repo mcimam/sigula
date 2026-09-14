@@ -68,7 +68,7 @@ commands:
   typecheck: "npm run typecheck"
   migrate: ""               # schema bootstraps on first boot via migrate.server.ts
   deploy_staging: ""
-  deploy_production: ""
+  deploy_production: "cd /home/sigula/sigula && git pull --ff-only && podman-compose up -d --build"
 
 # ── Autonomy ─────────────────────────────────────────────────────────────────
 # What the agent may do unattended vs. what needs your explicit go-ahead.
