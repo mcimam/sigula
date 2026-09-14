@@ -5,7 +5,16 @@ import { createCookieSessionStorage, redirect } from "react-router";
 import { db } from "~/db/client.server";
 import { profiles, users, type Role } from "~/db/schema";
 
-const SESSION_SECRET = process.env.SESSION_SECRET ?? "dev-only-change-me";
+const SESSION_SECRET = (() => {
+  const value = process.env.SESSION_SECRET;
+  if (value && value.length > 0 && value !== "dev-only-change-me") return value;
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(
+      "SESSION_SECRET must be set to a non-default value in production",
+    );
+  }
+  return value && value.length > 0 ? value : "dev-only-change-me";
+})();
 
 export const sessionStorage = createCookieSessionStorage({
   cookie: {

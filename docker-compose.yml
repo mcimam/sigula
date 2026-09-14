@@ -1,0 +1,31 @@
+# SiGula — served at https://sigula.ceater.cc
+# Caddy (host) → 127.0.0.1:3010 → this container :3000
+# Deploy: /home/sigula/sigula  (podman-compose)
+
+services:
+  app:
+    build: .
+    container_name: sigula
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3010:3000"
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      # Reach host-published WAHA (127.0.0.1:3002) from the container network.
+      WAHA_BASE_URL: http://host.containers.internal:3002
+    extra_hosts:
+      - "host.containers.internal:host-gateway"
+    volumes:
+      - sigula-data:/app/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/login >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 25s
+
+volumes:
+  sigula-data:

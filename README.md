@@ -41,17 +41,19 @@ under Admin → Pengaturan.
 | `npm test` | Vitest suite |
 | `npm run typecheck` | React Router typegen + `tsc` |
 
-## Docker
+## Docker / production
 
 ```bash
-docker build -t sigula .
-docker run --rm -p 3000:3000 \
-  -e SESSION_SECRET=replace-me \
-  -v sigula-data:/app/data \
-  sigula
+cp .env.example .env   # set a strong SESSION_SECRET
+podman-compose up -d --build
+# or: docker compose up -d --build
 ```
 
-SQLite lives under `/app/data` — mount a volume so the DB survives restarts.
+Production on `ceater.cc` is documented in `docs/runbook-sigula.md`
+(`https://sigula.ceater.cc`, host bind `127.0.0.1:3010`).
+
+SQLite lives under `/app/data` — compose mounts a named volume so the DB
+survives restarts.
 
 ## Repository layout
 
