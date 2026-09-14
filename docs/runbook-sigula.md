@@ -82,10 +82,10 @@ rollback keeps the DB unless you explicitly remove the volume.
 - **Check:** `.env` exists and compose env shows `NODE_ENV=production`
 - **Fix:** restore secret; recreate container without wiping the data volume
 
-### 3. Reminders not sending
-- **Usually caused by:** WAHA down or API key/session not configured
-- **Check:** `curl -sI http://127.0.0.1:3002/ping`; Admin → Pengaturan
-- **Fix:** start WAHA (`/home/waha`); set API key + session in Admin UI
+### 4. Login shows server error / POST /login.data 400
+- **Usually caused by:** React Router CSRF — browser `Origin` is `https://sigula.ceater.cc` while `@react-router/serve` behind Caddy builds `request.url` as `http://…`
+- **Check:** `podman logs sigula` for `Bad Request` on `POST /login.data`
+- **Fix:** ensure `react-router.config.ts` includes `allowedActionOrigins: ["sigula.ceater.cc", …]` then rebuild
 
 ## Dependencies
 
