@@ -8,9 +8,28 @@
 | Project | SiGula |
 | Track | production |
 | Phase | deployment |
-| Updated | 2026-09-26 |
+| Updated | 2026-09-26 (deployed) |
 
 ## Now
+
+**DEPLOYED to production 2026-09-26 16:37Z — `master` = `89d8bc4`** (user approved the deploy and the credential rotation).
+The old production database was the pre-migration schema (2 accounts, 555 customers, 822 transaksi, 10 salesmen + 1 legacy
+supervisor); the new build migrated it on boot (10 migrations, integrity ok, counts unchanged, salesmen 11). Verified from
+outside: headers via Caddy, login page prints no demo password, admin login with the new password, the old demo password and
+the demo `salesman` account refused, every admin page 200, container healthy. Downtime ≈ 5–10 s.
+- **Backup** `/home/sigula/backups/sigula-pre-erdv2-20260926T163042Z.db` (root, 600) and **image**
+  `localhost/sigula_app:pre-erdv2-20260926T163042Z`. Keep them until the new version has been used for a while.
+- **Rollback** (the migrated database cannot run on the old image): `cd /home/sigula/sigula && podman stop sigula && podman rm sigula;
+  VP=$(podman volume inspect sigula_sigula-data --format '{{.Mountpoint}}'); rm -f $VP/sigula.db*; cp /home/sigula/backups/sigula-pre-erdv2-20260926T163042Z.db $VP/sigula.db;
+  podman tag localhost/sigula_app:pre-erdv2-20260926T163042Z localhost/sigula_app:latest; git checkout d66972e; podman-compose up -d`. Anything written since the deploy is lost.
+- **Credentials:** the production `admin` password was rotated to a random one (reported to the user in chat, not stored anywhere);
+  the demo `salesman` account (no role) was deactivated. Both had the public demo password.
+- **Still open for production:** WAHA is not yet pointed at `/webhooks/waha` (replies are not received; set
+  `WHATSAPP_HOOK_URL` / `WHATSAPP_HOOK_EVENTS=message` and ideally a secret — DEBT-020), production users other than `admin`
+  do not exist yet, and there is no salesman/supervisor/management login until the admin creates them (Data Master → User).
+- **Build fragility found while deploying:** `podman-compose up -d --build` can fail (DEBT-026: `better-sqlite3` is compiled from
+  source in the image and node-gyp's download of Node headers timed out). What worked: `podman build --jobs 1 --network=host -t
+  localhost/sigula_app:latest .` then replace the container.
 
 **ERD v2 — R1, R3 and R2 DONE on branch `feat/erd-v2-foundation` (2026-09-26, not committed, not deployed).**
 Design: `docs/erd-sigula.dbml`; decisions: ADR-0005 (R1), ADR-0006 (R3), ADR-0007 (R2). Migrations `drizzle/0000–0004`.

@@ -123,7 +123,7 @@ release have no line numbers stored and cannot be answered by number.
 
 ## Release checklist — ERD v2, comments, WhatsApp replies (migrations `0000`–`0009`)
 
-Prepared 2026-09-26. **Nothing below has been run against production**; each step that changes production needs your go-ahead.
+Prepared 2026-09-26 and **carried out the same day** (see `.agents/work/STATE.md` for the result, the backup and the exact rollback commands). It was **not** run with the steps below in this order: the demo passwords were rotated after the deploy, in the same session. each step that changes production needs your go-ahead.
 What *was* rehearsed: the production build (`npm run build`, `react-router-serve`) booted against a copy of the development
 database rolled back to migration `0007`; migrations `0008`–`0009` applied on open (integrity and foreign-key checks clean),
 every role's pages answered 200, other roles' pages 403, and the webhook answered 200 / 401 / 413 as designed.
@@ -140,6 +140,9 @@ every role's pages answered 200, other roles' pages 403, and the webhook answere
 5. Merge/push the branch (needs your approval) so the server can `git pull --ff-only`.
 
 **Deploy** (`config.yml → commands.deploy_production`): `cd /home/sigula/sigula && git pull --ff-only && podman-compose up -d --build`.
+*If the build fails at `npm ci` with `gyp ERR! … ETIMEDOUT` (DEBT-026)*: build the image by hand with `podman build --jobs 1 --network=host -t localhost/sigula_app:latest .`,
+then `podman stop sigula && podman rm sigula && podman-compose up -d`. Before deploying, tag the running image (`podman tag localhost/sigula_app:latest localhost/sigula_app:pre-<release>`)
+and take the backup with the app's own SQLite backup (`podman exec sigula node -e "…new Database('/app/data/sigula.db').backup('/app/data/x.db')…"`, then move the file out of the volume) — that is consistent while the app runs.
 
 **After deploying — verify by looking, not by the exit code**
 
