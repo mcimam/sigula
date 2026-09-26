@@ -1,24 +1,18 @@
-import { desc, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { Link, useLoaderData } from "react-router";
 
 import type { Route } from "./+types/admin.audit";
 import { AppShell, PageHeader, StatusPill } from "~/components/AppShell";
-import {
-  paginate,
-  resolvePageSize,
-  TablePagination,
-  TableToolbar,
-} from "~/components/DataTable";
+import { resolvePageSize, TablePagination } from "~/components/DataTable";
+import { TableToolbar } from "~/components/TableSearch";
 import { db } from "~/db/client.server";
-import {
-  ACTIVITY_ENTITIES,
-  customers,
-  mutationLogs,
-  salesmen,
-  statusLogs,
-  users,
-} from "~/db/schema";
-import { listRecentActivity } from "~/lib/activity.server";
+import { users } from "~/db/schema";
+import { ACTIVITY_ENTITIES } from "~/lib/activity-entities";
+import { listActivityPage } from "~/lib/activity.server";
+import { listInboundPage } from "~/lib/inbound.server";
+import { listAssignmentMovesPage, listStatusChangesPage } from "~/lib/customer-history.server";
+import { parsePage } from "~/lib/pagination";
+import { customerName, salesmanName } from "~/lib/names.server";
 import {
   ACTION_LABELS,
   ENTITY_LABELS,
@@ -26,17 +20,19 @@ import {
   formatStamp,
   formatValue,
 } from "~/lib/activity-format";
-import { requireRole } from "~/lib/auth.server";
+import { requirePermission } from "~/lib/auth.server";
+import { PERM } from "~/lib/permissions";
 
 const OPEN_HREF = {
   transaksi: (id: number) => `/admin/transaksi?edit=${id}`,
   customer: (id: number) => `/admin/masterdata?tab=customer&edit=${id}`,
   salesman: (id: number) => `/admin/masterdata?tab=salesman&edit=${id}`,
   user: (id: number) => `/admin/masterdata?tab=user&edit=${id}`,
+  template: () => "/admin/settings?tab=templates",
 } as const;
 
 export async function loader({ request }: Route.LoaderArgs) {
-  const user = await requireRole(request, "admin");
+  const user = await requirePermission(request, PERM.auditRead);
   const url = new URL(request.url);
   const q = url.searchParams.get("q")?.trim().toLowerCase() ?? "";
   const entityParam = url.searchParams.get("entity") ?? "";
@@ -44,80 +40,99 @@ export async function loader({ request }: Route.LoaderArgs) {
     ? entityParam
     : "";
   const pageSize = resolvePageSize(url.searchParams.get("pageSize"));
-  const requestedPage = Math.max(1, Number(url.searchParams.get("page")) || 1);
 
-  const activityFiltered = listRecentActivity(2000).filter(
-    (a) =>
-      (!entity || a.entityType === entity) &&
-      (!q ||
-        [
-          a.entityLabel,
-          a.actorName,
-          ENTITY_LABELS[a.entityType],
-          ACTION_LABELS[a.action],
-          ...Object.entries(a.changes).flatMap(([k, c]) => [
-            fieldLabel(k),
-            String(c.from ?? ""),
-            String(c.to ?? ""),
-          ]),
-        ].some((v) => v.toLowerCase().includes(q))),
-  );
-  const activityTable = paginate(activityFiltered, requestedPage, pageSize);
+  // Each of the three lists on this page is paged in SQL, with its own page parameter.
+  const activityTable = listActivityPage({
+    entity,
+    q,
+    page: parsePage(url.searchParams.get("page")),
+    pageSize,
+  });
 
-  const mutations = db
-    .select()
-    .from(mutationLogs)
-    .orderBy(desc(mutationLogs.id))
-    .limit(50)
-    .all()
-    .map((m) => ({
-      ...m,
-      customer:
-        db.select().from(customers).where(eq(customers.id, m.customerId)).get()
-          ?.nama ?? "?",
-      dari:
-        db.select().from(salesmen).where(eq(salesmen.id, m.dariSalesmanId)).get()
-          ?.nama ?? "?",
-      ke:
-        db.select().from(salesmen).where(eq(salesmen.id, m.keSalesmanId)).get()
-          ?.nama ?? "?",
-      oleh:
-        db.select().from(users).where(eq(users.id, m.olehId)).get()?.username ??
-        "?",
-    }));
+  const username = (id: number | null) =>
+    id == null ? "system" : (db.select().from(users).where(eq(users.id, id)).get()?.username ?? "?");
 
-  const statuses = db
-    .select()
-    .from(statusLogs)
-    .orderBy(desc(statusLogs.id))
-    .limit(50)
-    .all()
-    .map((s) => ({
-      ...s,
-      customer:
-        db.select().from(customers).where(eq(customers.id, s.customerId)).get()
-          ?.nama ?? "?",
-      oleh: s.olehId
-        ? (db.select().from(users).where(eq(users.id, s.olehId)).get()
-            ?.username ?? "?")
-        : "system",
-    }));
+  const moves = listAssignmentMovesPage(parsePage(url.searchParams.get("movePage")), pageSize);
+  const mutations = {
+    ...moves,
+    rows: moves.rows.map((m) => ({
+      id: m.id,
+      tanggal: m.at,
+      customer: customerName(m.customerId),
+      dari: salesmanName(m.fromSalesmanId),
+      ke: salesmanName(m.toSalesmanId),
+      oleh: username(m.byId),
+    })),
+  };
 
-  return { user, mutations, statuses, activityTable, q, entity, pageSize };
+  const changes = listStatusChangesPage(parsePage(url.searchParams.get("statusPage")), pageSize);
+  const statuses = {
+    ...changes,
+    rows: changes.rows.map((s) => ({
+      id: s.id,
+      tanggal: s.changedAt,
+      customer: customerName(s.customerId),
+      tipe: s.reason || `${s.fromStatus} → ${s.toStatus}`,
+      oleh: username(s.changedById),
+    })),
+  };
+
+  const inbound = listInboundPage(parsePage(url.searchParams.get("replyPage")), pageSize);
+  const replies = {
+    ...inbound,
+    rows: inbound.rows.map((r) => ({
+      id: r.id,
+      waktu: r.receivedAt,
+      dari: r.salesmanId ? salesmanName(r.salesmanId) : `+${r.fromAddress}`,
+      pesan: r.body,
+      outcome: r.outcome,
+      detail: r.detail,
+      balasan: r.replyStatus,
+    })),
+  };
+
+  return { user, mutations, statuses, replies, activityTable, q, entity, pageSize };
 }
 
+/** How each fate of an incoming message reads on the page. */
+const REPLY_OUTCOMES = {
+  recorded: { label: "dicatat", tone: "ok" },
+  unrecognized: { label: "tidak dikenali", tone: "warn" },
+  nothing_pending: { label: "tidak ada yang menunggu", tone: "muted" },
+  unknown_sender: { label: "bukan salesman", tone: "muted" },
+} as const;
+const REPLY_SENT = { none: "—", sent: "terkirim", failed: "gagal terkirim" } as const;
+
 export default function AdminAudit() {
-  const { user, mutations, statuses, activityTable, q, entity, pageSize } =
+  const { user, mutations, statuses, replies, activityTable, q, entity, pageSize } =
     useLoaderData<typeof loader>();
-  const hrefFor = (over: { entity?: string; page?: number }) => {
+  const current = {
+    page: activityTable.page,
+    movePage: mutations.page,
+    statusPage: statuses.page,
+    replyPage: replies.page,
+  };
+  type PageKey = keyof typeof current;
+  /** This page's URL with some page numbers (and/or the record type) changed. */
+  const hrefFor = (over: Partial<typeof current> & { entity?: string }) => {
+    const pages = { ...current, ...over };
     const p = new URLSearchParams();
     const e = over.entity ?? entity;
     if (e) p.set("entity", e);
     if (q) p.set("q", q);
     p.set("pageSize", String(pageSize));
-    p.set("page", String(over.page ?? 1));
+    for (const key of Object.keys(current) as PageKey[]) p.set(key, String(pages[key]));
     return `?${p.toString()}`;
   };
+  /** What a table's "Go to" form must carry along: everything except that table's own page. */
+  const hiddenFor = (own: PageKey) => ({
+    pageSize: String(pageSize),
+    ...(q ? { q } : {}),
+    ...(entity ? { entity } : {}),
+    ...Object.fromEntries(
+      (Object.keys(current) as PageKey[]).filter((k) => k !== own).map((k) => [k, String(current[k])]),
+    ),
+  });
   return (
     <AppShell user={user}>
       <PageHeader title="Log Audit" subtitle="Append-only — tidak bisa diedit/hapus" />
@@ -130,7 +145,7 @@ export default function AdminAudit() {
           (chip) => (
             <Link
               key={chip.id || "all"}
-              to={hrefFor({ entity: chip.id })}
+              to={hrefFor({ entity: chip.id, page: 1 })}
               className={`btn btn-sm ${entity === chip.id ? "" : "btn-outline"}`}
             >
               {chip.label}
@@ -181,7 +196,13 @@ export default function AdminAudit() {
                   </td>
                   <td className="align-top">
                     <StatusPill
-                      tone={a.action === "create" ? "ok" : a.action === "delete" ? "danger" : "warn"}
+                      tone={
+                        a.action === "create" || a.action === "restore"
+                          ? "ok"
+                          : a.action === "delete"
+                            ? "danger"
+                            : "warn"
+                      }
                     >
                       {ACTION_LABELS[a.action]}
                     </StatusPill>
@@ -195,7 +216,7 @@ export default function AdminAudit() {
                             <span className="font-semibold">{fieldLabel(key)}</span>{" "}
                             {a.action === "update"
                               ? `${formatValue(c.from)} → ${formatValue(c.to)}`
-                              : formatValue(a.action === "create" ? c.to : c.from)}
+                              : formatValue(a.action === "create" || a.action === "restore" ? c.to : c.from)}
                           </div>
                         ))}
                   </td>
@@ -210,7 +231,7 @@ export default function AdminAudit() {
           totalPages={activityTable.totalPages}
           total={activityTable.total}
           hrefForPage={(p) => hrefFor({ page: p })}
-          hiddenFields={{ q, pageSize: String(pageSize), ...(entity ? { entity } : {}) }}
+          hiddenFields={hiddenFor("page")}
           emptyLabel="0 aktivitas"
         />
       </div>
@@ -229,16 +250,16 @@ export default function AdminAudit() {
             </tr>
           </thead>
           <tbody>
-            {mutations.length === 0 ? (
+            {mutations.rows.length === 0 ? (
               <tr>
                 <td colSpan={4} className="text-slate-500">
                   Belum ada mutasi.
                 </td>
               </tr>
             ) : (
-              mutations.map((m) => (
+              mutations.rows.map((m) => (
                 <tr key={m.id}>
-                  <td>{m.tanggal}</td>
+                  <td>{formatStamp(m.tanggal)}</td>
                   <td>{m.customer}</td>
                   <td>
                     {m.dari} → {m.ke}
@@ -249,6 +270,16 @@ export default function AdminAudit() {
             )}
           </tbody>
         </table>
+        <TablePagination
+          page={mutations.page}
+          pageSize={pageSize}
+          totalPages={mutations.totalPages}
+          total={mutations.total}
+          hrefForPage={(p) => hrefFor({ movePage: p })}
+          hiddenFields={hiddenFor("movePage")}
+          pageParam="movePage"
+          emptyLabel="0 mutasi"
+        />
       </div>
 
       <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
@@ -265,18 +296,85 @@ export default function AdminAudit() {
             </tr>
           </thead>
           <tbody>
-            {statuses.map((s) => (
-              <tr key={s.id}>
-                <td>{s.tanggal}</td>
-                <td>{s.customer}</td>
-                <td>
-                  <StatusPill tone="muted">{s.tipe}</StatusPill>
+            {statuses.rows.length === 0 ? (
+              <tr>
+                <td colSpan={4} className="text-slate-500">
+                  Belum ada perubahan status.
                 </td>
-                <td>{s.oleh}</td>
               </tr>
-            ))}
+            ) : (
+              statuses.rows.map((s) => (
+                <tr key={s.id}>
+                  <td>{formatStamp(s.tanggal)}</td>
+                  <td>{s.customer}</td>
+                  <td>
+                    <StatusPill tone="muted">{s.tipe}</StatusPill>
+                  </td>
+                  <td>{s.oleh}</td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
+        <TablePagination
+          page={statuses.page}
+          pageSize={pageSize}
+          totalPages={statuses.totalPages}
+          total={statuses.total}
+          hrefForPage={(p) => hrefFor({ statusPage: p })}
+          hiddenFields={hiddenFor("statusPage")}
+          pageParam="statusPage"
+          emptyLabel="0 perubahan"
+        />
+      </div>
+
+      <h2 className="mb-2 mt-6 text-sm font-semibold uppercase tracking-wide text-slate-500">
+        Balasan WhatsApp
+      </h2>
+      <div className="table-wrap">
+        <table className="data">
+          <thead>
+            <tr>
+              <th>Waktu</th>
+              <th>Dari</th>
+              <th>Pesan</th>
+              <th>Hasil</th>
+              <th className="hide-sm">Balasan kami</th>
+            </tr>
+          </thead>
+          <tbody>
+            {replies.rows.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="text-slate-500">
+                  Belum ada balasan WhatsApp yang masuk.
+                </td>
+              </tr>
+            ) : (
+              replies.rows.map((r) => (
+                <tr key={r.id}>
+                  <td className="align-top whitespace-nowrap">{formatStamp(r.waktu)}</td>
+                  <td className="align-top">{r.dari}</td>
+                  <td className="align-top whitespace-pre-wrap break-words">{r.pesan || "—"}</td>
+                  <td className="align-top">
+                    <StatusPill tone={REPLY_OUTCOMES[r.outcome].tone}>{REPLY_OUTCOMES[r.outcome].label}</StatusPill>
+                    {r.detail ? <div className="mt-1 text-xs text-slate-500">{r.detail}</div> : null}
+                  </td>
+                  <td className="align-top hide-sm text-xs text-slate-600">{REPLY_SENT[r.balasan]}</td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+        <TablePagination
+          page={replies.page}
+          pageSize={pageSize}
+          totalPages={replies.totalPages}
+          total={replies.total}
+          hrefForPage={(p) => hrefFor({ replyPage: p })}
+          hiddenFields={hiddenFor("replyPage")}
+          pageParam="replyPage"
+          emptyLabel="0 balasan"
+        />
       </div>
     </AppShell>
   );

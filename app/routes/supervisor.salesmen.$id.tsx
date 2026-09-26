@@ -1,26 +1,20 @@
-import { eq } from "drizzle-orm";
 import { Form, Link, useLoaderData } from "react-router";
 
 import type { Route } from "./+types/supervisor.salesmen.$id";
 import { AppShell, PageHeader, StatusPill } from "~/components/AppShell";
-import { db } from "~/db/client.server";
-import { customers, salesmen } from "~/db/schema";
-import { requireRole } from "~/lib/auth.server";
+import { assertInTeamOrAll } from "~/lib/access.server";
+import { requirePermission } from "~/lib/auth.server";
+import { PERM } from "~/lib/permissions";
 import { daysSinceOrder, isOverdue } from "~/lib/dates";
-import { subordinateIds } from "~/lib/masterdata.server";
+import { findLiveSalesman, liveCustomersOf } from "~/lib/masterdata.server";
 
 export async function loader({ request, params }: Route.LoaderArgs) {
-  const user = await requireRole(request, "supervisor");
+  const user = await requirePermission(request, PERM.teamRead);
   const id = Number(params.id);
-  const salesman = db.select().from(salesmen).where(eq(salesmen.id, id)).get();
-  if (!salesman || !subordinateIds(user.salesmanId!).includes(salesman.id)) {
-    throw new Response("Forbidden", { status: 403 });
-  }
-  const list = db
-    .select()
-    .from(customers)
-    .where(eq(customers.salesmanId, salesman.id))
-    .all()
+  const salesman = findLiveSalesman(id);
+  if (!salesman) throw new Response("Forbidden", { status: 403 });
+  assertInTeamOrAll(user, PERM.teamRead, salesman.id);
+  const list = liveCustomersOf(salesman.id)
     .map((c) => ({
       ...c,
       days: daysSinceOrder(c.lastOrderDate),

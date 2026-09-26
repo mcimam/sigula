@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { Form, Link } from "react-router";
 
+import { pageWindow } from "~/lib/pagination";
+
 export const PAGE_SIZE_OPTIONS = [10, 25, 50] as const;
 export const DEFAULT_PAGE_SIZE = 10;
 
@@ -11,10 +13,8 @@ export function resolvePageSize(raw: string | null): number {
 
 export function paginate<T>(rows: T[], requestedPage: number, pageSize: number) {
   const total = rows.length;
-  const totalPages = Math.max(1, Math.ceil(total / pageSize));
-  const page = Math.min(Math.max(1, requestedPage), totalPages);
-  const start = (page - 1) * pageSize;
-  return { rows: rows.slice(start, start + pageSize), total, totalPages, page, pageSize };
+  const { page, totalPages, offset } = pageWindow(total, requestedPage, pageSize);
+  return { rows: rows.slice(offset, offset + pageSize), total, totalPages, page, pageSize };
 }
 
 /**
@@ -85,12 +85,15 @@ export function BulkActionBar({
   idName,
   ids,
   onClear,
+  variant = "delete",
 }: {
   count: number;
   intent: string;
   idName: string;
   ids: number[];
   onClear: () => void;
+  /** `restore` is the Terhapus view: same bar, a non-destructive button. */
+  variant?: "delete" | "restore";
 }) {
   if (count === 0) return null;
   return (
@@ -101,58 +104,20 @@ export function BulkActionBar({
         {ids.map((id) => (
           <input key={id} type="hidden" name={idName} value={id} />
         ))}
-        <button type="submit" className="btn btn-sm btn-danger">
-          Hapus terpilih
-        </button>
+        {variant === "restore" ? (
+          <button type="submit" className="btn btn-sm">
+            Pulihkan terpilih
+          </button>
+        ) : (
+          <button type="submit" className="btn btn-sm btn-danger">
+            Hapus terpilih
+          </button>
+        )}
       </Form>
       <button type="button" className="btn btn-sm btn-outline" onClick={onClear}>
         Batalkan pilihan
       </button>
     </div>
-  );
-}
-
-export function TableToolbar({
-  q,
-  pageSize,
-  hiddenFields,
-  placeholder,
-}: {
-  q: string;
-  pageSize: number;
-  hiddenFields: Record<string, string>;
-  placeholder: string;
-}) {
-  return (
-    <Form method="get" className="table-toolbar">
-      {Object.entries(hiddenFields).map(([k, v]) => (
-        <input key={k} type="hidden" name={k} value={v} />
-      ))}
-      <input type="hidden" name="page" value="1" />
-      <input
-        className="form-control table-toolbar__search"
-        type="search"
-        name="q"
-        defaultValue={q}
-        placeholder={placeholder}
-        aria-label={placeholder}
-      />
-      <label className="table-toolbar__pagesize">
-        Rows
-        <select
-          name="pageSize"
-          className="form-control"
-          defaultValue={pageSize}
-          onChange={(e) => e.currentTarget.form?.requestSubmit()}
-        >
-          {PAGE_SIZE_OPTIONS.map((n) => (
-            <option key={n} value={n}>
-              {n}
-            </option>
-          ))}
-        </select>
-      </label>
-    </Form>
   );
 }
 
@@ -164,6 +129,7 @@ export function TablePagination({
   hrefForPage,
   hiddenFields,
   emptyLabel = "0 data",
+  pageParam = "page",
 }: {
   page: number;
   pageSize: number;
@@ -172,10 +138,12 @@ export function TablePagination({
   hrefForPage: (page: number) => string;
   hiddenFields: Record<string, string>;
   emptyLabel?: string;
+  /** The query parameter holding this table's page, when a screen has more than one table. */
+  pageParam?: string;
 }) {
   const start = total === 0 ? 0 : (page - 1) * pageSize + 1;
   const end = Math.min(page * pageSize, total);
-  const pageWindow = Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+  const pageNumbers = Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
     const first = Math.max(1, Math.min(page - 2, totalPages - 4));
     return first + i;
   });
@@ -191,7 +159,7 @@ export function TablePagination({
         >
           ‹ Prev
         </Link>
-        {pageWindow.map((p) => (
+        {pageNumbers.map((p) => (
           <Link
             key={p}
             className="page-btn"
@@ -213,11 +181,11 @@ export function TablePagination({
         {Object.entries(hiddenFields).map(([k, v]) => (
           <input key={k} type="hidden" name={k} value={v} />
         ))}
-        <label htmlFor="goto-page">Go to</label>
+        <label htmlFor={`goto-${pageParam}`}>Go to</label>
         <input
-          id="goto-page"
+          id={`goto-${pageParam}`}
           type="number"
-          name="page"
+          name={pageParam}
           min={1}
           max={totalPages}
           defaultValue={page}

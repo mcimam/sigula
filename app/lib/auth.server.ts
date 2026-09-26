@@ -1,9 +1,17 @@
 import bcrypt from "bcrypt";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull, or } from "drizzle-orm";
 import { createCookieSessionStorage, redirect } from "react-router";
 
 import { db } from "~/db/client.server";
-import { profiles, users, type Role } from "~/db/schema";
+import { alive, permissions, rolePermissions, roles, salesmen, userRoles, users } from "~/db/schema";
+import { nowIso } from "~/lib/dates";
+import {
+  can,
+  mergeGrants,
+  type Access,
+  type PermissionCode,
+  type Scope,
+} from "~/lib/permissions";
 
 const SESSION_SECRET = (() => {
   const value = process.env.SESSION_SECRET;
@@ -28,14 +36,20 @@ export const sessionStorage = createCookieSessionStorage({
   },
 });
 
-export type AuthUser = {
+export type AuthUser = Access & {
   id: number;
   username: string;
   displayName: string;
-  role: Role;
-  /** Salesman the account is linked to — for role `supervisor`, the team's leading salesman. */
-  salesmanId: number | null;
+  /** Names of the user's roles, for display. What they may do is `permissions`. */
+  roleNames: string[];
 };
+
+/**
+ * Who may hold a session: a live, active user whose linked salesman (if any) is
+ * live too. Needs `salesmen` left-joined on `users.salesman_id`.
+ */
+const canSignIn = () =>
+  and(alive(users), eq(users.isActive, true), or(isNull(users.salesmanId), isNull(salesmen.deletedAt)));
 
 export async function getSession(request: Request) {
   return sessionStorage.getSession(request.headers.get("Cookie"));
@@ -56,15 +70,35 @@ export async function getAuthUser(request: Request): Promise<AuthUser | null> {
       id: users.id,
       username: users.username,
       displayName: users.displayName,
-      role: profiles.role,
-      salesmanId: profiles.salesmanId,
+      salesmanId: users.salesmanId,
     })
     .from(users)
-    .innerJoin(profiles, eq(profiles.userId, users.id))
-    .where(eq(users.id, userId))
+    .leftJoin(salesmen, eq(salesmen.id, users.salesmanId))
+    .where(and(eq(users.id, userId), canSignIn()))
     .get();
+  if (!row) return null;
 
-  return row ?? null;
+  // One row per (role, permission); a role without permissions still shows up in `roleNames`.
+  const grants = db
+    .select({
+      roleName: roles.name,
+      code: permissions.code,
+      scope: rolePermissions.scope,
+    })
+    .from(userRoles)
+    .innerJoin(roles, eq(roles.id, userRoles.roleId))
+    .leftJoin(rolePermissions, eq(rolePermissions.roleId, roles.id))
+    .leftJoin(permissions, eq(permissions.id, rolePermissions.permissionId))
+    .where(eq(userRoles.userId, row.id))
+    .all();
+
+  return {
+    ...row,
+    roleNames: [...new Set(grants.map((g) => g.roleName))].sort(),
+    permissions: mergeGrants(
+      grants.filter((g): g is typeof g & { code: string; scope: Scope } => g.code !== null && g.scope !== null),
+    ),
+  };
 }
 
 export async function requireUser(request: Request): Promise<AuthUser> {
@@ -76,15 +110,13 @@ export async function requireUser(request: Request): Promise<AuthUser> {
   return user;
 }
 
-export async function requireRole(
+/** Signed in *and* holding `code`; otherwise 403 (or a redirect to the login page). */
+export async function requirePermission(
   request: Request,
-  roles: Role | Role[],
+  code: PermissionCode,
 ): Promise<AuthUser> {
   const user = await requireUser(request);
-  const allowed = Array.isArray(roles) ? roles : [roles];
-  if (!allowed.includes(user.role)) {
-    throw new Response("Forbidden", { status: 403 });
-  }
+  if (!can(user, code)) throw new Response("Forbidden", { status: 403 });
   return user;
 }
 
@@ -141,25 +173,22 @@ export function clearLoginFailures(key: string) {
 }
 
 export async function verifyLogin(username: string, password: string) {
-  const user = db.select().from(users).where(eq(users.username, username)).get();
+  const user = db
+    .select({ id: users.id, username: users.username, passwordHash: users.passwordHash })
+    .from(users)
+    .leftJoin(salesmen, eq(salesmen.id, users.salesmanId))
+    .where(and(eq(users.username, username), canSignIn()))
+    .get();
   if (!user) return null;
   const ok = await bcrypt.compare(password, user.passwordHash);
   return ok ? user : null;
 }
 
-export async function hashPassword(password: string) {
-  return bcrypt.hash(password, 10);
+/** Records a successful sign-in (shown in the user list). */
+export function recordLogin(userId: number) {
+  db.update(users).set({ lastLoginAt: nowIso() }).where(eq(users.id, userId)).run();
 }
 
-export function homeForRole(role: Role): string {
-  switch (role) {
-    case "admin":
-      return "/admin/dashboard";
-    case "salesman":
-      return "/salesman";
-    case "supervisor":
-      return "/supervisor";
-    case "management":
-      return "/management";
-  }
+export async function hashPassword(password: string) {
+  return bcrypt.hash(password, 10);
 }

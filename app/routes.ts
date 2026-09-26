@@ -9,10 +9,8 @@ export default [
   route("login", "routes/login.tsx"),
   route("logout", "routes/logout.tsx"),
   route("salesman", "routes/salesman._index.tsx"),
-  route(
-    "salesman/customers/:id/reason",
-    "routes/salesman.customers.$id.reason.tsx",
-  ),
+  route("comments", "routes/comments.tsx"),
+  route("webhooks/waha", "routes/webhooks.waha.tsx"),
   route(
     "salesman/customers/:id/record-order",
     "routes/salesman.customers.$id.record-order.tsx",

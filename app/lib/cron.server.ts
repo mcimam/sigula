@@ -1,8 +1,6 @@
 import { Cron } from "croner";
-import { eq } from "drizzle-orm";
 
-import { db } from "~/db/client.server";
-import { profiles, users } from "~/db/schema";
+import { BUSINESS_TIMEZONE } from "~/lib/dates";
 import { eligibleCustomerCount, triggerBatch } from "~/lib/reminders.server";
 import {
   getCronSettings,
@@ -16,33 +14,17 @@ type CronGlobal = typeof globalThis & {
 
 const g = globalThis as CronGlobal;
 
-function getFirstAdminUserId(): number | null {
-  const row = db
-    .select({ id: users.id })
-    .from(users)
-    .innerJoin(profiles, eq(profiles.userId, users.id))
-    .where(eq(profiles.role, "admin"))
-    .get();
-  return row?.id ?? null;
-}
-
 /** Run one scheduled notification batch (same rules as manual trigger). */
 export async function runScheduledBatch() {
   const cron = getCronSettings();
   if (!cron.enabled) return;
-
-  const adminId = getFirstAdminUserId();
-  if (!adminId) {
-    recordCronRun("failed", "Tidak ada user admin untuk menjalankan batch");
-    return;
-  }
 
   try {
     if (eligibleCustomerCount() === 0) {
       recordCronRun("skipped", "Tidak ada customer eligible");
       return;
     }
-    const batch = await triggerBatch({ triggeredById: adminId });
+    const batch = await triggerBatch({ triggeredById: null });
     if (!batch) {
       recordCronRun("skipped", "Tidak ada customer eligible");
       return;
@@ -73,7 +55,7 @@ export function refreshCronScheduler() {
 
   g.__sigulaCron = new Cron(
     cron.expression,
-    { timezone: "Asia/Jakarta" },
+    { timezone: BUSINESS_TIMEZONE },
     () => {
       void runScheduledBatch();
     },

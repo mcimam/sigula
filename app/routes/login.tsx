@@ -6,14 +6,15 @@ import {
   clearLoginFailures,
   createUserSession,
   getAuthUser,
-  homeForRole,
+  recordLogin,
   recordLoginFailure,
   verifyLogin,
 } from "~/lib/auth.server";
+import { homeFor } from "~/lib/permissions";
 
 export async function loader({ request }: Route.LoaderArgs) {
   const user = await getAuthUser(request);
-  if (user) throw redirect(homeForRole(user.role));
+  if (user) throw redirect(homeFor(user) ?? "/");
   return null;
 }
 
@@ -23,7 +24,7 @@ export async function action({ request }: Route.ActionArgs) {
   const password = String(form.get("password") ?? "");
   const next = String(form.get("next") ?? "/");
 
-  const ip = request.headers.get("x-forwarded-for") ?? "local";
+  const ip = request.headers.get("x-forwarded-for") ?? "local"; // DEBT-024: spoofable when the app is reached directly
   const key = `${ip}:${username.toLowerCase()}`;
   if (!checkLoginThrottle(key)) {
     return { error: "Terlalu banyak percobaan. Coba lagi dalam 15 menit." };
@@ -35,6 +36,7 @@ export async function action({ request }: Route.ActionArgs) {
     return { error: "Username atau password salah." };
   }
   clearLoginFailures(key);
+  recordLogin(user.id);
   return createUserSession(user.id, next.startsWith("/") ? next : "/");
 }
 
@@ -82,10 +84,11 @@ export default function LoginPage() {
             Masuk
           </button>
         </Form>
-        <p className="mt-4 text-xs text-slate-400">
-          Demo: admin / salesman / supervisor / management — password{" "}
-          <code>sigula123</code>
-        </p>
+        {import.meta.env.PROD ? null : (
+          <p className="mt-4 text-xs text-slate-400">
+            Demo: admin / salesman / supervisor / management — password <code>sigula123</code>
+          </p>
+        )}
       </div>
     </div>
   );

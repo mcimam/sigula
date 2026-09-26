@@ -1,0 +1,76 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1790397339060,
+      "tag": "0000_baseline_adr0004",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1790397497191,
+      "tag": "0001_erd_v2_foundation",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1790398429806,
+      "tag": "0002_transaksi_cascade_marker",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1790415800721,
+      "tag": "0003_notifications_followups",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1790418004726,
+      "tag": "0004_rbac_roles_permissions",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1790429644430,
+      "tag": "0005_record_comments",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1790434255665,
+      "tag": "0006_reminder_message_v2",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1790435632692,
+      "tag": "0007_inbound_replies",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1790437442292,
+      "tag": "0008_inbound_reply_to",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1790437478724,
+      "tag": "0009_free_text_reason",
+      "breakpoints": true
+    }
+  ]
+}

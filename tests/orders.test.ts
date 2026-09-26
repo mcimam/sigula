@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 
 import { db } from "~/db/client.server";
-import { customers, transaksi, statusLogs } from "~/db/schema";
+import { customerStatusHistory, transaksi } from "~/db/schema";
 import {
   computeEligibleCustomers,
   createTransaksi,
@@ -16,6 +16,7 @@ import {
 import {
   TODAY,
   addCustomer,
+  isPending,
   getCustomer,
   resetDb,
   seedOrg,
@@ -60,7 +61,7 @@ describe("computeEligibleCustomers (BR-2)", () => {
       salesmanId: salesman.id,
       nama: "Pending",
       lastOrderDate: "2026-07-01",
-      notified: true,
+      pending: true,
     });
     expect(computeEligibleCustomers(TODAY)).toHaveLength(1);
     expect(notYetNotifiedEligible(TODAY)).toHaveLength(0);
@@ -70,19 +71,14 @@ describe("computeEligibleCustomers (BR-2)", () => {
 describe("recordOrder (FR-9/FR-10, BR-5)", () => {
   beforeEach(() => resetDb());
 
-  it("sets last_order_date, clears notified/handled_on, appends OrderHistory", async () => {
+  it("sets last_order_date, ends the pending reminder, appends OrderHistory", async () => {
     const { salesman, admin } = await seedOrg();
     const c = addCustomer({
       salesmanId: salesman.id,
       nama: "A",
       lastOrderDate: "2026-01-01",
-      notified: true,
+      pending: true,
     });
-    db.update(customers)
-      .set({ handledOn: "2026-08-01" })
-      .where(eq(customers.id, c.id))
-      .run();
-
     const result = recordOrder({
       customerId: c.id,
       actingUserId: admin.id,
@@ -93,8 +89,7 @@ describe("recordOrder (FR-9/FR-10, BR-5)", () => {
 
     const updated = getCustomer(c.id);
     expect(updated.lastOrderDate).toBe(TODAY);
-    expect(updated.notified).toBe(false);
-    expect(updated.handledOn).toBeNull();
+    expect(isPending(c.id)).toBe(false);
     expect(updated.statusCustomer).toBe("aktif");
 
     const history = db
@@ -108,7 +103,7 @@ describe("recordOrder (FR-9/FR-10, BR-5)", () => {
     expect(history[0].salesmanId).toBe(salesman.id);
   });
 
-  it("auto-reactivates Inactive customers and writes StatusLog", async () => {
+  it("auto-reactivates Inactive customers and records the transition", async () => {
     const { salesman, admin } = await seedOrg();
     const c = addCustomer({
       salesmanId: salesman.id,
@@ -127,12 +122,13 @@ describe("recordOrder (FR-9/FR-10, BR-5)", () => {
 
     const logs = db
       .select()
-      .from(statusLogs)
-      .where(eq(statusLogs.customerId, c.id))
+      .from(customerStatusHistory)
+      .where(eq(customerStatusHistory.customerId, c.id))
       .all();
     expect(logs).toHaveLength(1);
-    expect(logs[0].tipe).toBe("auto_reactivation");
-    expect(logs[0].olehId).toBe(admin.id);
+    expect([logs[0].fromStatus, logs[0].toStatus]).toEqual(["inactive", "aktif"]);
+    expect(logs[0].reason).toBe("auto_reactivation");
+    expect(logs[0].changedById).toBe(admin.id);
   });
 });
 

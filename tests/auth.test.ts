@@ -4,7 +4,6 @@ import {
   checkLoginThrottle,
   clearLoginFailures,
   hashPassword,
-  homeForRole,
   recordLoginFailure,
   verifyLogin,
 } from "~/lib/auth.server";
@@ -26,13 +25,6 @@ describe("auth helpers", () => {
     const hash = await hashPassword("secret");
     expect(hash).not.toBe("secret");
     expect(hash.startsWith("$2")).toBe(true);
-  });
-
-  it("homeForRole routes each role to its dashboard", () => {
-    expect(homeForRole("admin")).toBe("/admin/dashboard");
-    expect(homeForRole("salesman")).toBe("/salesman");
-    expect(homeForRole("supervisor")).toBe("/supervisor");
-    expect(homeForRole("management")).toBe("/management");
   });
 
   it("login throttle locks out after 10 failures and clears on success path", () => {

@@ -150,6 +150,18 @@ describe("handleUpload (preview → confirm / discard)", () => {
     expect(custom).toEqual({ error: "Bentuk file salah." });
   });
 
+  it("hands the uploaded file's name to confirm", async () => {
+    const h = handlers();
+    const res = await handleUpload(
+      form({ intent: "preview", file: file("payload", "order-september.xlsx") }),
+      h,
+    );
+    await handleUpload(form({ intent: "confirm", preview_token: res!.token! }), h);
+    expect(h.confirm).toHaveBeenCalledWith(expect.any(Buffer), expect.any(FormData), {
+      fileName: "order-september.xlsx",
+    });
+  });
+
   it("an UploadError from parse or confirm is shown as-is", async () => {
     const h = handlers({
       parse: async () => {

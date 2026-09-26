@@ -1,19 +1,16 @@
-import { desc, eq, max } from "drizzle-orm";
+import { and, desc, eq, max } from "drizzle-orm";
 
 import { db } from "~/db/client.server";
-import { customers, salesmen, statusLogs, transaksi } from "~/db/schema";
+import { alive, customers, transaksi } from "~/db/schema";
 import { diffChanges, logActivity, snapshotChanges } from "~/lib/activity.server";
-import { isOverdue, todayIso } from "~/lib/dates";
-
-const customerName = (id: number) =>
-  db.select({ n: customers.nama }).from(customers).where(eq(customers.id, id)).get()?.n ??
-  `#${id}`;
-const salesmanName = (id: number) =>
-  db.select({ n: salesmen.nama }).from(salesmen).where(eq(salesmen.id, id)).get()?.n ??
-  `#${id}`;
+import { recordStatusChange } from "~/lib/customer-history.server";
+import { findLiveCustomer, findLiveSalesman } from "~/lib/masterdata.server";
+import { customerName, salesmanName } from "~/lib/names.server";
+import { pendingCustomerIds } from "~/lib/pending.server";
+import { isOverdue, nowIso, todayIso } from "~/lib/dates";
 
 /** Human-readable field values for the activity trail (names, not ids). */
-function transaksiFields(row: {
+export function transaksiFields(row: {
   customerId: number;
   salesmanId: number;
   tanggalOrder: string;
@@ -32,33 +29,40 @@ function transaksiFields(row: {
 const transaksiLabel = (row: { customerId: number; tanggalOrder: string }) =>
   `${customerName(row.customerId)} · ${row.tanggalOrder}`;
 
-/** BR-2: Active + overdue (includes already-notified — dashboards use this). */
+/** A transaksi may only point at a live customer and a live salesman. */
+export function assertLiveParents(customerId: number, salesmanId: number) {
+  if (!findLiveCustomer(customerId)) {
+    throw new Error(`Customer ${customerName(customerId)} tidak ditemukan atau sudah dihapus`);
+  }
+  if (!findLiveSalesman(salesmanId)) {
+    throw new Error(`Salesman ${salesmanName(salesmanId)} tidak ditemukan atau sudah dihapus`);
+  }
+}
+
+/** BR-2: Active + overdue (includes already-pending — dashboards use this). */
 export function computeEligibleCustomers(today = todayIso()) {
   const rows = db
     .select()
     .from(customers)
-    .where(eq(customers.statusCustomer, "aktif"))
+    .where(and(eq(customers.statusCustomer, "aktif"), alive(customers)))
     .all();
   return rows.filter((c) =>
     isOverdue(c.lastOrderDate, c.orderCycleDays, today),
   );
 }
 
-/** FR-3 narrowing for trigger/preview/retry — exclude already-notified. */
+/** FR-3 narrowing for trigger/preview/retry — exclude customers that are already pending. */
 export function notYetNotifiedEligible(today = todayIso()) {
-  return computeEligibleCustomers(today).filter((c) => !c.notified);
+  const pending = pendingCustomerIds();
+  return computeEligibleCustomers(today).filter((c) => !pending.has(c.id));
 }
 
-export function eligibleCustomerCount(today = todayIso()) {
-  return notYetNotifiedEligible(today).length;
-}
-
-/** Recompute customer.last_order_date from transaksi (max tanggal). */
+/** Recompute customer.last_order_date from live transaksi (max tanggal). */
 export function syncCustomerLastOrderDate(customerId: number) {
   const row = db
     .select({ latest: max(transaksi.tanggalOrder) })
     .from(transaksi)
-    .where(eq(transaksi.customerId, customerId))
+    .where(and(eq(transaksi.customerId, customerId), alive(transaksi)))
     .get();
   const latest = row?.latest ?? null;
   db.update(customers)
@@ -75,16 +79,14 @@ export function recordOrder(opts: {
   sumber?: "seed" | "import" | "manual";
   salesmanId?: number;
   catatan?: string;
+  /** Set for rows that come from an Excel import (`import_batches`). */
+  importBatchId?: number;
 }) {
   const tanggalOrder = opts.tanggalOrder ?? todayIso();
   const sumber = opts.sumber ?? "manual";
 
   const result = db.transaction((tx) => {
-    const customer = tx
-      .select()
-      .from(customers)
-      .where(eq(customers.id, opts.customerId))
-      .get();
+    const customer = findLiveCustomer(opts.customerId);
     if (!customer) throw new Error(`Customer ${opts.customerId} not found`);
 
     const wasInactive = customer.statusCustomer === "inactive";
@@ -98,6 +100,9 @@ export function recordOrder(opts: {
         tanggalOrder,
         sumber,
         catatan: opts.catatan ?? "",
+        importBatchId: opts.importBatchId ?? null,
+        createdById: opts.actingUserId,
+        updatedById: opts.actingUserId,
       })
       .returning()
       .get();
@@ -105,7 +110,7 @@ export function recordOrder(opts: {
     const latestRow = tx
       .select({ latest: max(transaksi.tanggalOrder) })
       .from(transaksi)
-      .where(eq(transaksi.customerId, customer.id))
+      .where(and(eq(transaksi.customerId, customer.id), alive(transaksi)))
       .get();
     const latest = latestRow?.latest ?? tanggalOrder;
 
@@ -113,20 +118,18 @@ export function recordOrder(opts: {
       .set({
         lastOrderDate: latest,
         statusCustomer: "aktif",
-        handledOn: null,
-        notified: false,
       })
       .where(eq(customers.id, customer.id))
       .run();
 
     if (wasInactive) {
-      tx.insert(statusLogs)
-        .values({
-          customerId: customer.id,
-          tipe: "auto_reactivation",
-          olehId: opts.actingUserId,
-        })
-        .run();
+      recordStatusChange(tx, {
+        customerId: customer.id,
+        from: "inactive",
+        to: "aktif",
+        reason: "auto_reactivation",
+        changedById: opts.actingUserId,
+      });
     }
 
     return {
@@ -166,6 +169,7 @@ export function listTransaksi(limit = 200) {
   return db
     .select()
     .from(transaksi)
+    .where(alive(transaksi))
     .orderBy(desc(transaksi.id))
     .limit(limit)
     .all();
@@ -179,6 +183,7 @@ export function createTransaksi(opts: {
   catatan?: string;
   actingUserId: number | null;
 }) {
+  assertLiveParents(opts.customerId, opts.salesmanId);
   return recordOrder({
     customerId: opts.customerId,
     salesmanId: opts.salesmanId,
@@ -200,9 +205,10 @@ export function updateTransaksi(opts: {
   const existing = db
     .select()
     .from(transaksi)
-    .where(eq(transaksi.id, opts.id))
+    .where(and(eq(transaksi.id, opts.id), alive(transaksi)))
     .get();
   if (!existing) throw new Error("Transaksi not found");
+  assertLiveParents(opts.customerId, opts.salesmanId);
 
   const oldCustomerId = existing.customerId;
   const before = transaksiFields(existing);
@@ -213,6 +219,7 @@ export function updateTransaksi(opts: {
       salesmanId: opts.salesmanId,
       tanggalOrder: opts.tanggalOrder,
       catatan: opts.catatan ?? existing.catatan,
+      updatedById: opts.actingUserId ?? null,
     })
     .where(eq(transaksi.id, opts.id))
     .run();
@@ -233,17 +240,20 @@ export function updateTransaksi(opts: {
   });
 }
 
+/** Soft delete (ADR-0005): the row stays, hidden, and `restoreTransaksi` brings it back. */
 export function deleteTransaksi(id: number, actingUserId?: number | null) {
   const existing = db
     .select()
     .from(transaksi)
-    .where(eq(transaksi.id, id))
+    .where(and(eq(transaksi.id, id), alive(transaksi)))
     .get();
   if (!existing) throw new Error("Transaksi not found");
-  // Snapshot before the row (and possibly its customer's name) goes away.
   const label = transaksiLabel(existing);
   const fields = transaksiFields(existing);
-  db.delete(transaksi).where(eq(transaksi.id, id)).run();
+  db.update(transaksi)
+    .set({ deletedAt: nowIso(), deletedById: actingUserId ?? null })
+    .where(eq(transaksi.id, id))
+    .run();
   syncCustomerLastOrderDate(existing.customerId);
   logActivity({
     entityType: "transaksi",

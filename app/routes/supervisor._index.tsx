@@ -2,12 +2,14 @@ import { Link, useLoaderData } from "react-router";
 
 import type { Route } from "./+types/supervisor._index";
 import { AppShell, PageHeader, StatTile } from "~/components/AppShell";
-import { requireRole } from "~/lib/auth.server";
+import { requireSalesmanId } from "~/lib/access.server";
+import { requirePermission } from "~/lib/auth.server";
+import { PERM } from "~/lib/permissions";
 import { salesmenWithStats } from "~/lib/masterdata.server";
 
 export async function loader({ request }: Route.LoaderArgs) {
-  const user = await requireRole(request, "supervisor");
-  const team = salesmenWithStats(user.salesmanId!);
+  const user = await requirePermission(request, PERM.teamRead);
+  const team = salesmenWithStats(requireSalesmanId(user));
   return {
     user,
     team,

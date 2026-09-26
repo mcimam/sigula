@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { notificationBatches } from "~/db/schema";
-import { appSettings } from "~/db/schema";
+import { appSettings, notificationRuns } from "~/db/schema";
 import { db } from "~/db/client.server";
 import { runScheduledBatch, stopCronSchedulerForTests } from "~/lib/cron.server";
 import {
@@ -14,7 +13,7 @@ import {
 
 import {
   addCustomer,
-  getCustomer,
+  isPending,
   resetDb,
   seedOrg,
 } from "./helpers/fixtures";
@@ -38,6 +37,24 @@ describe("settings.server", () => {
       apiKey: "secret",
       timeoutMs: 5000,
     });
+  });
+
+  it("keeps the webhook secret as a secret, leaves it alone when left blank, and falls back to the environment", () => {
+    expect(getWahaSettings().webhookSecret).toBe("");
+    const base = { baseUrl: "http://waha.test", session: "main", timeoutMs: 5000 };
+
+    saveWahaSettings({ ...base, webhookSecret: "kunci-1" });
+    expect(getWahaSettings().webhookSecret).toBe("kunci-1");
+    expect(db.select().from(appSettings).all().find((r) => r.key === "waha.webhook_secret")).toMatchObject({ isSecret: true });
+
+    saveWahaSettings({ ...base, webhookSecret: "" }); // a blank field is "unchanged", not "clear"
+    saveWahaSettings({ ...base });
+    expect(getWahaSettings().webhookSecret).toBe("kunci-1");
+
+    db.delete(appSettings).run();
+    vi.stubEnv("WAHA_WEBHOOK_SECRET", "dari-env");
+    expect(getWahaSettings().webhookSecret).toBe("dari-env");
+    vi.unstubAllEnvs();
   });
 
   it("validates cron expressions", () => {
@@ -88,8 +105,9 @@ describe("runScheduledBatch", () => {
     await runScheduledBatch();
     expect(getCronSettings().lastRunStatus).toBe("ok");
     expect(getCronSettings().lastRunMessage).toMatch(/Batch #\d+/);
-    expect(db.select().from(notificationBatches).all()).toHaveLength(1);
-    expect(getCustomer(c.id).notified).toBe(true);
+    expect(db.select().from(notificationRuns).all()).toHaveLength(1);
+    expect(db.select().from(notificationRuns).all()[0]).toMatchObject({ trigger: "scheduled", triggeredById: null });
+    expect(isPending(c.id)).toBe(true);
 
     vi.unstubAllGlobals();
   });

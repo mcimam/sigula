@@ -1,4 +1,3 @@
-import { eq } from "drizzle-orm";
 import { useLoaderData } from "react-router";
 
 import type { Route } from "./+types/admin.masterdata";
@@ -9,27 +8,33 @@ import {
   resolvePageSize,
   SelectAllCheckbox,
   TablePagination,
-  TableToolbar,
   useRowSelection,
 } from "~/components/DataTable";
 import {
   AddLink,
   EditLink,
   parseDrawer,
+  ReadonlyField,
   RecordDrawer,
   useDrawerHref,
   useRowOpen,
 } from "~/components/RecordDrawer";
+import { TableToolbar } from "~/components/TableSearch";
+import { ToggleField } from "~/components/ToggleField";
+import { TrashTable } from "~/components/TrashTable";
 import { db } from "~/db/client.server";
-import {
-  customers,
-  profiles,
-  salesmen,
-  users,
-  type Role,
-} from "~/db/schema";
-import { requireRole } from "~/lib/auth.server";
-import { listActivityFor } from "~/lib/activity.server";
+import { alive, users } from "~/db/schema";
+import { requirePermission } from "~/lib/auth.server";
+import { PERM } from "~/lib/permissions";
+import { attachWhatsapp } from "~/lib/contacts.server";
+import { formatStamp } from "~/lib/activity-format";
+import { orderStanding, orderStatusText, sinceLabel, todayIso } from "~/lib/dates";
+import { listRoles, rolesForUsers } from "~/lib/roles.server";
+import { canOwnOrAll } from "~/lib/access.server";
+import { FEED_PAGE_PARAM } from "~/lib/activity-format";
+import { listFeedFor } from "~/lib/activity.server";
+import { listFollowUpReasons } from "~/lib/follow-ups.server";
+import { parsePage } from "~/lib/pagination";
 import {
   createCustomer,
   createSalesman,
@@ -37,16 +42,28 @@ import {
   deleteCustomersMany,
   deleteSalesmenMany,
   deleteUsersMany,
+  listLiveCustomers,
+  listLiveSalesmen,
   subordinateIds,
   updateCustomer,
   updateSalesman,
   updateUserAccount,
 } from "~/lib/masterdata.server";
+import {
+  countDeleted,
+  listDeletedCustomers,
+  listDeletedSalesmen,
+  listDeletedUsers,
+  restoreCustomersMany,
+  restoreSalesmenMany,
+  restoreUsersMany,
+} from "~/lib/trash.server";
 
-function flashRedirect(request: Request, tab: string, message: string) {
+/** `trash` keeps the admin in the Terhapus view (a restore may fail and needs context). */
+function flashRedirect(request: Request, tab: string, message: string, trash = false) {
   return Response.redirect(
     new URL(
-      `/admin/masterdata?tab=${tab}&flash=${encodeURIComponent(message)}`,
+      `/admin/masterdata?tab=${tab}${trash ? "&trash=1" : ""}&flash=${encodeURIComponent(message)}`,
       request.url,
     ),
     303,
@@ -54,26 +71,33 @@ function flashRedirect(request: Request, tab: string, message: string) {
 }
 
 export async function loader({ request }: Route.LoaderArgs) {
-  const user = await requireRole(request, "admin");
+  const user = await requirePermission(request, PERM.masterdataManage);
   const url = new URL(request.url);
   const tab = url.searchParams.get("tab") ?? "customer";
   const q = url.searchParams.get("q")?.trim().toLowerCase() ?? "";
   const pageSize = resolvePageSize(url.searchParams.get("pageSize"));
   const requestedPage = Math.max(1, Number(url.searchParams.get("page")) || 1);
+  const trash = url.searchParams.get("trash") === "1";
 
-  const allSalesmen = db.select().from(salesmen).all();
-  const allCustomers = db.select().from(customers).all();
-  const allUsers = db
+  const allSalesmen = attachWhatsapp(listLiveSalesmen());
+  const allCustomers = listLiveCustomers();
+  const userRows = db
     .select({
       id: users.id,
       username: users.username,
       displayName: users.displayName,
-      role: profiles.role,
-      salesmanId: profiles.salesmanId,
+      salesmanId: users.salesmanId,
+      isActive: users.isActive,
+      lastLoginAt: users.lastLoginAt,
     })
     .from(users)
-    .innerJoin(profiles, eq(profiles.userId, users.id))
+    .where(alive(users))
     .all();
+  const rolesByUser = rolesForUsers(userRows.map((u) => u.id));
+  const allUsers = userRows.map((u) => {
+    const userRoles = rolesByUser.get(u.id) ?? [];
+    return { ...u, roleCodes: userRoles.map((r) => r.code), roleNames: userRoles.map((r) => r.name) };
+  });
 
   const customersFiltered = q
     ? allCustomers.filter((c) => {
@@ -96,16 +120,58 @@ export async function loader({ request }: Route.LoaderArgs) {
         (u) =>
           u.username.toLowerCase().includes(q) ||
           u.displayName.toLowerCase().includes(q) ||
-          u.role.toLowerCase().includes(q),
+          u.roleNames.join(" ").toLowerCase().includes(q),
       )
     : allUsers;
 
-  const drawer = parseDrawer(url);
+  // Terhapus view: only the current tab's list is loaded, and the drawer is off.
+  const matches = (q: string, ...fields: (string | null)[]) =>
+    !q || fields.some((f) => (f ?? "").toLowerCase().includes(q));
+  const customerTrash =
+    trash && tab === "customer"
+      ? paginate(
+          listDeletedCustomers().filter((c) => matches(q, c.nama, c.salesmanNama)),
+          requestedPage,
+          pageSize,
+        )
+      : null;
+  const salesmanTrash =
+    trash && tab === "salesman"
+      ? paginate(
+          listDeletedSalesmen().filter((s) => matches(q, s.nama, s.nomorWa)),
+          requestedPage,
+          pageSize,
+        )
+      : null;
+  const userTrash =
+    trash && tab === "user"
+      ? paginate(
+          listDeletedUsers().filter((u) => matches(q, u.username, u.displayName, u.roleNames.join(" "))),
+          requestedPage,
+          pageSize,
+        )
+      : null;
+
+  // BR-1 is computed here at read time, never stored: rows carry the last order's age and overdue flag.
+  const today = todayIso();
+  const withStanding = <C extends { lastOrderDate: string | null; orderCycleDays: number }>(c: C) => ({
+    ...c,
+    ...orderStanding(c.lastOrderDate, c.orderCycleDays, today),
+  });
+
+  const feedPage = parsePage(url.searchParams.get(FEED_PAGE_PARAM));
+  const feedOf = (entityType: "customer" | "salesman" | "user", entityId: number) => ({
+    feed: listFeedFor(entityType, entityId, feedPage),
+    entityType,
+    entityId,
+  });
+
+  const drawer = trash ? null : parseDrawer(url);
   const editId = drawer?.mode === "edit" ? drawer.id : null;
   const editing = {
     customer:
       tab === "customer" && editId
-        ? (allCustomers.find((c) => c.id === editId) ?? null)
+        ? (allCustomers.filter((c) => c.id === editId).map(withStanding)[0] ?? null)
         : null,
     salesman:
       tab === "salesman" && editId
@@ -120,10 +186,20 @@ export async function loader({ request }: Route.LoaderArgs) {
     tab,
     q,
     pageSize,
+    trash,
+    roles: listRoles(),
+    trashCounts: countDeleted(),
+    activeCounts: { customer: allCustomers.length, salesman: allSalesmen.length, user: allUsers.length },
+    customerTrash,
+    salesmanTrash,
+    userTrash,
     creating: drawer?.mode === "new",
     editing,
     flash: url.searchParams.get("flash"),
-    customerTable: paginate(customersFiltered, requestedPage, pageSize),
+    customerTable: (() => {
+      const page = paginate(customersFiltered, requestedPage, pageSize);
+      return { ...page, rows: page.rows.map(withStanding) };
+    })(),
     salesmen: allSalesmen,
     salesmanTable: paginate(salesmenFiltered, requestedPage, pageSize),
     // ADR-0004: any other salesman can be a supervisor, except this one and
@@ -133,23 +209,32 @@ export async function loader({ request }: Route.LoaderArgs) {
       : [],
     userTable: paginate(usersFiltered, requestedPage, pageSize),
     activity: editing.customer
-      ? listActivityFor("customer", editing.customer.id)
+      ? {
+          ...feedOf("customer", editing.customer.id),
+          // A late customer's reason can be given here by whoever may follow it up (the salesman).
+          reasons:
+            editing.customer.overdue &&
+            editing.customer.statusCustomer === "aktif" &&
+            canOwnOrAll(user, PERM.customerFollowUp, editing.customer.salesmanId)
+              ? listFollowUpReasons().map(({ code, label }) => ({ code, label }))
+              : undefined,
+        }
       : editing.salesman
-        ? listActivityFor("salesman", editing.salesman.id)
+        ? feedOf("salesman", editing.salesman.id)
         : editing.user
-          ? listActivityFor("user", editing.user.id)
-          : [],
+          ? feedOf("user", editing.user.id)
+          : null,
   };
 }
 
 export async function action({ request }: Route.ActionArgs) {
-  const user = await requireRole(request, "admin");
+  const user = await requirePermission(request, PERM.masterdataManage);
   const form = await request.formData();
   const intent = String(form.get("intent") ?? "");
   const optionalId = (key: string) => (form.get(key) ? Number(form.get(key)) : null);
   const ids = (key: string) => form.getAll(key).map(Number).filter(Number.isFinite);
-  const bulkMessage = (n: number, noun: string) =>
-    n === 1 ? `1 ${noun} dihapus` : `${n} ${noun} dihapus`;
+  const bulkMessage = (n: number, noun: string) => `${n} ${noun} dihapus (bisa dipulihkan)`;
+  const restoredMessage = (n: number, noun: string) => `${n} ${noun} dipulihkan`;
 
   try {
     if (intent === "create_customer") {
@@ -189,6 +274,24 @@ export async function action({ request }: Route.ActionArgs) {
       return flashRedirect(request, "customer", bulkMessage(list.length, "customer"));
     }
 
+    if (intent === "restore_many_customer") {
+      const list = ids("customer_id");
+      restoreCustomersMany(list, user.id);
+      return flashRedirect(request, "customer", restoredMessage(list.length, "customer"), true);
+    }
+
+    if (intent === "restore_many_salesman") {
+      const list = ids("salesman_id");
+      restoreSalesmenMany(list, user.id);
+      return flashRedirect(request, "salesman", restoredMessage(list.length, "salesman"), true);
+    }
+
+    if (intent === "restore_many_user") {
+      const list = ids("user_id");
+      restoreUsersMany(list, user.id);
+      return flashRedirect(request, "user", restoredMessage(list.length, "user"), true);
+    }
+
     if (intent === "create_salesman") {
       createSalesman({
         nama: String(form.get("nama") ?? ""),
@@ -222,9 +325,10 @@ export async function action({ request }: Route.ActionArgs) {
       await createUserAccount({
         username: String(form.get("username") ?? ""),
         displayName: String(form.get("display_name") ?? ""),
-        password: String(form.get("password") ?? "sigula123"),
-        role: String(form.get("role") ?? "admin") as Role,
+        password: String(form.get("password") ?? ""),
+        roles: form.getAll("roles").map(String),
         salesmanId: optionalId("salesman_id"),
+        isActive: form.get("is_active") === "on",
         actingUserId: user.id,
       });
       return flashRedirect(request, "user", "User ditambahkan");
@@ -235,8 +339,9 @@ export async function action({ request }: Route.ActionArgs) {
         id: Number(form.get("user_id")),
         displayName: String(form.get("display_name") ?? ""),
         password: String(form.get("password") ?? ""),
-        role: String(form.get("role") ?? "admin") as Role,
+        roles: form.getAll("roles").map(String),
         salesmanId: optionalId("salesman_id"),
+        isActive: form.get("is_active") === "on",
         actingUserId: user.id,
       });
       return flashRedirect(request, "user", "User disimpan");
@@ -251,7 +356,7 @@ export async function action({ request }: Route.ActionArgs) {
     const msg = err instanceof Error ? err.message : "Gagal menyimpan";
     const tab =
       intent.includes("salesman") ? "salesman" : intent.includes("user") ? "user" : "customer";
-    return flashRedirect(request, tab, msg);
+    return flashRedirect(request, tab, msg, intent.startsWith("restore_"));
   }
 
   return flashRedirect(request, "customer", "Aksi tidak dikenal");
@@ -277,6 +382,13 @@ export default function AdminMasterdata() {
     userTable,
     q,
     pageSize,
+    trash,
+    roles: roleList,
+    trashCounts,
+    activeCounts,
+    customerTrash,
+    salesmanTrash,
+    userTrash,
     creating,
     editing,
   } = data;
@@ -310,17 +422,48 @@ export default function AdminMasterdata() {
 
       {tab === "customer" ? (
         <>
-          <div className="mb-3 flex justify-end">
-            <AddLink href={drawerHref("new")} label="Tambah customer" />
-          </div>
+          {trash ? null : (
+            <div className="mb-3 flex justify-end">
+              <AddLink href={drawerHref("new")} label="Tambah customer" />
+            </div>
+          )}
 
           <TableToolbar
             q={q}
             pageSize={pageSize}
             hiddenFields={{ tab: "customer" }}
+            statusFilter={{ trash, activeCount: activeCounts.customer, trashCount: trashCounts.customer }}
             placeholder="Cari customer atau salesman…"
           />
 
+          {customerTrash ? (
+            <TrashTable
+              table={customerTrash}
+              noun="customer"
+              intent="restore_many_customer"
+              idName="customer_id"
+              resetKey={`customer-trash:${q}:${customerTrash.page}:${pageSize}`}
+              q={q}
+              hrefForPage={(p) =>
+                `?tab=customer&trash=1&q=${encodeURIComponent(q)}&pageSize=${pageSize}&page=${p}`
+              }
+              hiddenFields={{ tab: "customer", trash: "1", q, pageSize: String(pageSize) }}
+              columns={[
+                { header: "Customer", cell: (c) => <span className="font-medium">{c.nama}</span> },
+                { header: "Salesman", hideOnMobile: true, cell: (c) => c.salesmanNama },
+                { header: "Tipe", hideOnMobile: true, cell: (c) => c.tipeCustomer },
+                {
+                  header: "Status",
+                  cell: (c) => (
+                    <StatusPill tone={c.statusCustomer === "aktif" ? "ok" : "muted"}>
+                      {c.statusCustomer}
+                    </StatusPill>
+                  ),
+                },
+              ]}
+            />
+          ) : (
+            <>
           <BulkActionBar
             count={customerSelection.selected.size}
             intent="delete_many_customer"
@@ -347,6 +490,8 @@ export default function AdminMasterdata() {
                   <th className="hide-sm">Salesman</th>
                   <th className="hide-sm">Tipe</th>
                   <th className="hide-sm">Siklus</th>
+                  <th className="hide-sm">Transaksi terakhir</th>
+                  <th>Status order</th>
                   <th>Status</th>
                   <th></th>
                 </tr>
@@ -354,7 +499,7 @@ export default function AdminMasterdata() {
               <tbody>
                 {list.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="text-slate-500">
+                    <td colSpan={9} className="text-slate-500">
                       {q ? "Tidak ada customer yang cocok." : "Belum ada customer."}
                     </td>
                   </tr>
@@ -379,6 +524,17 @@ export default function AdminMasterdata() {
                       <td className="align-top hide-sm">{smName(c.salesmanId)}</td>
                       <td className="align-top hide-sm">{c.tipeCustomer}</td>
                       <td className="align-top hide-sm">{c.orderCycleDays} hari</td>
+                      <td className="align-top hide-sm">
+                        {c.lastOrderDate ?? <span className="text-slate-400">Belum pernah</span>}
+                        {c.daysSinceOrder !== null ? (
+                          <div className="text-xs text-slate-500">{sinceLabel(c.daysSinceOrder)}</div>
+                        ) : null}
+                      </td>
+                      <td className="align-top">
+                        <StatusPill tone={c.overdue ? "danger" : "ok"}>
+                          {c.overdue ? "Overdue" : "On track"}
+                        </StatusPill>
+                      </td>
                       <td className="align-top">
                         <StatusPill tone={c.statusCustomer === "aktif" ? "ok" : "muted"}>
                           {c.statusCustomer}
@@ -412,7 +568,7 @@ export default function AdminMasterdata() {
               title={editing.customer ? "Edit customer" : "Tambah customer"}
               subtitle={editing.customer?.nama}
               submitLabel={editing.customer ? "Simpan" : "Tambah"}
-              activity={editing.customer ? activity : undefined}
+              activity={activity ?? undefined}
               remove={
                 editing.customer
                   ? { intent: "delete_many_customer", idName: "customer_id", id: editing.customer.id }
@@ -427,6 +583,23 @@ export default function AdminMasterdata() {
               />
               {editing.customer ? (
                 <input type="hidden" name="customer_id" value={editing.customer.id} />
+              ) : null}
+              {editing.customer ? (
+                <ToggleField
+                  name="status_customer"
+                  label="Status"
+                  defaultOn={editing.customer.statusCustomer === "aktif"}
+                  on={{
+                    value: "aktif",
+                    label: "Aktif",
+                    hint: "Ikut pengingat saat melewati siklus order.",
+                  }}
+                  off={{
+                    value: "inactive",
+                    label: "Inactive",
+                    hint: "Tidak ikut pengingat. Bisa diaktifkan kembali kapan saja.",
+                  }}
+                />
               ) : null}
               <div className="form-field">
                 <label htmlFor="d-nama">Nama</label>
@@ -466,20 +639,6 @@ export default function AdminMasterdata() {
                   <option value="baru">Baru</option>
                 </select>
               </div>
-              {editing.customer ? (
-                <div className="form-field">
-                  <label htmlFor="d-status">Status</label>
-                  <select
-                    id="d-status"
-                    name="status_customer"
-                    className="form-control"
-                    defaultValue={editing.customer.statusCustomer}
-                  >
-                    <option value="aktif">Aktif</option>
-                    <option value="inactive">Inactive</option>
-                  </select>
-                </div>
-              ) : null}
               <div className="form-field">
                 <label htmlFor="d-siklus">Siklus order (hari)</label>
                 <input
@@ -491,24 +650,69 @@ export default function AdminMasterdata() {
                   defaultValue={editing.customer?.orderCycleDays ?? 30}
                 />
               </div>
+              {editing.customer ? (
+                <>
+                  <ReadonlyField
+                    id="d-last-order"
+                    label="Tanggal transaksi terakhir"
+                    value={editing.customer.lastOrderDate ?? "Belum pernah order"}
+                  />
+                  <ReadonlyField
+                    id="d-order-status"
+                    label="Status order"
+                    value={orderStatusText(editing.customer)}
+                  />
+                </>
+              ) : null}
             </RecordDrawer>
           ) : null}
+            </>
+          )}
         </>
       ) : null}
 
       {tab === "salesman" ? (
         <>
-          <div className="mb-3 flex justify-end">
-            <AddLink href={drawerHref("new")} label="Tambah salesman" />
-          </div>
+          {trash ? null : (
+            <div className="mb-3 flex justify-end">
+              <AddLink href={drawerHref("new")} label="Tambah salesman" />
+            </div>
+          )}
 
           <TableToolbar
             q={q}
             pageSize={pageSize}
             hiddenFields={{ tab: "salesman" }}
+            statusFilter={{ trash, activeCount: activeCounts.salesman, trashCount: trashCounts.salesman }}
             placeholder="Cari salesman atau nomor WA…"
           />
 
+          {salesmanTrash ? (
+            <TrashTable
+              table={salesmanTrash}
+              noun="salesman"
+              intent="restore_many_salesman"
+              idName="salesman_id"
+              resetKey={`salesman-trash:${q}:${salesmanTrash.page}:${pageSize}`}
+              q={q}
+              hrefForPage={(p) =>
+                `?tab=salesman&trash=1&q=${encodeURIComponent(q)}&pageSize=${pageSize}&page=${p}`
+              }
+              hiddenFields={{ tab: "salesman", trash: "1", q, pageSize: String(pageSize) }}
+              columns={[
+                { header: "Salesman", cell: (s) => <span className="font-medium">{s.nama}</span> },
+                { header: "WA", hideOnMobile: true, cell: (s) => s.nomorWa || "—" },
+                { header: "Supervisor", hideOnMobile: true, cell: (s) => s.supervisorNama },
+                {
+                  header: "Status",
+                  cell: (s) => (
+                    <StatusPill tone={s.status === "aktif" ? "ok" : "muted"}>{s.status}</StatusPill>
+                  ),
+                },
+              ]}
+            />
+          ) : (
+            <>
           <BulkActionBar
             count={salesmanSelection.selected.size}
             intent="delete_many_salesman"
@@ -598,7 +802,7 @@ export default function AdminMasterdata() {
               title={editing.salesman ? "Edit salesman" : "Tambah salesman"}
               subtitle={editing.salesman?.nama}
               submitLabel={editing.salesman ? "Simpan" : "Tambah"}
-              activity={editing.salesman ? activity : undefined}
+              activity={activity ?? undefined}
               remove={
                 editing.salesman
                   ? { intent: "delete_many_salesman", idName: "salesman_id", id: editing.salesman.id }
@@ -665,22 +869,54 @@ export default function AdminMasterdata() {
               </div>
             </RecordDrawer>
           ) : null}
+            </>
+          )}
         </>
       ) : null}
 
       {tab === "user" ? (
         <>
-          <div className="mb-3 flex justify-end">
-            <AddLink href={drawerHref("new")} label="Tambah user" />
-          </div>
+          {trash ? null : (
+            <div className="mb-3 flex justify-end">
+              <AddLink href={drawerHref("new")} label="Tambah user" />
+            </div>
+          )}
 
           <TableToolbar
             q={q}
             pageSize={pageSize}
             hiddenFields={{ tab: "user" }}
+            statusFilter={{ trash, activeCount: activeCounts.user, trashCount: trashCounts.user }}
             placeholder="Cari username, nama, atau role…"
           />
 
+          {userTrash ? (
+            <TrashTable
+              table={userTrash}
+              noun="user"
+              intent="restore_many_user"
+              idName="user_id"
+              resetKey={`user-trash:${q}:${userTrash.page}:${pageSize}`}
+              q={q}
+              hrefForPage={(p) =>
+                `?tab=user&trash=1&q=${encodeURIComponent(q)}&pageSize=${pageSize}&page=${p}`
+              }
+              hiddenFields={{ tab: "user", trash: "1", q, pageSize: String(pageSize) }}
+              columns={[
+                {
+                  header: "User",
+                  cell: (u) => (
+                    <>
+                      <div className="font-medium">{u.username}</div>
+                      <div className="text-xs text-slate-500">{u.roleNames.join(" · ") || "—"}</div>
+                    </>
+                  ),
+                },
+                { header: "Nama tampilan", hideOnMobile: true, cell: (u) => u.displayName },
+              ]}
+            />
+          ) : (
+            <>
           <BulkActionBar
             count={userSelection.selected.size}
             intent="delete_many_user"
@@ -704,13 +940,14 @@ export default function AdminMasterdata() {
                   <th>User</th>
                   <th className="hide-sm">Nama tampilan</th>
                   <th className="hide-sm">Tertaut ke</th>
+                  <th className="hide-sm">Login terakhir</th>
                   <th></th>
                 </tr>
               </thead>
               <tbody>
                 {userList.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="text-slate-500">
+                    <td colSpan={6} className="text-slate-500">
                       {q ? "Tidak ada user yang cocok." : "Belum ada user."}
                     </td>
                   </tr>
@@ -737,15 +974,19 @@ export default function AdminMasterdata() {
                       <td className="align-top">
                         <div className="font-medium">{u.username}</div>
                         <div className="text-xs text-slate-500">
-                          {u.role}
+                          {u.roleNames.join(" · ") || "Tanpa role"}
                           {u.id === user.id ? " · Anda" : ""}
                         </div>
+                        {u.isActive ? null : (
+                          <StatusPill tone="muted">nonaktif</StatusPill>
+                        )}
                       </td>
                       <td className="align-top hide-sm">{u.displayName}</td>
                       <td className="align-top hide-sm">
-                        {u.role === "salesman" || u.role === "supervisor"
-                          ? smName(u.salesmanId)
-                          : "—"}
+                        {u.salesmanId ? smName(u.salesmanId) : "—"}
+                      </td>
+                      <td className="align-top hide-sm text-slate-500">
+                        {u.lastLoginAt ? formatStamp(u.lastLoginAt) : "belum pernah"}
                       </td>
                       <td className="align-top">
                         <EditLink href={drawerHref(u.id)} />
@@ -775,7 +1016,7 @@ export default function AdminMasterdata() {
               title={editing.user ? "Edit user" : "Tambah user"}
               subtitle={editing.user?.username}
               submitLabel={editing.user ? "Simpan" : "Tambah"}
-              activity={editing.user ? activity : undefined}
+              activity={activity ?? undefined}
               remove={
                 editing.user
                   ? { intent: "delete_many_user", idName: "user_id", id: editing.user.id, disabledReason: editing.user.id === user.id ? "Akun Anda sendiri tidak bisa dihapus" : undefined }
@@ -825,22 +1066,28 @@ export default function AdminMasterdata() {
                   defaultValue={editing.user ? undefined : "sigula123"}
                 />
               </div>
+              <fieldset className="form-field">
+                <legend className="mb-1 text-sm font-medium">Role</legend>
+                <div className="space-y-2">
+                  {roleList.map((r) => (
+                    <label key={r.id} className="flex items-start gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        name="roles"
+                        value={r.code}
+                        className="mt-1"
+                        defaultChecked={editing.user?.roleCodes.includes(r.code) ?? false}
+                      />
+                      <span>
+                        <span className="font-medium">{r.name}</span>
+                        <span className="block text-xs text-slate-500">{r.description}</span>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
               <div className="form-field">
-                <label htmlFor="d-role">Role</label>
-                <select
-                  id="d-role"
-                  name="role"
-                  className="form-control"
-                  defaultValue={editing.user?.role ?? "admin"}
-                >
-                  <option value="admin">Admin</option>
-                  <option value="salesman">Salesman</option>
-                  <option value="supervisor">Supervisor</option>
-                  <option value="management">Management</option>
-                </select>
-              </div>
-              <div className="form-field">
-                <label htmlFor="d-salesman">Salesman (untuk role salesman / supervisor)</label>
+                <label htmlFor="d-salesman">Salesman (wajib untuk role yang membaca data salesman atau tim)</label>
                 <select
                   id="d-salesman"
                   name="salesman_id"
@@ -855,8 +1102,18 @@ export default function AdminMasterdata() {
                   ))}
                 </select>
               </div>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  name="is_active"
+                  defaultChecked={editing.user?.isActive ?? true}
+                />
+                Akun aktif (bisa login)
+              </label>
             </RecordDrawer>
           ) : null}
+            </>
+          )}
         </>
       ) : null}
     </AppShell>

@@ -9,9 +9,10 @@ import {
   resolvePageSize,
   SelectAllCheckbox,
   TablePagination,
-  TableToolbar,
   useRowSelection,
 } from "~/components/DataTable";
+import { TableToolbar } from "~/components/TableSearch";
+import { TrashTable } from "~/components/TrashTable";
 import { UploadButton, type UploadPreviewView } from "~/components/UploadDialog";
 import {
   AddLink,
@@ -21,10 +22,11 @@ import {
   useDrawerHref,
   useRowOpen,
 } from "~/components/RecordDrawer";
-import { db } from "~/db/client.server";
-import { listActivityFor } from "~/lib/activity.server";
-import { customers, salesmen } from "~/db/schema";
-import { requireRole } from "~/lib/auth.server";
+import { FEED_PAGE_PARAM } from "~/lib/activity-format";
+import { listFeedFor } from "~/lib/activity.server";
+import { parsePage } from "~/lib/pagination";
+import { requirePermission } from "~/lib/auth.server";
+import { PERM } from "~/lib/permissions";
 import {
   confirmImport,
   parsePreview,
@@ -32,6 +34,7 @@ import {
   type ImportPreview,
   type ImportResult,
 } from "~/lib/imports.server";
+import { listLiveCustomers, listLiveSalesmen } from "~/lib/masterdata.server";
 import {
   createTransaksi,
   deleteTransaksiMany,
@@ -39,6 +42,7 @@ import {
   updateTransaksi,
 } from "~/lib/orders.server";
 import { todayIso } from "~/lib/dates";
+import { countDeleted, listDeletedTransaksi, restoreTransaksiMany } from "~/lib/trash.server";
 import { handleUpload, UploadError } from "~/lib/upload.server";
 
 function describeImportPreview(preview: ImportPreview): UploadPreviewView {
@@ -117,15 +121,16 @@ function describeImportResult(result: ImportResult): ReactNode {
 }
 
 export async function loader({ request }: Route.LoaderArgs) {
-  const user = await requireRole(request, "admin");
+  const user = await requirePermission(request, PERM.transaksiManage);
   const url = new URL(request.url);
   const q = url.searchParams.get("q")?.trim().toLowerCase() ?? "";
   const pageSize = resolvePageSize(url.searchParams.get("pageSize"));
   const requestedPage = Math.max(1, Number(url.searchParams.get("page")) || 1);
+  const trash = url.searchParams.get("trash") === "1";
 
   const rows = listTransaksi(2000);
-  const allCustomers = db.select().from(customers).all();
-  const allSalesmen = db.select().from(salesmen).all();
+  const allCustomers = listLiveCustomers();
+  const allSalesmen = listLiveSalesmen();
   const enrichedAll = rows.map((t) => ({
     ...t,
     customerNama:
@@ -134,7 +139,10 @@ export async function loader({ request }: Route.LoaderArgs) {
       allSalesmen.find((s) => s.id === t.salesmanId)?.nama ?? `#${t.salesmanId}`,
   }));
 
-  const filtered = q
+  // The Terhapus view lists its own rows below; the live ones are not sent along.
+  const filtered = trash
+    ? []
+    : q
     ? enrichedAll.filter((t) =>
         [t.customerNama, t.salesmanNama, t.catatan, t.tanggalOrder]
           .filter(Boolean)
@@ -148,7 +156,22 @@ export async function loader({ request }: Route.LoaderArgs) {
     pageSize,
   );
 
-  const drawer = parseDrawer(url);
+  // Terhapus view: read-only list, no drawer.
+  const trashTable = trash
+    ? paginate(
+        listDeletedTransaksi().filter(
+          (t) =>
+            !q ||
+            [t.customerNama, t.salesmanNama, t.catatan, t.tanggalOrder].some((v) =>
+              v.toLowerCase().includes(q),
+            ),
+        ),
+        requestedPage,
+        pageSize,
+      )
+    : null;
+
+  const drawer = trash ? null : parseDrawer(url);
   const editing =
     drawer?.mode === "edit"
       ? (enrichedAll.find((t) => t.id === drawer.id) ?? null)
@@ -157,13 +180,23 @@ export async function loader({ request }: Route.LoaderArgs) {
   return {
     user,
     creating: drawer?.mode === "new",
-    activity: editing ? listActivityFor("transaksi", editing.id) : [],
+    activity: editing
+      ? {
+          feed: listFeedFor("transaksi", editing.id, parsePage(url.searchParams.get(FEED_PAGE_PARAM))),
+          entityType: "transaksi" as const,
+          entityId: editing.id,
+        }
+      : null,
     transaksi: pageRows,
     total,
     page,
     pageSize,
     totalPages,
     q,
+    trash,
+    trashCount: countDeleted().transaksi,
+    activeCount: rows.length,
+    trashTable,
     editing,
     customers: allCustomers,
     salesmen: allSalesmen,
@@ -172,62 +205,78 @@ export async function loader({ request }: Route.LoaderArgs) {
 }
 
 export async function action({ request }: Route.ActionArgs) {
-  const user = await requireRole(request, "admin");
+  const user = await requirePermission(request, PERM.transaksiManage);
   const form = await request.formData();
   const intent = String(form.get("intent") ?? "");
 
-  const redirectFlash = (msg: string) =>
+  /** `trash` keeps the admin in the Terhapus view (a restore may fail and needs context). */
+  const redirectFlash = (msg: string, trash = false) =>
     Response.redirect(
       new URL(
-        `/admin/transaksi?flash=${encodeURIComponent(msg)}`,
+        `/admin/transaksi?${trash ? "trash=1&" : ""}flash=${encodeURIComponent(msg)}`,
         request.url,
       ),
       303,
     );
-
-  if (intent === "create") {
-    createTransaksi({
-      customerId: Number(form.get("customer_id")),
-      salesmanId: Number(form.get("salesman_id")),
-      tanggalOrder: String(form.get("tanggal_order") || todayIso()),
-      catatan: String(form.get("catatan") ?? ""),
-      actingUserId: user.id,
-      sumber: "manual",
-    });
-    return redirectFlash("Transaksi ditambahkan");
-  }
-
-  if (intent === "update") {
-    updateTransaksi({
-      id: Number(form.get("transaksi_id")),
-      customerId: Number(form.get("customer_id")),
-      salesmanId: Number(form.get("salesman_id")),
-      tanggalOrder: String(form.get("tanggal_order")),
-      catatan: String(form.get("catatan") ?? ""),
-      actingUserId: user.id,
-    });
-    return redirectFlash("Transaksi disimpan");
-  }
-
-  if (intent === "delete_many") {
-    const ids = form
+  const ids = () =>
+    form
       .getAll("transaksi_id")
       .map((v) => Number(v))
       .filter((n) => Number.isFinite(n));
-    deleteTransaksiMany(ids, user.id);
+
+  try {
+    if (intent === "create") {
+      createTransaksi({
+        customerId: Number(form.get("customer_id")),
+        salesmanId: Number(form.get("salesman_id")),
+        tanggalOrder: String(form.get("tanggal_order") || todayIso()),
+        catatan: String(form.get("catatan") ?? ""),
+        actingUserId: user.id,
+        sumber: "manual",
+      });
+      return redirectFlash("Transaksi ditambahkan");
+    }
+
+    if (intent === "update") {
+      updateTransaksi({
+        id: Number(form.get("transaksi_id")),
+        customerId: Number(form.get("customer_id")),
+        salesmanId: Number(form.get("salesman_id")),
+        tanggalOrder: String(form.get("tanggal_order")),
+        catatan: String(form.get("catatan") ?? ""),
+        actingUserId: user.id,
+      });
+      return redirectFlash("Transaksi disimpan");
+    }
+
+    if (intent === "delete_many") {
+      const list = ids();
+      deleteTransaksiMany(list, user.id);
+      return redirectFlash(`${list.length} transaksi dihapus (bisa dipulihkan)`);
+    }
+
+    if (intent === "restore_many") {
+      const list = ids();
+      restoreTransaksiMany(list, user.id);
+      return redirectFlash(`${list.length} transaksi dipulihkan`, true);
+    }
+  } catch (err) {
+    // A stale form (customer deleted in another tab, …) is a message, not a 500.
     return redirectFlash(
-      ids.length === 1 ? "1 transaksi dihapus" : `${ids.length} transaksi dihapus`,
+      err instanceof Error ? err.message : "Gagal menyimpan",
+      intent === "restore_many",
     );
   }
 
   const upload = await handleUpload(form, {
     parse: parsePreview,
-    confirm: async (buffer, f) => {
+    confirm: async (buffer, f, file) => {
       try {
         return await confirmImport({
           buffer,
           actingUserId: user.id,
           treatUnknownSheetsAsNewSalesman: f.get("treat_unknown") === "on",
+          fileName: file.fileName,
         });
       } catch (err) {
         if (err instanceof UnresolvedSheetsError) {
@@ -255,6 +304,10 @@ export default function AdminTransaksi() {
     pageSize,
     totalPages,
     q,
+    trash,
+    trashCount,
+    activeCount,
+    trashTable,
     creating,
     editing,
     activity,
@@ -291,6 +344,7 @@ export default function AdminTransaksi() {
         <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
           Log transaksi
         </h2>
+        {trash ? null : (
         <div className="flex items-center gap-2">
           <UploadButton
             title="Import dari Excel"
@@ -312,15 +366,44 @@ export default function AdminTransaksi() {
           />
           <AddLink href={drawerHref("new")} label="Tambah transaksi" />
         </div>
+        )}
       </div>
 
       <TableToolbar
         q={q}
         pageSize={pageSize}
         hiddenFields={{}}
+        statusFilter={{ trash, activeCount, trashCount }}
         placeholder="Cari transaksi…"
       />
 
+      {trashTable ? (
+        <TrashTable
+          table={trashTable}
+          noun="transaksi"
+          intent="restore_many"
+          idName="transaksi_id"
+          resetKey={`transaksi-trash:${q}:${trashTable.page}:${pageSize}`}
+          q={q}
+          hrefForPage={(p) => `?trash=1&q=${encodeURIComponent(q)}&pageSize=${pageSize}&page=${p}`}
+          hiddenFields={{ trash: "1", q, pageSize: String(pageSize) }}
+          columns={[
+            { header: "ID", cell: (t) => `#${t.id}` },
+            {
+              header: "Tanggal",
+              cell: (t) => (
+                <>
+                  <div>{t.tanggalOrder}</div>
+                  <div className="text-xs text-slate-400">{t.sumber}</div>
+                </>
+              ),
+            },
+            { header: "Customer", cell: (t) => <span className="font-medium">{t.customerNama}</span> },
+            { header: "Salesman", hideOnMobile: true, cell: (t) => t.salesmanNama },
+          ]}
+        />
+      ) : (
+      <>
       <BulkActionBar
         count={selected.size}
         intent="delete_many"
@@ -405,7 +488,7 @@ export default function AdminTransaksi() {
           title={editing ? "Edit transaksi" : "Tambah transaksi"}
           subtitle={editing ? `#${editing.id} · ${editing.sumber}` : undefined}
           submitLabel={editing ? "Simpan" : "Tambah"}
-          activity={editing ? activity : undefined}
+          activity={activity ?? undefined}
           remove={
             editing
               ? { intent: "delete_many", idName: "transaksi_id", id: editing.id }
@@ -471,6 +554,8 @@ export default function AdminTransaksi() {
           </div>
         </RecordDrawer>
       ) : null}
+      </>
+      )}
     </AppShell>
   );
 }

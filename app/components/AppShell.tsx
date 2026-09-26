@@ -1,82 +1,116 @@
 import { Form, Link, NavLink, useLocation } from "react-router";
 
 import type { AuthUser } from "~/lib/auth.server";
-import type { Role } from "~/db/schema";
+import { can, PERM, type PermissionCode } from "~/lib/permissions";
 
 type NavEntry = {
   to: string;
   label: string;
+  /** Shown only to users holding this permission. */
+  permission: PermissionCode;
   children?: { tab: string; label: string }[];
 };
 
-const NAV: Record<Role, NavEntry[]> = {
-  admin: [
-    { to: "/admin/dashboard", label: "Dashboard" },
-    { to: "/admin/transaksi", label: "Transaksi" },
-    {
-      to: "/admin/masterdata",
-      label: "Data Master",
-      children: [
-        { tab: "customer", label: "Customer" },
-        { tab: "salesman", label: "Salesman" },
-        { tab: "user", label: "User" },
-      ],
-    },
-    { to: "/admin/audit", label: "Log Audit" },
-    {
-      to: "/admin/settings",
-      label: "Pengaturan",
-      children: [
-        { tab: "waha", label: "Koneksi WAHA" },
-        { tab: "cron", label: "Jadwal Cron" },
-      ],
-    },
-  ],
-  salesman: [
-    { to: "/salesman", label: "Dashboard" },
-    { to: "/reports/salesman/me", label: "Export Reminder" },
-  ],
-  supervisor: [
-    { to: "/supervisor", label: "Tim Saya" },
-    { to: "/reports/supervisor/me", label: "Export Tim" },
-  ],
-  management: [
-    { to: "/management", label: "Ringkasan" },
-    { to: "/reports/management", label: "Export Ringkasan" },
-  ],
-};
+/** Sidebar sections, in the order they appear when a user has more than one. */
+const NAV: { group: string; entries: NavEntry[] }[] = [
+  {
+    group: "Admin",
+    entries: [
+      { to: "/admin/dashboard", label: "Dashboard", permission: PERM.adminDashboard },
+      { to: "/admin/transaksi", label: "Transaksi", permission: PERM.transaksiManage },
+      {
+        to: "/admin/masterdata",
+        label: "Data Master",
+        permission: PERM.masterdataManage,
+        children: [
+          { tab: "customer", label: "Customer" },
+          { tab: "salesman", label: "Salesman" },
+          { tab: "user", label: "User" },
+        ],
+      },
+      { to: "/admin/audit", label: "Log Audit", permission: PERM.auditRead },
+      {
+        to: "/admin/settings",
+        label: "Pengaturan",
+        permission: PERM.settingsManage,
+        children: [
+          { tab: "waha", label: "Koneksi WAHA" },
+          { tab: "cron", label: "Jadwal Cron" },
+          { tab: "templates", label: "Template Pesan" },
+        ],
+      },
+    ],
+  },
+  {
+    group: "Manajemen",
+    entries: [
+      { to: "/management", label: "Ringkasan", permission: PERM.managementRead },
+      { to: "/reports/management", label: "Export Ringkasan", permission: PERM.managementRead },
+    ],
+  },
+  {
+    group: "Tim",
+    entries: [
+      { to: "/supervisor", label: "Tim Saya", permission: PERM.teamRead },
+      { to: "/reports/supervisor/me", label: "Export Tim", permission: PERM.teamRead },
+    ],
+  },
+  {
+    group: "Salesman",
+    entries: [
+      { to: "/salesman", label: "Dashboard", permission: PERM.customerFollowUp },
+      { to: "/reports/salesman/me", label: "Export Reminder", permission: PERM.customerFollowUp },
+    ],
+  },
+];
 
-function NavItems({ role }: { role: Role }) {
+/** The sections this user can open. Headings are shown only when there is more than one. */
+function visibleNav(user: AuthUser) {
+  return NAV.map((section) => ({
+    ...section,
+    entries: section.entries.filter((e) => can(user, e.permission)),
+  })).filter((section) => section.entries.length > 0);
+}
+
+function NavItems({ user }: { user: AuthUser }) {
   const { pathname, search } = useLocation();
   // No `?tab=` means the first submenu entry.
   const tabParam = new URLSearchParams(search).get("tab");
+  const sections = visibleNav(user);
 
   return (
     <>
-      {NAV[role].map((item) => (
-        <div key={item.to}>
-          <NavLink
-            to={item.to}
-            className={({ isActive }) =>
-              `app-nav-link${isActive ? " app-nav-link--active" : ""}`
-            }
-            end={item.to === "/salesman" || item.to === "/supervisor" || item.to === "/management"}
-          >
-            {item.label}
-          </NavLink>
-          {item.children && pathname.startsWith(item.to) ? (
-            <div className="app-nav-sub">
-              {item.children.map((child, _i, siblings) => (
-                <Link
-                  key={child.tab}
-                  to={`${item.to}?tab=${child.tab}`}
-                  className={`app-nav-sub__link${(tabParam ?? siblings[0].tab) === child.tab ? " app-nav-sub__link--active" : ""}`}
-                >
-                  {child.label}
-                </Link>
-              ))}
-            </div>
+      {sections.map((section) => (
+        <div key={section.group}>
+          {sections.length > 1 ? (
+            <div className="app-nav-group">{section.group}</div>
           ) : null}
+          {section.entries.map((item) => (
+            <div key={item.to}>
+              <NavLink
+                to={item.to}
+                className={({ isActive }) =>
+                  `app-nav-link${isActive ? " app-nav-link--active" : ""}`
+                }
+                end={item.to === "/salesman" || item.to === "/supervisor" || item.to === "/management"}
+              >
+                {item.label}
+              </NavLink>
+              {item.children && pathname.startsWith(item.to) ? (
+                <div className="app-nav-sub">
+                  {item.children.map((child, _i, siblings) => (
+                    <Link
+                      key={child.tab}
+                      to={`${item.to}?tab=${child.tab}`}
+                      className={`app-nav-sub__link${(tabParam ?? siblings[0].tab) === child.tab ? " app-nav-sub__link--active" : ""}`}
+                    >
+                      {child.label}
+                    </Link>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          ))}
         </div>
       ))}
     </>
@@ -99,11 +133,11 @@ export function AppShell({
           <Link to="/">SiGula</Link>
         </div>
         <nav className="app-sidebar__nav">
-          <NavItems role={user.role} />
+          <NavItems user={user} />
         </nav>
         <div className="app-sidebar__user">
           <div className="text-sm font-medium">{user.displayName}</div>
-          <div className="text-xs text-slate-500 capitalize">{user.role}</div>
+          <div className="text-xs text-slate-500">{user.roleNames.join(" · ") || "Tanpa role"}</div>
           <Form method="post" action="/logout" className="mt-2">
             <button type="submit" className="btn btn-ghost btn-sm w-full">
               Keluar
@@ -123,7 +157,7 @@ export function AppShell({
                 const details = (e.currentTarget.closest("details") as HTMLDetailsElement | null);
                 if (details) details.open = false;
               }}>
-                <NavItems role={user.role} />
+                <NavItems user={user} />
               </nav>
               <div className="mt-3 border-t border-slate-100 pt-3">
                 <div className="text-sm font-medium">{user.displayName}</div>
@@ -177,8 +211,11 @@ export function StatTile({
 }) {
   return (
     <div className={`stat-tile${tone ? ` stat-tile--${tone}` : ""}`}>
+      <div className="stat-tile__label">
+        <span className="stat-tile__dot" aria-hidden />
+        {label}
+      </div>
       <div className="stat-tile__value">{value}</div>
-      <div className="stat-tile__label">{label}</div>
     </div>
   );
 }

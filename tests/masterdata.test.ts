@@ -3,7 +3,10 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 
 import { db } from "~/db/client.server";
-import { customers, mutationLogs, salesmen, statusLogs, users } from "~/db/schema";
+import { alive, customerStatusHistory, customers, salesmen, users } from "~/db/schema";
+import { listAssignmentMovesPage } from "~/lib/customer-history.server";
+import { migrateDatabase } from "~/db/migrate.server";
+import { sqlite } from "~/db/client.server";
 import {
   clampCycleDays,
   deleteCustomersMany,
@@ -12,10 +15,12 @@ import {
   reactivateCustomer,
   reassignCustomer,
   salesmenWithStats,
+  updateCustomer,
 } from "~/lib/masterdata.server";
 
 import {
   addCustomer,
+  assignmentHistory,
   getCustomer,
   resetDb,
   seedOrg,
@@ -33,7 +38,7 @@ describe("clampCycleDays (BR-6)", () => {
 describe("reassignCustomer (FR-12)", () => {
   beforeEach(() => resetDb());
 
-  it("moves customer and appends MutationLog", async () => {
+  it("moves customer and closes/opens its assignment history", async () => {
     const { salesman, salesmanB, admin } = await seedOrg();
     const c = addCustomer({ salesmanId: salesman.id, nama: "Toko" });
 
@@ -44,11 +49,15 @@ describe("reassignCustomer (FR-12)", () => {
     });
 
     expect(getCustomer(c.id).salesmanId).toBe(salesmanB.id);
-    const logs = db.select().from(mutationLogs).all();
-    expect(logs).toHaveLength(1);
-    expect(logs[0].dariSalesmanId).toBe(salesman.id);
-    expect(logs[0].keSalesmanId).toBe(salesmanB.id);
-    expect(logs[0].olehId).toBe(admin.id);
+    const history = assignmentHistory(c.id);
+    expect(history).toHaveLength(2);
+    expect(history[0].salesmanId).toBe(salesman.id);
+    expect(history[0].validTo).toBe(history[1].validFrom);
+    expect(history[1].salesmanId).toBe(salesmanB.id);
+    expect(history[1].validTo).toBeNull();
+    expect(history[1].assignedById).toBe(admin.id);
+    const [move] = listAssignmentMovesPage(1, 10).rows;
+    expect([move.fromSalesmanId, move.toSalesmanId]).toEqual([salesman.id, salesmanB.id]);
   });
 
   it("rejects reassignment to the current salesman", async () => {
@@ -67,7 +76,7 @@ describe("reassignCustomer (FR-12)", () => {
 describe("reactivateCustomer (FR-11)", () => {
   beforeEach(() => resetDb());
 
-  it("reactivates Inactive and logs manual_reactivation", async () => {
+  it("reactivates Inactive and records the transition", async () => {
     const { salesman, admin } = await seedOrg();
     const c = addCustomer({
       salesmanId: salesman.id,
@@ -78,10 +87,13 @@ describe("reactivateCustomer (FR-11)", () => {
     expect(getCustomer(c.id).statusCustomer).toBe("aktif");
     const logs = db
       .select()
-      .from(statusLogs)
-      .where(eq(statusLogs.customerId, c.id))
+      .from(customerStatusHistory)
+      .where(eq(customerStatusHistory.customerId, c.id))
       .all();
-    expect(logs[0].tipe).toBe("manual_reactivation");
+    expect(logs).toHaveLength(1);
+    expect([logs[0].fromStatus, logs[0].toStatus]).toEqual(["inactive", "aktif"]);
+    expect(logs[0].reason).toBe("manual_reactivation");
+    expect(logs[0].changedById).toBe(admin.id);
   });
 
   it("rejects reactivation of an already-active customer", async () => {
@@ -107,7 +119,7 @@ describe("salesmenWithStats", () => {
       salesmanId: salesman.id,
       nama: "Pending",
       lastOrderDate: "2026-01-01",
-      notified: true,
+      pending: true,
     });
     addCustomer({
       salesmanId: salesman.id,
@@ -127,7 +139,7 @@ describe("salesmenWithStats", () => {
 describe("deleteCustomersMany", () => {
   beforeEach(() => resetDb());
 
-  it("deletes every listed customer", async () => {
+  it("soft-deletes every listed customer", async () => {
     const { salesman } = await seedOrg();
     const c1 = addCustomer({ salesmanId: salesman.id, nama: "Toko A" });
     const c2 = addCustomer({ salesmanId: salesman.id, nama: "Toko B" });
@@ -135,8 +147,12 @@ describe("deleteCustomersMany", () => {
 
     deleteCustomersMany([c1.id, c3.id]);
 
-    const remaining = db.select().from(customers).all();
-    expect(remaining.map((c) => c.id)).toEqual([c2.id]);
+    const live = db.select().from(customers).where(alive(customers)).all();
+    expect(live.map((c) => c.id)).toEqual([c2.id]);
+    // The rows are still there — that is what makes them restorable.
+    expect(db.select().from(customers).all()).toHaveLength(3);
+    // History is a log: it is never removed with the customer.
+    expect(assignmentHistory(c1.id)).toHaveLength(1);
   });
 });
 
@@ -148,7 +164,7 @@ describe("deleteSalesmenMany", () => {
 
     deleteSalesmenMany([salesmanB.id]);
 
-    const remaining = db.select().from(salesmen).all();
+    const remaining = db.select().from(salesmen).where(alive(salesmen)).all();
     expect(remaining.map((s) => s.id).sort()).toEqual(
       [salesman.id, supervisor.id].sort(),
     );
@@ -162,7 +178,7 @@ describe("deleteSalesmenMany", () => {
       /masih punya 1 customer/,
     );
 
-    const ids = db.select().from(salesmen).all().map((s) => s.id);
+    const ids = db.select().from(salesmen).where(alive(salesmen)).all().map((s) => s.id);
     expect(ids).toContain(salesman.id);
     expect(ids).toContain(salesmanB.id);
   });
@@ -176,7 +192,7 @@ describe("deleteUsersMany", () => {
 
     deleteUsersMany([salesmanUser.id], admin.id);
 
-    const remaining = db.select().from(users).all();
+    const remaining = db.select().from(users).where(alive(users)).all();
     expect(remaining.map((u) => u.id)).toEqual([admin.id]);
   });
 
@@ -187,7 +203,46 @@ describe("deleteUsersMany", () => {
       /akun sendiri/,
     );
 
-    const remaining = db.select().from(users).all();
+    const remaining = db.select().from(users).where(alive(users)).all();
     expect(remaining).toHaveLength(2);
+  });
+});
+
+describe("updateCustomer status changes", () => {
+  beforeEach(() => resetDb());
+
+  it("records a manual inactive/reactivation made through the edit form, and only real changes", async () => {
+    const { salesman, admin } = await seedOrg();
+    const c = addCustomer({ salesmanId: salesman.id, nama: "Toko" });
+    const edit = (statusCustomer: "aktif" | "inactive") =>
+      updateCustomer({
+        id: c.id, nama: "Toko", salesmanId: salesman.id, tipeCustomer: "lama",
+        statusCustomer, orderCycleDays: 30, actingUserId: admin.id,
+      });
+
+    edit("aktif"); // no change
+    edit("inactive");
+    edit("aktif");
+
+    const rows = db
+      .select()
+      .from(customerStatusHistory)
+      .where(eq(customerStatusHistory.customerId, c.id))
+      .all();
+    expect(rows.map((r) => `${r.fromStatus}>${r.toStatus}:${r.reason}`)).toEqual([
+      "aktif>inactive:manual_inactive",
+      "inactive>aktif:manual_reactivation",
+    ]);
+  });
+});
+
+describe("migrateDatabase() on an already-migrated database", () => {
+  it("does not resurrect the retired legacy tables or the old unique index", () => {
+    resetDb();
+    migrateDatabase(sqlite); // what every later boot does
+    const names = (sqlite
+      .prepare("SELECT name FROM sqlite_master WHERE name IN ('mutation_logs', 'status_logs', 'unique_customer_name_per_salesman')")
+      .all() as { name: string }[]).map((r) => r.name);
+    expect(names).toEqual([]);
   });
 });

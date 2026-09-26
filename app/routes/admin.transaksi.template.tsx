@@ -1,12 +1,12 @@
 import type { Route } from "./+types/admin.transaksi.template";
-import { requireRole } from "~/lib/auth.server";
+import { requirePermission } from "~/lib/auth.server";
+import { PERM } from "~/lib/permissions";
 import { buildImportTemplate } from "~/lib/imports.server";
-import { db } from "~/db/client.server";
-import { salesmen } from "~/db/schema";
+import { listLiveSalesmen } from "~/lib/masterdata.server";
 
 export async function loader({ request }: Route.LoaderArgs) {
-  await requireRole(request, "admin");
-  const first = db.select().from(salesmen).all()[0];
+  await requirePermission(request, PERM.transaksiManage);
+  const first = listLiveSalesmen()[0];
   const buf = await buildImportTemplate({
     exampleSheetName: first?.nama,
   });

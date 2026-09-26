@@ -1,9 +1,13 @@
+import crypto from "node:crypto";
+
 import ExcelJS from "exceljs";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 
 import { db } from "~/db/client.server";
-import { customers, salesmen } from "~/db/schema";
+import { alive, customers, importBatches, salesmen } from "~/db/schema";
 import { logActivity, snapshotChanges } from "~/lib/activity.server";
+import { insertCustomer, listLiveSalesmen } from "~/lib/masterdata.server";
+import { salesmanName } from "~/lib/names.server";
 import { recordOrder } from "~/lib/orders.server";
 
 const HEADER_NAME = "Nama Konsumen";
@@ -140,7 +144,7 @@ export async function parsePreview(
   buffer: ArrayBuffer | Buffer,
 ): Promise<ImportPreview> {
   const workbook = await loadWorkbook(buffer);
-  const allSalesmen = db.select().from(salesmen).all();
+  const allSalesmen = listLiveSalesmen();
   const byName = new Map(
     allSalesmen.map((s) => [s.nama.trim().toUpperCase(), s]),
   );
@@ -182,8 +186,10 @@ export async function parsePreview(
         .from(customers)
         .where(
           and(
-            eq(customers.nama, row.nama),
+            alive(customers),
             eq(customers.salesmanId, salesman.id),
+            // Same customer if the names differ only by case (the DB enforces it too).
+            sql`lower(${customers.nama}) = lower(${row.nama})`,
           ),
         )
         .get();
@@ -224,11 +230,30 @@ export async function confirmImport(opts: {
   buffer: ArrayBuffer | Buffer;
   actingUserId: number;
   treatUnknownSheetsAsNewSalesman: boolean;
+  /** Name of the uploaded file, kept on the `import_batches` row. */
+  fileName?: string;
 }): Promise<ImportResult> {
   const preview = await parsePreview(opts.buffer);
   if (preview.unknownSheets.length > 0 && !opts.treatUnknownSheetsAsNewSalesman) {
     throw new UnresolvedSheetsError(preview.unknownSheets);
   }
+
+  const fileBytes = Buffer.isBuffer(opts.buffer) ? opts.buffer : Buffer.from(opts.buffer);
+  // Every transaksi this import writes points back at one batch (where did it come from?).
+  // DEBT-016: the file's hash is kept but a repeated upload of the same file is not flagged.
+  const batch =
+    preview.newCustomers.length + preview.updatedCustomers.length > 0
+      ? db
+          .insert(importBatches)
+          .values({
+            fileName: opts.fileName || "import.xlsx",
+            fileSha256: crypto.createHash("sha256").update(fileBytes).digest("hex"),
+            importedById: opts.actingUserId,
+          })
+          .returning()
+          .get()
+      : null;
+  let orderRows = 0;
 
   const newSalesmen: string[] = [];
   const sheetToSalesmanId = new Map<string, number>();
@@ -259,19 +284,17 @@ export async function confirmImport(opts: {
     if (salesmanId == null) {
       salesmanId = sheetToSalesmanId.get(row.sheetName)!;
     }
-    const created = db
-      .insert(customers)
-      .values({
+    const created = insertCustomer(
+      {
         nama: row.nama,
         salesmanId,
         tipeCustomer: row.tipeCustomer,
         orderCycleDays: 30,
         statusCustomer: "aktif",
         lastOrderDate: null,
-        notified: false,
-      })
-      .returning()
-      .get();
+      },
+      opts.actingUserId,
+    );
     logActivity({
       entityType: "customer",
       entityId: created.id,
@@ -282,8 +305,7 @@ export async function confirmImport(opts: {
         {
           nama: created.nama,
           salesman:
-            db.select({ n: salesmen.nama }).from(salesmen).where(eq(salesmen.id, salesmanId)).get()
-              ?.n ?? `#${salesmanId}`,
+            salesmanName(salesmanId),
           tipe_customer: created.tipeCustomer,
           order_cycle_days: created.orderCycleDays,
           status_customer: created.statusCustomer,
@@ -297,7 +319,9 @@ export async function confirmImport(opts: {
         actingUserId: opts.actingUserId,
         tanggalOrder: row.lastOrderDate,
         sumber: "import",
+        importBatchId: batch?.id,
       });
+      orderRows += 1;
     }
     newCount += 1;
   }
@@ -308,8 +332,14 @@ export async function confirmImport(opts: {
       actingUserId: opts.actingUserId,
       tanggalOrder: row.newDate,
       sumber: "import",
+      importBatchId: batch?.id,
     });
+    orderRows += 1;
     updatedCount += 1;
+  }
+
+  if (batch) {
+    db.update(importBatches).set({ rowCount: orderRows }).where(eq(importBatches.id, batch.id)).run();
   }
 
   return {

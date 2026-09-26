@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { db } from "~/db/client.server";
-import { activityLogs, customers, users } from "~/db/schema";
-import { eq } from "drizzle-orm";
-import { diffChanges, listActivityFor, listRecentActivity, logActivity } from "~/lib/activity.server";
+import { activityLogs, alive, customers, users } from "~/db/schema";
+import { and, eq } from "drizzle-orm";
+import { diffChanges, logActivity } from "~/lib/activity.server";
 import {
   createCustomer,
   createSalesman,
@@ -24,9 +24,9 @@ import {
 import ExcelJS from "exceljs";
 
 import { confirmImport } from "~/lib/imports.server";
-import { submitReason } from "~/lib/reminders.server";
+import { submitReason } from "~/lib/follow-ups.server";
 
-import { addCustomer, resetDb, seedOrg } from "./helpers/fixtures";
+import { addCustomer, logsFor, recentLogs, resetDb, seedOrg } from "./helpers/fixtures";
 
 describe("activity log", () => {
   beforeEach(() => resetDb());
@@ -72,7 +72,7 @@ describe("activity log", () => {
     });
     deleteTransaksi(row.id, admin.id);
 
-    const trail = listActivityFor("transaksi", row.id);
+    const trail = logsFor("transaksi", row.id);
     expect(trail.map((t) => t.action)).toEqual(["delete", "update", "create"]);
     expect(trail.every((t) => t.actorName === "Admin")).toBe(true);
 
@@ -105,7 +105,7 @@ describe("activity log", () => {
       actingUserId: admin.id,
     });
 
-    const [update, create] = listActivityFor("customer", c.id);
+    const [update, create] = logsFor("customer", c.id);
     expect(create.action).toBe("create");
     expect(update.action).toBe("update");
     expect(update.changes).toEqual({
@@ -125,8 +125,10 @@ describe("activity log", () => {
     });
     deleteCustomerRecord(c.id, admin.id);
 
-    expect(db.select().from(customers).where(eq(customers.id, c.id)).all()).toHaveLength(0);
-    const del = listActivityFor("customer", c.id)[0];
+    expect(
+      db.select().from(customers).where(and(eq(customers.id, c.id), alive(customers))).all(),
+    ).toHaveLength(0);
+    const del = logsFor("customer", c.id)[0];
     expect(del.action).toBe("delete");
     expect(del.entityLabel).toBe("Toko C");
     expect(del.changes.transaksi_terhapus).toEqual({ from: 1, to: null });
@@ -144,7 +146,7 @@ describe("activity log", () => {
       actingUserId: admin.id,
     });
     void salesman;
-    const update = listActivityFor("salesman", s.id)[0];
+    const update = logsFor("salesman", s.id)[0];
     expect(update.changes).toEqual({
       nomor_wa: { from: null, to: "6299" },
       supervisor: { from: null, to: "Budi Supervisor" },
@@ -157,21 +159,22 @@ describe("activity log", () => {
       username: "nina",
       displayName: "Nina",
       password: "rahasia-banget",
-      role: "admin",
+      roles: ["admin"],
       actingUserId: admin.id,
     });
     await updateUserAccount({
       id: u.id,
       displayName: "Nina B",
       password: "lebih-rahasia",
-      role: "admin",
+      roles: ["admin"],
+      isActive: true,
       actingUserId: admin.id,
     });
 
     const raw = JSON.stringify(db.select().from(activityLogs).all());
     expect(raw).not.toContain("rahasia");
     expect(raw).not.toContain("passwordHash");
-    const update = listActivityFor("user", u.id)[0];
+    const update = logsFor("user", u.id)[0];
     expect(update.changes.password).toEqual({ from: null, to: "(diubah)" });
     expect(update.changes.display_name).toEqual({ from: "Nina", to: "Nina B" });
   });
@@ -181,22 +184,24 @@ describe("activity log", () => {
     const actor = await createUserAccount({
       username: "tmp",
       displayName: "Temp Admin",
-      password: "x",
-      role: "admin",
+      password: "password-x",
+      roles: ["admin"],
       actingUserId: admin.id,
     });
     const target = await createUserAccount({
       username: "target",
       displayName: "Target",
-      password: "x",
-      role: "admin",
+      password: "password-x",
+      roles: ["admin"],
       actingUserId: actor.id,
     });
     deleteUserAccount(target.id, actor.id);
     deleteUserAccount(actor.id, admin.id);
 
-    expect(db.select().from(users).where(eq(users.id, actor.id)).all()).toHaveLength(0);
-    const trail = listActivityFor("user", target.id);
+    expect(
+      db.select().from(users).where(and(eq(users.id, actor.id), alive(users))).all(),
+    ).toHaveLength(0);
+    const trail = logsFor("user", target.id);
     expect(trail.map((t) => t.action)).toEqual(["delete", "create"]);
     expect(trail[0].actorName).toBe("Temp Admin"); // snapshot, not a live join
   });
@@ -211,24 +216,45 @@ describe("activity log", () => {
       actingUserId: admin.id,
     });
     createSalesman({ nama: "Q", actingUserId: admin.id });
-    const recent = listRecentActivity(10);
+    const recent = recentLogs(10);
     expect(recent.map((r) => r.entityType)).toEqual(["salesman", "customer"]);
   });
 
-  it('reason code "bangkrut" logs the customer going inactive; other codes log nothing', async () => {
+  it("logs every reason a salesman gives on the customer, with who gave it", async () => {
     const { salesman, salesmanUser } = await seedOrg();
-    const c1 = addCustomer({ salesmanId: salesman.id, nama: "Bangkrut" });
-    const c2 = addCustomer({ salesmanId: salesman.id, nama: "MasihAda" });
+    const c = addCustomer({ salesmanId: salesman.id, nama: "MasihAda" });
 
-    submitReason({ customerId: c2.id, kodeAlasan: "2", actingUserId: salesmanUser.id });
-    submitReason({ customerId: c1.id, kodeAlasan: "3", actingUserId: salesmanUser.id });
-    submitReason({ customerId: c1.id, kodeAlasan: "3", actingUserId: salesmanUser.id }); // already inactive
+    submitReason({ customerId: c.id, kodeAlasan: "2", actingUserId: salesmanUser.id });
 
-    expect(listActivityFor("customer", c2.id)).toHaveLength(0);
-    const trail = listActivityFor("customer", c1.id);
+    const trail = logsFor("customer", c.id);
     expect(trail).toHaveLength(1);
-    expect(trail[0].changes.status_customer).toEqual({ from: "aktif", to: "inactive" });
+    expect(trail[0].action).toBe("update");
     expect(trail[0].actorName).toBe("Andi");
+    expect(trail[0].changes).toEqual({ alasan_keterlambatan: { from: null, to: "Stok Masih Ada" } });
+  });
+
+  it("a reason that deactivates the customer logs the status change in the same entry", async () => {
+    const { salesman, salesmanUser } = await seedOrg();
+    const c = addCustomer({ salesmanId: salesman.id, nama: "Bangkrut" });
+
+    submitReason({ customerId: c.id, kodeAlasan: "3", actingUserId: salesmanUser.id });
+    submitReason({ customerId: c.id, kodeAlasan: "3", actingUserId: salesmanUser.id }); // already inactive
+
+    const trail = logsFor("customer", c.id); // newest first
+    expect(trail).toHaveLength(2);
+    expect(trail[1].changes).toEqual({
+      alasan_keterlambatan: { from: null, to: "Sudah Bangkrut" },
+      status_customer: { from: "aktif", to: "inactive" },
+    });
+    expect(trail[0].changes).toEqual({ alasan_keterlambatan: { from: null, to: "Sudah Bangkrut" } });
+  });
+
+  it("logs nothing when the reason is rejected", async () => {
+    const { salesman, salesmanUser } = await seedOrg();
+    const c = addCustomer({ salesmanId: salesman.id, nama: "Toko" });
+
+    expect(() => submitReason({ customerId: c.id, kodeAlasan: "9", actingUserId: salesmanUser.id })).toThrow();
+    expect(logsFor("customer", c.id)).toHaveLength(0);
   });
 
   it("Excel import logs the customers and salesmen it creates, and the transaksi via recordOrder", async () => {
@@ -245,7 +271,7 @@ describe("activity log", () => {
       treatUnknownSheetsAsNewSalesman: true,
     });
 
-    const all = listRecentActivity(20);
+    const all = recentLogs(20);
     const kinds = all.map((a) => `${a.entityType}:${a.action}`).sort();
     expect(kinds).toEqual(["customer:create", "salesman:create", "transaksi:create"]);
     expect(all.every((a) => a.actorName === "Admin")).toBe(true);

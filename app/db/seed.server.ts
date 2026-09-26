@@ -2,22 +2,29 @@ import { eq } from "drizzle-orm";
 
 import { hashPassword } from "~/lib/auth.server";
 import { db, sqlite } from "~/db/client.server";
-import { migrate } from "~/db/migrate.server";
-import {
-  customers,
-  profiles,
-  salesmen,
-  users,
-} from "~/db/schema";
+import { customers, salesmen, users } from "~/db/schema";
+import { setWhatsappNumber } from "~/lib/contacts.server";
 import { todayIso } from "~/lib/dates";
+import { assertPasswordAcceptable, insertCustomer } from "~/lib/masterdata.server";
+import { roleIdsByCode, setUserRoles } from "~/lib/roles.server";
 import { recordOrder } from "~/lib/orders.server";
 
 let seedPromise: Promise<{ seeded: boolean }> | null = null;
 
-/** Demo seed — password for every role: `sigula123` */
+/**
+ * First boot on an empty database. Outside production: a demo organisation whose four accounts
+ * share the published password `sigula123`. **In production none of that**: demo accounts with a
+ * public password must never exist there, so an empty production database gets one administrator,
+ * and only if the operator supplies the password (`ADMIN_PASSWORD`, optionally `ADMIN_USERNAME`);
+ * without it nothing is seeded and the log says why.
+ */
 export async function seedIfEmpty() {
   if (!seedPromise) {
-    seedPromise = runSeed().catch((err) => {
+    seedPromise = seedDatabase({
+      production: process.env.NODE_ENV === "production",
+      adminUsername: process.env.ADMIN_USERNAME,
+      adminPassword: process.env.ADMIN_PASSWORD,
+    }).catch((err) => {
       seedPromise = null;
       throw err;
     });
@@ -25,9 +32,51 @@ export async function seedIfEmpty() {
   return seedPromise;
 }
 
-async function runSeed() {
-  migrate();
+export async function seedDatabase(opts: { production: boolean; adminUsername?: string; adminPassword?: string }) {
+  return opts.production ? seedFirstAdmin(opts) : runSeed();
+}
 
+/** The one account a production install starts with. Only when the database has no users at all. */
+async function seedFirstAdmin(opts: { adminUsername?: string; adminPassword?: string }) {
+  sqlite.exec("BEGIN IMMEDIATE");
+  try {
+    if (db.select().from(users).all().length > 0) {
+      sqlite.exec("COMMIT");
+      return { seeded: false };
+    }
+    const password = opts.adminPassword ?? "";
+    try {
+      assertPasswordAcceptable(password);
+    } catch (err) {
+      sqlite.exec("COMMIT");
+      console.error(
+        `[sigula] Database kosong dan tidak ada admin pertama: set ADMIN_PASSWORD (dan bila perlu ADMIN_USERNAME) lalu jalankan ulang. ${err instanceof Error ? err.message : ""}`,
+      );
+      return { seeded: false };
+    }
+    const user = db
+      .insert(users)
+      .values({
+        username: (opts.adminUsername ?? "").trim() || "admin",
+        passwordHash: await hashPassword(password),
+        displayName: "Administrator",
+      })
+      .returning()
+      .get();
+    setUserRoles(db, user.id, roleIdsByCode(["admin"]), null);
+    sqlite.exec("COMMIT");
+    return { seeded: true };
+  } catch (err) {
+    try {
+      sqlite.exec("ROLLBACK");
+    } catch {
+      /* ignore */
+    }
+    throw err;
+  }
+}
+
+async function runSeed() {
   // Serialize concurrent first-boot requests (root loader runs per request).
   sqlite.exec("BEGIN IMMEDIATE");
   try {
@@ -47,78 +96,40 @@ async function runSeed() {
     // ADR-0004: a supervisor is just a salesman with subordinates.
     const supervisor = db
       .insert(salesmen)
-      .values({ nama: "Budi Supervisor", nomorWa: "628111111111", status: "aktif" })
+      .values({ nama: "Budi Supervisor", status: "aktif" })
       .returning()
       .get();
+    setWhatsappNumber(supervisor.id, "628111111111");
 
     const salesman = db
       .insert(salesmen)
       .values({
         nama: "Andi Sales",
-        nomorWa: "628222222222",
         supervisorId: supervisor.id,
         status: "aktif",
       })
       .returning()
       .get();
+    setWhatsappNumber(salesman.id, "628222222222");
 
-    const adminUser = db
-      .insert(users)
-      .values({
-        username: "admin",
-        passwordHash,
-        displayName: "Admin SiGula",
-      })
-      .returning()
-      .get();
-    db.insert(profiles).values({ userId: adminUser.id, role: "admin" }).run();
-
-    const salesmanUser = db
-      .insert(users)
-      .values({
-        username: "salesman",
-        passwordHash,
-        displayName: "Andi Sales",
-      })
-      .returning()
-      .get();
-    db.insert(profiles)
-      .values({
-        userId: salesmanUser.id,
-        role: "salesman",
-        salesmanId: salesman.id,
-      })
-      .run();
-
-    const supervisorUser = db
-      .insert(users)
-      .values({
-        username: "supervisor",
-        passwordHash,
-        displayName: "Budi Supervisor",
-      })
-      .returning()
-      .get();
-    db.insert(profiles)
-      .values({
-        userId: supervisorUser.id,
-        role: "supervisor",
-        salesmanId: supervisor.id,
-      })
-      .run();
-
-    const managementUser = db
-      .insert(users)
-      .values({
-        username: "management",
-        passwordHash,
-        displayName: "Manajemen",
-      })
-      .returning()
-      .get();
-    db.insert(profiles)
-      .values({ userId: managementUser.id, role: "management" })
-      .run();
+    const makeUser = (
+      username: string,
+      displayName: string,
+      roleCode: string,
+      salesmanId: number | null = null,
+    ) => {
+      const user = db
+        .insert(users)
+        .values({ username, passwordHash, displayName, salesmanId })
+        .returning()
+        .get();
+      setUserRoles(db, user.id, roleIdsByCode([roleCode]), null);
+      return user;
+    };
+    const adminUser = makeUser("admin", "Admin SiGula", "admin");
+    makeUser("salesman", "Andi Sales", "salesman", salesman.id);
+    makeUser("supervisor", "Budi Supervisor", "supervisor", supervisor.id);
+    makeUser("management", "Manajemen", "management");
 
     const specs = [
       {
@@ -152,19 +163,17 @@ async function runSeed() {
     ];
 
     for (const s of specs) {
-      const c = db
-        .insert(customers)
-        .values({
+      const c = insertCustomer(
+        {
           nama: s.nama,
           salesmanId: salesman.id,
           tipeCustomer: s.tipe,
           orderCycleDays: s.cycle,
           statusCustomer: s.status,
           lastOrderDate: s.last,
-          notified: false,
-        })
-        .returning()
-        .get();
+        },
+        adminUser.id,
+      );
       if (s.last) {
         recordOrder({
           customerId: c.id,
@@ -174,7 +183,7 @@ async function runSeed() {
         });
         if (s.status === "inactive") {
           db.update(customers)
-            .set({ statusCustomer: "inactive", notified: false })
+            .set({ statusCustomer: "inactive" })
             .where(eq(customers.id, c.id))
             .run();
         }

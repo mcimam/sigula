@@ -14,6 +14,19 @@ import "./app.css";
 
 export const links: Route.LinksFunction = () => [];
 
+/**
+ * Headers on every page. No CSP yet (the framework's inline hydration script needs a nonce; DEBT-019).
+ * HSTS only in a production build, where the site is served over HTTPS behind Caddy, and without
+ * `includeSubDomains`: the other hosts under the same domain are not ours to pin.
+ */
+export const headers: Route.HeadersFunction = () => ({
+  "X-Content-Type-Options": "nosniff",
+  "X-Frame-Options": "DENY",
+  "Referrer-Policy": "strict-origin-when-cross-origin",
+  "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+  ...(import.meta.env.PROD ? { "Strict-Transport-Security": "max-age=15552000" } : {}),
+});
+
 export async function loader() {
   await seedIfEmpty();
   ensureCronScheduler();

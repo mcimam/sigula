@@ -1,7 +1,8 @@
 import { data } from "react-router";
 
 import type { Route } from "./+types/admin.settings.waha-session";
-import { requireRole } from "~/lib/auth.server";
+import { requirePermission } from "~/lib/auth.server";
+import { PERM } from "~/lib/permissions";
 import {
   getWahaSessionView,
   loginWahaSession,
@@ -19,7 +20,7 @@ export const headers: Route.HeadersFunction = () => NO_STORE.headers;
 
 /** Status poll for `WahaSessionCard`: the session view plus, while waiting for a scan, its QR. */
 export async function loader({ request }: Route.LoaderArgs) {
-  await requireRole(request, "admin");
+  await requirePermission(request, PERM.settingsManage);
   const result: WahaSessionResult = {
     view: await getWahaSessionView(),
     error: null,
@@ -28,7 +29,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 }
 
 export async function action({ request }: Route.ActionArgs) {
-  await requireRole(request, "admin");
+  await requirePermission(request, PERM.settingsManage);
   const form = await request.formData();
   const intent = String(form.get("intent") ?? "");
 

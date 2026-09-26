@@ -7,14 +7,14 @@ import {
 
 const TTL_MS = 30 * 60 * 1000;
 
-const uploads = new Map<string, { buffer: Buffer; expires: number }>(); // DEBT-006
+const uploads = new Map<string, { buffer: Buffer; fileName: string; expires: number }>(); // DEBT-006
 
 /** A message that is safe to show to the user as-is. Anything else is a 500. */
 export class UploadError extends Error {}
 
-function storeUpload(buffer: Buffer) {
+function storeUpload(buffer: Buffer, fileName: string) {
   const token = crypto.randomUUID();
-  uploads.set(token, { buffer, expires: Date.now() + TTL_MS });
+  uploads.set(token, { buffer, fileName, expires: Date.now() + TTL_MS });
   for (const [k, v] of uploads) {
     if (v.expires < Date.now()) uploads.delete(k);
   }
@@ -26,7 +26,7 @@ function takeUpload(token: string) {
   const entry = uploads.get(token);
   uploads.delete(token);
   if (!entry || entry.expires < Date.now()) return null;
-  return entry.buffer;
+  return { buffer: entry.buffer, fileName: entry.fileName };
 }
 
 /**
@@ -49,7 +49,7 @@ export async function handleUpload<P, R>(
   form: FormData,
   handlers: {
     parse: (buffer: Buffer) => Promise<P>;
-    confirm: (buffer: Buffer, form: FormData) => Promise<R>;
+    confirm: (buffer: Buffer, form: FormData, file: { fileName: string }) => Promise<R>;
     maxBytes?: number;
     unreadableMessage?: string;
   },
@@ -81,14 +81,14 @@ export async function handleUpload<P, R>(
               "File tidak bisa dibaca. Pastikan formatnya valid dan sesuai template."),
       };
     }
-    return { preview, token: storeUpload(buffer) };
+    return { preview, token: storeUpload(buffer, file.name) };
   }
 
   if (intent === UPLOAD_INTENT.confirm) {
-    const buffer = takeUpload(token);
-    if (!buffer) return { error: "Preview kedaluwarsa — upload ulang." };
+    const upload = takeUpload(token);
+    if (!upload) return { error: "Preview kedaluwarsa — upload ulang." };
     try {
-      return { result: await handlers.confirm(buffer, form) };
+      return { result: await handlers.confirm(upload.buffer, form, { fileName: upload.fileName }) };
     } catch (err) {
       if (err instanceof UploadError) return { error: err.message };
       throw err;

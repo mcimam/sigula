@@ -5,11 +5,15 @@ import {
   canLogout,
   describeSessionState,
   type WahaSessionResult,
-  type WahaSessionState,
   type WahaSessionView,
 } from "~/lib/waha-session";
 
-export type WahaSendResult = { ok: boolean; errorMessage?: string };
+export type WahaSendResult = {
+  ok: boolean;
+  errorMessage?: string;
+  /** WAHA's id for the sent message, when it returned one. */
+  messageId?: string;
+};
 
 export type WahaClient = {
   sendText: (nomorWa: string, text: string) => Promise<WahaSendResult>;
@@ -63,7 +67,7 @@ export function createWahaClient(overrides?: {
             errorMessage: `WAHA returned ${res.status}: ${res.statusText}`,
           };
         }
-        return { ok: true };
+        return { ok: true, messageId: await readMessageId(res) };
       } catch (err) {
         const reason = err instanceof Error ? err.message : String(err);
         return { ok: false, errorMessage: `WAHA unreachable: ${reason}` };
@@ -72,6 +76,43 @@ export function createWahaClient(overrides?: {
       }
     },
   };
+}
+
+/** WAHA answers a send with the message; its id is a string or `{ _serialized }`. Best effort — never fails the send. */
+async function readMessageId(res: Response): Promise<string | undefined> {
+  try {
+    const body = (await res.json()) as { id?: unknown };
+    if (typeof body?.id === "string") return body.id;
+    const serialized = (body?.id as { _serialized?: unknown } | undefined)?._serialized;
+    return typeof serialized === "string" ? serialized : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * WhatsApp sometimes shows a sender as an anonymous `<n>@lid` instead of `<phone>@c.us`.
+ * WAHA can map it back (`GET /api/{session}/lids/{lid}` → `{ lid, pn }`); `pn` is null when it
+ * does not know. Returns the phone number's digits, or null — never throws.
+ */
+export async function lookupPhoneByLid(lid: string): Promise<string | null> {
+  const { baseUrl, session, apiKey, timeoutMs } = getWahaSettings();
+  if (!baseUrl) return null;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(`${baseUrl.replace(/\/$/, "")}/api/${encodeURIComponent(session)}/lids/${encodeURIComponent(lid)}`, {
+      headers: apiKey ? { "X-Api-Key": apiKey } : {},
+      signal: controller.signal,
+    });
+    if (!res.ok) return null;
+    const body = (await res.json()) as { pn?: unknown };
+    return typeof body.pn === "string" ? body.pn.replace(/\D/g, "") || null : null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 /** Ping WAHA — list sessions if available, else root reachability. */

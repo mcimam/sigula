@@ -1,15 +1,9 @@
 import ExcelJS from "exceljs";
-import { eq, inArray } from "drizzle-orm";
 
-import { db } from "~/db/client.server";
-import {
-  customers,
-  reasonLogs,
-  REASON_LABELS,
-  salesmen,
-} from "~/db/schema";
-import { daysSinceOrder, isOverdue, todayIso } from "~/lib/dates";
-import { subordinateIds } from "~/lib/masterdata.server";
+import { daysSinceOrder } from "~/lib/dates";
+import { followUpCountBySalesman, reasonCounts } from "~/lib/follow-ups.server";
+import { liveCustomersOf, salesmenWithStats } from "~/lib/masterdata.server";
+import { pendingCustomerIds } from "~/lib/pending.server";
 
 async function workbookBuffer(wb: ExcelJS.Workbook) {
   const buf = await wb.xlsx.writeBuffer();
@@ -17,12 +11,9 @@ async function workbookBuffer(wb: ExcelJS.Workbook) {
 }
 
 export async function buildSalesmanReminderReport(salesmanId: number) {
-  const list = db
-    .select()
-    .from(customers)
-    .where(eq(customers.salesmanId, salesmanId))
-    .all()
-    .filter((c) => c.notified)
+  const pending = pendingCustomerIds();
+  const list = liveCustomersOf(salesmanId)
+    .filter((c) => pending.has(c.id))
     .map((c) => ({
       ...c,
       days: daysSinceOrder(c.lastOrderDate) ?? Number.POSITIVE_INFINITY,
@@ -45,11 +36,7 @@ export async function buildSalesmanReminderReport(salesmanId: number) {
 
 /** `supervisorId` is the leading salesman; the team is every subordinate at any depth. */
 export async function buildSupervisorTeamReport(supervisorId: number) {
-  const teamIds = subordinateIds(supervisorId);
-  const team =
-    teamIds.length > 0
-      ? db.select().from(salesmen).where(inArray(salesmen.id, teamIds)).all()
-      : [];
+  const pending = pendingCustomerIds();
   const wb = new ExcelJS.Workbook();
   const summary = wb.addWorksheet("Ringkasan Salesman");
   summary.addRow(["Salesman", "Aktif", "Inactive", "Perlu follow-up"]);
@@ -63,21 +50,9 @@ export async function buildSupervisorTeamReport(supervisorId: number) {
     "Notified",
   ]);
 
-  for (const sm of team) {
-    const custs = db
-      .select()
-      .from(customers)
-      .where(eq(customers.salesmanId, sm.id))
-      .all();
-    const aktif = custs.filter((c) => c.statusCustomer === "aktif").length;
-    const inactive = custs.filter((c) => c.statusCustomer === "inactive").length;
-    const followUp = custs.filter(
-      (c) =>
-        c.statusCustomer === "aktif" &&
-        isOverdue(c.lastOrderDate, c.orderCycleDays),
-    ).length;
-    summary.addRow([sm.nama, aktif, inactive, followUp]);
-    for (const c of custs) {
+  for (const sm of salesmenWithStats(supervisorId)) {
+    summary.addRow([sm.nama, sm.aktif, sm.inactive, sm.followUp]);
+    for (const c of liveCustomersOf(sm.id)) {
       const days = daysSinceOrder(c.lastOrderDate);
       detail.addRow([
         sm.nama,
@@ -85,7 +60,7 @@ export async function buildSupervisorTeamReport(supervisorId: number) {
         c.statusCustomer,
         days ?? "belum pernah",
         c.orderCycleDays,
-        c.notified ? "ya" : "tidak",
+        pending.has(c.id) ? "ya" : "tidak",
       ]);
     }
   }
@@ -98,57 +73,27 @@ export async function buildManagementSummaryReport() {
   perSup.addRow(["Supervisor", "Salesman", "Aktif", "Perlu follow-up"]);
 
   // Direct reports only: every salesman appears under exactly one supervisor.
-  const allSalesmen = db.select().from(salesmen).all();
+  const allSalesmen = salesmenWithStats();
   const supervisorIds = new Set(
     allSalesmen.map((s) => s.supervisorId).filter((id): id is number => id != null),
   );
   for (const sup of allSalesmen.filter((s) => supervisorIds.has(s.id))) {
-    const team = allSalesmen.filter((s) => s.supervisorId === sup.id);
-    for (const sm of team) {
-      const custs = db
-        .select()
-        .from(customers)
-        .where(eq(customers.salesmanId, sm.id))
-        .all();
-      const aktif = custs.filter((c) => c.statusCustomer === "aktif").length;
-      const followUp = custs.filter(
-        (c) =>
-          c.statusCustomer === "aktif" &&
-          isOverdue(c.lastOrderDate, c.orderCycleDays),
-      ).length;
-      perSup.addRow([sup.nama, sm.nama, aktif, followUp]);
+    for (const sm of allSalesmen.filter((s) => s.supervisorId === sup.id)) {
+      perSup.addRow([sup.nama, sm.nama, sm.aktif, sm.followUp]);
     }
   }
 
   const perSm = wb.addWorksheet("Per Salesman");
   perSm.addRow(["Salesman", "Alasan Terinput (all-time)", "Customer Aktif"]);
-  for (const sm of db.select().from(salesmen).all()) {
-    const reasons = db
-      .select()
-      .from(reasonLogs)
-      .where(eq(reasonLogs.salesmanId, sm.id))
-      .all().length;
-    const aktif = db
-      .select()
-      .from(customers)
-      .where(eq(customers.salesmanId, sm.id))
-      .all()
-      .filter((c) => c.statusCustomer === "aktif").length;
-    perSm.addRow([sm.nama, reasons, aktif]);
+  const followUps = followUpCountBySalesman();
+  for (const sm of allSalesmen) {
+    perSm.addRow([sm.nama, followUps.get(sm.id) ?? 0, sm.aktif]);
   }
 
   const reasonsSheet = wb.addWorksheet("Alasan");
   reasonsSheet.addRow(["Kode", "Label", "Jumlah"]);
-  const allReasons = db.select().from(reasonLogs).all();
-  for (const code of ["1", "2", "3"] as const) {
-    reasonsSheet.addRow([
-      code,
-      REASON_LABELS[code],
-      allReasons.filter((r) => r.kodeAlasan === code).length,
-    ]);
-  }
+  for (const r of reasonCounts()) reasonsSheet.addRow([r.code, r.label, r.count]);
 
   return workbookBuffer(wb);
 }
 
-export { todayIso };

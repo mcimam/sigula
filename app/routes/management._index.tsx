@@ -2,24 +2,18 @@ import { useLoaderData, Link } from "react-router";
 
 import type { Route } from "./+types/management._index";
 import { AppShell, PageHeader, StatTile } from "~/components/AppShell";
-import { db } from "~/db/client.server";
-import { reasonLogs, REASON_LABELS } from "~/db/schema";
-import { requireRole } from "~/lib/auth.server";
+import { requirePermission } from "~/lib/auth.server";
+import { PERM } from "~/lib/permissions";
+import { reasonCounts } from "~/lib/follow-ups.server";
 import { supervisorsWithStats } from "~/lib/masterdata.server";
 
 export async function loader({ request }: Route.LoaderArgs) {
-  const user = await requireRole(request, "management");
+  const user = await requirePermission(request, PERM.managementRead);
   const supers = supervisorsWithStats();
-  const reasons = db.select().from(reasonLogs).all();
-  const reasonCounts = (["1", "2", "3"] as const).map((code) => ({
-    code,
-    label: REASON_LABELS[code],
-    count: reasons.filter((r) => r.kodeAlasan === code).length,
-  }));
   return {
     user,
     supers,
-    reasonCounts,
+    reasonCounts: reasonCounts(),
     totals: {
       followUp: supers.reduce((n, s) => n + s.followUp, 0),
       pending: supers.reduce((n, s) => n + s.pending, 0),
@@ -28,7 +22,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 }
 
 export default function ManagementDashboard() {
-  const { user, supers, reasonCounts, totals } = useLoaderData<typeof loader>();
+  const { user, supers, reasonCounts: reasons, totals } = useLoaderData<typeof loader>();
   return (
     <AppShell user={user}>
       <PageHeader
@@ -87,7 +81,7 @@ export default function ManagementDashboard() {
             </tr>
           </thead>
           <tbody>
-            {reasonCounts.map((r) => (
+            {reasons.map((r) => (
               <tr key={r.code}>
                 <td>{r.code}</td>
                 <td>{r.label}</td>

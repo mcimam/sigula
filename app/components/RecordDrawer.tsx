@@ -1,13 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Form, Link, useLocation, useNavigate, useSearchParams } from "react-router";
 
-import {
-  ACTION_LABELS,
-  fieldLabel,
-  formatStamp,
-  formatValue,
-  type ActivityItem,
-} from "~/lib/activity-format";
+import { ActivityFeed, type ActivityFeedProps } from "~/components/ActivityFeed";
 
 export type DrawerState = { mode: "new" } | { mode: "edit"; id: number } | null;
 
@@ -45,45 +39,6 @@ export type DrawerRemove = {
   disabledReason?: string;
 };
 
-function ActivityTimeline({ items }: { items: ActivityItem[] }) {
-  return (
-    <section className="drawer__activity" aria-labelledby="drawer-activity-title">
-      <h3 id="drawer-activity-title" className="drawer__activity-title">
-        Aktivitas
-      </h3>
-      {items.length === 0 ? (
-        <p className="drawer__empty">Belum ada aktivitas tercatat untuk record ini.</p>
-      ) : (
-        <ol className="activity-list">
-          {items.map((item) => (
-            <li key={item.id} className={`activity-list__item activity-list__item--${item.action}`}>
-              <div className="activity-list__head">
-                <strong>{ACTION_LABELS[item.action]}</strong>
-                <span> oleh {item.actorName || "sistem"}</span>
-                <time className="activity-list__time">{formatStamp(item.createdAt)}</time>
-              </div>
-              <ul className="activity-list__changes">
-                {Object.entries(item.changes).map(([key, change]) => (
-                  <li key={key}>
-                    <span className="activity-list__field">{fieldLabel(key)}</span>{" "}
-                    {item.action === "update" ? (
-                      <>
-                        <s>{formatValue(change.from)}</s> → <b>{formatValue(change.to)}</b>
-                      </>
-                    ) : (
-                      <b>{formatValue(item.action === "create" ? change.to : change.from)}</b>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </li>
-          ))}
-        </ol>
-      )}
-    </section>
-  );
-}
-
 export function RecordDrawer({
   title,
   subtitle,
@@ -91,6 +46,7 @@ export function RecordDrawer({
   submitLabel = "Simpan",
   activity,
   remove,
+  viewOnly = false,
   children,
 }: {
   title: string;
@@ -98,13 +54,15 @@ export function RecordDrawer({
   closeHref: string;
   submitLabel?: string;
   /** Existing records only — omit in create mode. */
-  activity?: ActivityItem[];
+  activity?: ActivityFeedProps;
   remove?: DrawerRemove;
+  /** A panel to read, not to edit: no form, no Simpan/Batal (e.g. a salesman's view of a customer). */
+  viewOnly?: boolean;
   children: ReactNode;
 }) {
   const navigate = useNavigate();
   const panelRef = useRef<HTMLElement>(null);
-  const [wide, setWide] = useState(false);
+  const [full, setFull] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -118,7 +76,9 @@ export function RecordDrawer({
 
   useEffect(() => {
     panelRef.current
-      ?.querySelector<HTMLElement>(".drawer__body input:not([type=hidden]), .drawer__body select")
+      ?.querySelector<HTMLElement>(
+        ".drawer__fields input:not([type=hidden]):not([readonly]), .drawer__fields select",
+      )
       ?.focus();
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -155,18 +115,28 @@ export function RecordDrawer({
     closeMenu();
   }
 
+  const body = (
+    <div className={`drawer__body${activity ? " drawer__body--split" : ""}`}>
+      <div className="drawer__fields">{children}</div>
+      {activity ? <ActivityFeed {...activity} /> : null}
+    </div>
+  );
+
   return (
     <div className="drawer-root">
-      <Link
-        to={closeHref}
-        preventScrollReset
-        className="drawer-backdrop"
-        aria-label="Tutup panel"
-        tabIndex={-1}
-      />
+      {/* Full page covers the screen, so there is nothing left to click on as a scrim. */}
+      {full ? null : (
+        <Link
+          to={closeHref}
+          preventScrollReset
+          className="drawer-backdrop"
+          aria-label="Tutup panel"
+          tabIndex={-1}
+        />
+      )}
       <aside
         ref={panelRef}
-        className={`drawer${wide ? " drawer--wide" : ""}`}
+        className={`drawer${full ? " drawer--full" : ""}`}
         role="dialog"
         aria-modal="true"
         aria-labelledby="drawer-title"
@@ -199,7 +169,7 @@ export function RecordDrawer({
                   <div className="drawer__menu" role="menu">
                     {confirming && remove ? (
                       <div className="drawer__confirm">
-                        <p>Hapus record ini? Tindakan tidak bisa dibatalkan.</p>
+                        <p>Hapus record ini? Record masuk ke daftar Terhapus dan bisa dipulihkan.</p>
                         <div className="drawer__confirm-actions">
                           <Form method="post">
                             <input type="hidden" name="intent" value={remove.intent} />
@@ -250,11 +220,12 @@ export function RecordDrawer({
             <button
               type="button"
               className="drawer__icon-btn"
-              aria-label={wide ? "Ciutkan panel" : "Perluas panel"}
-              aria-pressed={wide}
-              onClick={() => setWide((w) => !w)}
+              aria-label={full ? "Ciutkan ke panel samping" : "Perluas ke halaman penuh"}
+              title={full ? "Ciutkan ke panel samping" : "Perluas ke halaman penuh"}
+              aria-pressed={full}
+              onClick={() => setFull((f) => !f)}
             >
-              {wide ? "⤡" : "⤢"}
+              {full ? "⤡" : "⤢"}
             </button>
             <Link
               to={closeHref}
@@ -266,26 +237,37 @@ export function RecordDrawer({
             </Link>
           </div>
         </header>
-        <Form method="post" className="drawer__form">
-          <div className="drawer__body">
-            {children}
-            {activity ? <ActivityTimeline items={activity} /> : null}
-          </div>
-          <footer className="drawer__footer">
-            <Link to={closeHref} preventScrollReset className="btn btn-outline">
-              Batal
-            </Link>
-            <button type="submit" className="btn">
-              {submitLabel}
-            </button>
-          </footer>
-        </Form>
+        {viewOnly ? (
+          <div className="drawer__form">{body}</div>
+        ) : (
+          <Form method="post" className="drawer__form">
+            {body}
+            <footer className="drawer__footer">
+              <Link to={closeHref} preventScrollReset className="btn btn-outline">
+                Batal
+              </Link>
+              <button type="submit" className="btn">
+                {submitLabel}
+              </button>
+            </footer>
+          </Form>
+        )}
       </aside>
     </div>
   );
 }
 
-export function EditLink({ href }: { href: string }) {
+/** A value shown among the form fields that the user cannot change (and that is not submitted). */
+export function ReadonlyField({ id, label, value }: { id: string; label: string; value: string }) {
+  return (
+    <div className="form-field">
+      <label htmlFor={id}>{label}</label>
+      <input id={id} className="form-control" value={value} readOnly />
+    </div>
+  );
+}
+
+export function EditLink({ href, label = "Edit" }: { href: string; label?: string }) {
   return (
     <Link
       to={href}
@@ -293,7 +275,7 @@ export function EditLink({ href }: { href: string }) {
       className="btn btn-sm btn-outline"
       onClick={(e) => e.stopPropagation()}
     >
-      Edit
+      {label}
     </Link>
   );
 }
