@@ -1,5 +1,5 @@
 import ExcelJS from "exceljs";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 
 import { db } from "~/db/client.server";
 import {
@@ -7,9 +7,9 @@ import {
   reasonLogs,
   REASON_LABELS,
   salesmen,
-  supervisors,
 } from "~/db/schema";
 import { daysSinceOrder, isOverdue, todayIso } from "~/lib/dates";
+import { subordinateIds } from "~/lib/masterdata.server";
 
 async function workbookBuffer(wb: ExcelJS.Workbook) {
   const buf = await wb.xlsx.writeBuffer();
@@ -43,12 +43,13 @@ export async function buildSalesmanReminderReport(salesmanId: number) {
   return workbookBuffer(wb);
 }
 
+/** `supervisorId` is the leading salesman; the team is every subordinate at any depth. */
 export async function buildSupervisorTeamReport(supervisorId: number) {
-  const team = db
-    .select()
-    .from(salesmen)
-    .where(eq(salesmen.supervisorId, supervisorId))
-    .all();
+  const teamIds = subordinateIds(supervisorId);
+  const team =
+    teamIds.length > 0
+      ? db.select().from(salesmen).where(inArray(salesmen.id, teamIds)).all()
+      : [];
   const wb = new ExcelJS.Workbook();
   const summary = wb.addWorksheet("Ringkasan Salesman");
   summary.addRow(["Salesman", "Aktif", "Inactive", "Perlu follow-up"]);
@@ -96,13 +97,13 @@ export async function buildManagementSummaryReport() {
   const perSup = wb.addWorksheet("Per Supervisor");
   perSup.addRow(["Supervisor", "Salesman", "Aktif", "Perlu follow-up"]);
 
-  const allSupervisors = db.select().from(supervisors).all();
-  for (const sup of allSupervisors) {
-    const team = db
-      .select()
-      .from(salesmen)
-      .where(eq(salesmen.supervisorId, sup.id))
-      .all();
+  // Direct reports only: every salesman appears under exactly one supervisor.
+  const allSalesmen = db.select().from(salesmen).all();
+  const supervisorIds = new Set(
+    allSalesmen.map((s) => s.supervisorId).filter((id): id is number => id != null),
+  );
+  for (const sup of allSalesmen.filter((s) => supervisorIds.has(s.id))) {
+    const team = allSalesmen.filter((s) => s.supervisorId === sup.id);
     for (const sm of team) {
       const custs = db
         .select()

@@ -66,6 +66,9 @@ describe("Excel import (FR-18–FR-21, BR-7/BR-8)", () => {
     const preview = await parsePreview(buf);
     expect(preview.updatedCustomers).toHaveLength(1);
     expect(preview.updatedCustomers[0].nama).toBe("Toko Lama");
+    // The preview table names each row's salesman by its sheet.
+    expect(preview.updatedCustomers[0].sheetName).toBe("Andi Sales");
+    expect(preview.newCustomers[0].sheetName).toBe("Andi Sales");
     expect(preview.newCustomers).toHaveLength(1);
     expect(preview.newCustomers[0].nama).toBe("Toko Baru");
     expect(preview.unchangedCount).toBe(1);

@@ -2,6 +2,7 @@ import { Form, redirect, useActionData, useLoaderData, useNavigation } from "rea
 
 import type { Route } from "./+types/admin.settings";
 import { AppShell, PageHeader, StatusPill } from "~/components/AppShell";
+import { WahaSessionCard } from "~/components/WahaSessionCard";
 import { refreshCronScheduler } from "~/lib/cron.server";
 import { requireRole } from "~/lib/auth.server";
 import {
@@ -15,6 +16,17 @@ import {
 } from "~/lib/settings.server";
 import { testWahaConnection } from "~/lib/waha.server";
 
+const TAB_HEADER = {
+  waha: {
+    label: "Koneksi WAHA",
+    subtitle: "Koneksi dan sesi WhatsApp lewat WAHA",
+  },
+  cron: {
+    label: "Jadwal Cron",
+    subtitle: "Jadwal pengiriman batch otomatis",
+  },
+} as const;
+
 function settingsRedirect(message: string, tab?: string) {
   const params = new URLSearchParams({ flash: message });
   if (tab) params.set("tab", tab);
@@ -24,7 +36,8 @@ function settingsRedirect(message: string, tab?: string) {
 export async function loader({ request }: Route.LoaderArgs) {
   const user = await requireRole(request, "admin");
   const url = new URL(request.url);
-  const tab = url.searchParams.get("tab") === "cron" ? "cron" : "waha";
+  const tab: keyof typeof TAB_HEADER =
+    url.searchParams.get("tab") === "cron" ? "cron" : "waha";
   const waha = getWahaSettings();
   const cron = getCronSettings();
   return {
@@ -123,24 +136,9 @@ export default function AdminSettings() {
   return (
     <AppShell user={user} flash={flash}>
       <PageHeader
-        title="Pengaturan"
-        subtitle="Koneksi WAHA dan jadwal pengiriman batch otomatis"
+        title={`Pengaturan · ${TAB_HEADER[activeTab].label}`}
+        subtitle={TAB_HEADER[activeTab].subtitle}
       />
-
-      <div className="mb-6 flex flex-wrap gap-2">
-        <a
-          href="/admin/settings?tab=waha"
-          className={`btn btn-sm ${activeTab === "waha" ? "" : "btn-outline"}`}
-        >
-          Koneksi WAHA
-        </a>
-        <a
-          href="/admin/settings?tab=cron"
-          className={`btn btn-sm ${activeTab === "cron" ? "" : "btn-outline"}`}
-        >
-          Jadwal Cron
-        </a>
-      </div>
 
       {error ? (
         <div className="alert alert-danger mb-4" role="alert">
@@ -150,9 +148,6 @@ export default function AdminSettings() {
 
       {activeTab === "waha" ? (
         <div className="card max-w-2xl">
-          <h2 className="mb-4 text-lg font-semibold text-slate-800">
-            Koneksi WAHA
-          </h2>
           <p className="mb-4 text-sm text-slate-500">
             Nilai di sini disimpan di database aplikasi dan dipakai untuk semua
             pengiriman WhatsApp. Environment variable tetap menjadi fallback
@@ -239,9 +234,6 @@ export default function AdminSettings() {
         </div>
       ) : (
         <div className="card max-w-2xl">
-          <h2 className="mb-4 text-lg font-semibold text-slate-800">
-            Jadwal Cron
-          </h2>
           {/* DEBT-010: opt-in scheduled batch — contradicts ADR-0002 manual-only default */}
           <div className="alert alert-warn mb-4">
             Pengiriman otomatis meningkatkan risiko nomor WA di-rate-limit.
@@ -328,6 +320,8 @@ export default function AdminSettings() {
           </Form>
         </div>
       )}
+
+      {activeTab === "waha" ? <WahaSessionCard /> : null}
     </AppShell>
   );
 }

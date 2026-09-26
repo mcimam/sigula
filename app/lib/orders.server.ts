@@ -1,8 +1,36 @@
 import { desc, eq, max } from "drizzle-orm";
 
 import { db } from "~/db/client.server";
-import { customers, statusLogs, transaksi } from "~/db/schema";
+import { customers, salesmen, statusLogs, transaksi } from "~/db/schema";
+import { diffChanges, logActivity, snapshotChanges } from "~/lib/activity.server";
 import { isOverdue, todayIso } from "~/lib/dates";
+
+const customerName = (id: number) =>
+  db.select({ n: customers.nama }).from(customers).where(eq(customers.id, id)).get()?.n ??
+  `#${id}`;
+const salesmanName = (id: number) =>
+  db.select({ n: salesmen.nama }).from(salesmen).where(eq(salesmen.id, id)).get()?.n ??
+  `#${id}`;
+
+/** Human-readable field values for the activity trail (names, not ids). */
+function transaksiFields(row: {
+  customerId: number;
+  salesmanId: number;
+  tanggalOrder: string;
+  catatan: string | null;
+  sumber?: string;
+}) {
+  return {
+    customer: customerName(row.customerId),
+    salesman: salesmanName(row.salesmanId),
+    tanggal_order: row.tanggalOrder,
+    catatan: row.catatan,
+    ...(row.sumber ? { sumber: row.sumber } : {}),
+  };
+}
+
+const transaksiLabel = (row: { customerId: number; tanggalOrder: string }) =>
+  `${customerName(row.customerId)} · ${row.tanggalOrder}`;
 
 /** BR-2: Active + overdue (includes already-notified — dashboards use this). */
 export function computeEligibleCustomers(today = todayIso()) {
@@ -51,7 +79,7 @@ export function recordOrder(opts: {
   const tanggalOrder = opts.tanggalOrder ?? todayIso();
   const sumber = opts.sumber ?? "manual";
 
-  return db.transaction((tx) => {
+  const result = db.transaction((tx) => {
     const customer = tx
       .select()
       .from(customers)
@@ -62,7 +90,8 @@ export function recordOrder(opts: {
     const wasInactive = customer.statusCustomer === "inactive";
     const salesmanId = opts.salesmanId ?? customer.salesmanId;
 
-    tx.insert(transaksi)
+    const inserted = tx
+      .insert(transaksi)
       .values({
         customerId: customer.id,
         salesmanId,
@@ -70,7 +99,8 @@ export function recordOrder(opts: {
         sumber,
         catatan: opts.catatan ?? "",
       })
-      .run();
+      .returning()
+      .get();
 
     const latestRow = tx
       .select({ latest: max(transaksi.tanggalOrder) })
@@ -99,8 +129,37 @@ export function recordOrder(opts: {
         .run();
     }
 
-    return { customerId: customer.id, tanggalOrder, reactivated: wasInactive };
+    return {
+      customerId: customer.id,
+      tanggalOrder,
+      reactivated: wasInactive,
+      inserted,
+    };
   });
+
+  logActivity({
+    entityType: "transaksi",
+    entityId: result.inserted.id,
+    entityLabel: transaksiLabel(result.inserted),
+    action: "create",
+    actorId: opts.actingUserId,
+    changes: snapshotChanges(transaksiFields(result.inserted), "create"),
+  });
+  if (result.reactivated) {
+    logActivity({
+      entityType: "customer",
+      entityId: result.customerId,
+      entityLabel: customerName(result.customerId),
+      action: "update",
+      actorId: opts.actingUserId,
+      changes: { status_customer: { from: "inactive", to: "aktif" } },
+    });
+  }
+  return {
+    customerId: result.customerId,
+    tanggalOrder: result.tanggalOrder,
+    reactivated: result.reactivated,
+  };
 }
 
 export function listTransaksi(limit = 200) {
@@ -136,6 +195,7 @@ export function updateTransaksi(opts: {
   salesmanId: number;
   tanggalOrder: string;
   catatan?: string;
+  actingUserId?: number | null;
 }) {
   const existing = db
     .select()
@@ -145,6 +205,7 @@ export function updateTransaksi(opts: {
   if (!existing) throw new Error("Transaksi not found");
 
   const oldCustomerId = existing.customerId;
+  const before = transaksiFields(existing);
 
   db.update(transaksi)
     .set({
@@ -160,15 +221,42 @@ export function updateTransaksi(opts: {
   if (oldCustomerId !== opts.customerId) {
     syncCustomerLastOrderDate(oldCustomerId);
   }
+
+  const updated = db.select().from(transaksi).where(eq(transaksi.id, opts.id)).get()!;
+  logActivity({
+    entityType: "transaksi",
+    entityId: opts.id,
+    entityLabel: transaksiLabel(updated),
+    action: "update",
+    actorId: opts.actingUserId,
+    changes: diffChanges(before, transaksiFields(updated)),
+  });
 }
 
-export function deleteTransaksi(id: number) {
+export function deleteTransaksi(id: number, actingUserId?: number | null) {
   const existing = db
     .select()
     .from(transaksi)
     .where(eq(transaksi.id, id))
     .get();
   if (!existing) throw new Error("Transaksi not found");
+  // Snapshot before the row (and possibly its customer's name) goes away.
+  const label = transaksiLabel(existing);
+  const fields = transaksiFields(existing);
   db.delete(transaksi).where(eq(transaksi.id, id)).run();
   syncCustomerLastOrderDate(existing.customerId);
+  logActivity({
+    entityType: "transaksi",
+    entityId: id,
+    entityLabel: label,
+    action: "delete",
+    actorId: actingUserId,
+    changes: snapshotChanges(fields, "delete"),
+  });
+}
+
+export function deleteTransaksiMany(ids: number[], actingUserId?: number | null) {
+  for (const id of ids) {
+    deleteTransaksi(id, actingUserId);
+  }
 }

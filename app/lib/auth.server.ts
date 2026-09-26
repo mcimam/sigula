@@ -33,8 +33,8 @@ export type AuthUser = {
   username: string;
   displayName: string;
   role: Role;
+  /** Salesman the account is linked to — for role `supervisor`, the team's leading salesman. */
   salesmanId: number | null;
-  supervisorId: number | null;
 };
 
 export async function getSession(request: Request) {
@@ -58,7 +58,6 @@ export async function getAuthUser(request: Request): Promise<AuthUser | null> {
       displayName: users.displayName,
       role: profiles.role,
       salesmanId: profiles.salesmanId,
-      supervisorId: profiles.supervisorId,
     })
     .from(users)
     .innerJoin(profiles, eq(profiles.userId, users.id))

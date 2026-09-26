@@ -7,12 +7,13 @@ import { db } from "~/db/client.server";
 import { customers, salesmen } from "~/db/schema";
 import { requireRole } from "~/lib/auth.server";
 import { daysSinceOrder, isOverdue } from "~/lib/dates";
+import { subordinateIds } from "~/lib/masterdata.server";
 
 export async function loader({ request, params }: Route.LoaderArgs) {
   const user = await requireRole(request, "supervisor");
   const id = Number(params.id);
   const salesman = db.select().from(salesmen).where(eq(salesmen.id, id)).get();
-  if (!salesman || salesman.supervisorId !== user.supervisorId) {
+  if (!salesman || !subordinateIds(user.salesmanId!).includes(salesman.id)) {
     throw new Response("Forbidden", { status: 403 });
   }
   const list = db

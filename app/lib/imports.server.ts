@@ -3,6 +3,7 @@ import { and, eq } from "drizzle-orm";
 
 import { db } from "~/db/client.server";
 import { customers, salesmen } from "~/db/schema";
+import { logActivity, snapshotChanges } from "~/lib/activity.server";
 import { recordOrder } from "~/lib/orders.server";
 
 const HEADER_NAME = "Nama Konsumen";
@@ -28,6 +29,7 @@ export type NewCustomerRow = {
 
 export type UpdatedCustomerRow = {
   customerId: number;
+  sheetName: string;
   nama: string;
   salesmanId: number;
   oldDate: string | null;
@@ -203,6 +205,7 @@ export async function parsePreview(
       ) {
         preview.updatedCustomers.push({
           customerId: existing.id,
+          sheetName: sheet.name,
           nama: existing.nama,
           salesmanId: salesman.id,
           oldDate: existing.lastOrderDate,
@@ -238,6 +241,14 @@ export async function confirmImport(opts: {
       .get();
     newSalesmen.push(created.nama);
     sheetToSalesmanId.set(sheetName, created.id);
+    logActivity({
+      entityType: "salesman",
+      entityId: created.id,
+      entityLabel: created.nama,
+      action: "create",
+      actorId: opts.actingUserId,
+      changes: snapshotChanges({ nama: created.nama, status: created.status }, "create"),
+    });
   }
 
   let newCount = 0;
@@ -261,6 +272,25 @@ export async function confirmImport(opts: {
       })
       .returning()
       .get();
+    logActivity({
+      entityType: "customer",
+      entityId: created.id,
+      entityLabel: created.nama,
+      action: "create",
+      actorId: opts.actingUserId,
+      changes: snapshotChanges(
+        {
+          nama: created.nama,
+          salesman:
+            db.select({ n: salesmen.nama }).from(salesmen).where(eq(salesmen.id, salesmanId)).get()
+              ?.n ?? `#${salesmanId}`,
+          tipe_customer: created.tipeCustomer,
+          order_cycle_days: created.orderCycleDays,
+          status_customer: created.statusCustomer,
+        },
+        "create",
+      ),
+    });
     if (row.lastOrderDate) {
       recordOrder({
         customerId: created.id,

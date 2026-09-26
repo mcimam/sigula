@@ -5,7 +5,7 @@ import type { Route } from "./+types/supervisor.customers.$id.reactivate";
 import { db } from "~/db/client.server";
 import { customers, salesmen } from "~/db/schema";
 import { requireRole } from "~/lib/auth.server";
-import { reactivateCustomer } from "~/lib/masterdata.server";
+import { reactivateCustomer, subordinateIds } from "~/lib/masterdata.server";
 
 export async function action({ request, params }: Route.ActionArgs) {
   const user = await requireRole(request, "supervisor");
@@ -17,7 +17,7 @@ export async function action({ request, params }: Route.ActionArgs) {
     .from(salesmen)
     .where(eq(salesmen.id, customer.salesmanId))
     .get();
-  if (!salesman || salesman.supervisorId !== user.supervisorId) {
+  if (!salesman || !subordinateIds(user.salesmanId!).includes(salesman.id)) {
     throw new Response("Forbidden", { status: 403 });
   }
 

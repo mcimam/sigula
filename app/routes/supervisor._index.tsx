@@ -7,7 +7,7 @@ import { salesmenWithStats } from "~/lib/masterdata.server";
 
 export async function loader({ request }: Route.LoaderArgs) {
   const user = await requireRole(request, "supervisor");
-  const team = salesmenWithStats(user.supervisorId!);
+  const team = salesmenWithStats(user.salesmanId!);
   return {
     user,
     team,

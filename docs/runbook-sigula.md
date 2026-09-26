@@ -37,6 +37,28 @@ curl -sI https://sigula.ceater.cc/login
 **Verify after:** login page over HTTPS, `admin` can sign in, trigger page loads.
 Watch `podman logs -f sigula` for a few minutes.
 
+### Upgrade note — ADR-0004 (supervisors folded into salesmen)
+
+The first boot of this version rewrites `salesmen`, `profiles` and
+`notification_deliveries` and drops `supervisors`
+(`docs/adr/0004-salesman-hierarchy-replaces-supervisors.md`). It is
+transactional and self-checking (aborts and rolls back on any foreign-key
+violation, leaving the old schema in place), **but it is not reversible by
+rolling the code back** — an older build cannot read the new schema. So:
+
+1. Needs explicit approval before running against production (shared migration).
+2. Take a file-level backup first, with the app stopped so the WAL is flushed:
+   ```bash
+   podman-compose stop
+   podman run --rm -v sigula-data:/data -v "$PWD":/backup alpine \
+     sh -c 'cp -a /data/. /backup/sigula-data-pre-adr0004/'
+   podman-compose up -d
+   ```
+3. After boot: sign in as `admin` → Data Master → Salesman; the former
+   supervisors appear as salesmen and each team's members point at them.
+   Supervisor-role users log in as before. To roll back, restore the backup
+   copy into the volume and check out the previous commit.
+
 ## Rollback
 
 ```bash
@@ -92,7 +114,7 @@ rollback keeps the DB unless you explicitly remove the volume.
 | Service | What breaks without it | Degraded behaviour |
 |---|---|---|
 | Caddy | No public HTTPS | App still on `127.0.0.1:3010` |
-| WAHA (`127.0.0.1:3002`) | Reminder send/retry fails | Tracking/import/logging still work |
+| WAHA (`127.0.0.1:3002`) | Reminder send/retry fails; Pengaturan → Sesi WhatsApp shows "WAHA tidak terjangkau" | Tracking/import/logging still work |
 | SQLite volume `sigula-data` | Data loss if removed | — |
 
 ## Escalation
@@ -107,3 +129,12 @@ rollback keeps the DB unless you explicitly remove the volume.
 - First boot seeds demo users (`admin` / `sigula123`) — change passwords before
   sharing the URL widely.
 - WAHA optional at boot; configure under Admin → Pengaturan.
+- **WhatsApp login** (first time, or after the phone logs the device out): Admin → Pengaturan →
+  Koneksi WAHA → *Sesi WhatsApp* → Login, scan the QR (WhatsApp → Perangkat tertaut). The
+  *Session* field must equal the session name WAHA actually has (`waha.ceater.cc` had `Sigula`, not
+  `default`, on 2026-09-26) — a wrong name shows "Sesi belum dibuat", and Login would create a
+  second session.
+  Logout drops the linked number; reminders stop until the next Login + scan.
+- WAHA answers **403** (not 404) for a session that does not exist, so a 403 on
+  `GET /api/sessions/<name>` does not by itself mean the API key is wrong; the app reads the
+  session list instead.

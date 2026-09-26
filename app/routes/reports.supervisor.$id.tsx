@@ -4,11 +4,11 @@ import { buildSupervisorTeamReport } from "~/lib/reports.server";
 
 export async function loader({ request, params }: Route.LoaderArgs) {
   const user = await requireRole(request, ["supervisor", "admin"]);
-  const idParam = params.id === "me" ? user.supervisorId : Number(params.id);
+  const idParam = params.id === "me" ? user.salesmanId : Number(params.id);
   if (idParam == null || Number.isNaN(idParam)) {
     throw new Response("Not found", { status: 404 });
   }
-  if (user.role === "supervisor" && user.supervisorId !== idParam) {
+  if (user.role === "supervisor" && user.salesmanId !== idParam) {
     throw new Response("Forbidden", { status: 403 });
   }
   const buf = await buildSupervisorTeamReport(idParam);

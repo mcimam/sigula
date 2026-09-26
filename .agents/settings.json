@@ -41,5 +41,19 @@
       "Bash(curl* | bash)"
     ]
   },
-  "env": {}
+  "env": {},
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.agents/hooks/codemap-guard.mjs\"",
+            "timeout": 15,
+            "statusMessage": "Checking code map is in step with code…"
+          }
+        ]
+      }
+    ]
+  }
 }

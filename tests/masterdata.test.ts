@@ -3,9 +3,12 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 
 import { db } from "~/db/client.server";
-import { mutationLogs, statusLogs } from "~/db/schema";
+import { customers, mutationLogs, salesmen, statusLogs, users } from "~/db/schema";
 import {
   clampCycleDays,
+  deleteCustomersMany,
+  deleteSalesmenMany,
+  deleteUsersMany,
   reactivateCustomer,
   reassignCustomer,
   salesmenWithStats,
@@ -118,5 +121,73 @@ describe("salesmenWithStats", () => {
     expect(andi.inactive).toBe(1);
     expect(andi.followUp).toBe(2);
     expect(andi.pending).toBe(1);
+  });
+});
+
+describe("deleteCustomersMany", () => {
+  beforeEach(() => resetDb());
+
+  it("deletes every listed customer", async () => {
+    const { salesman } = await seedOrg();
+    const c1 = addCustomer({ salesmanId: salesman.id, nama: "Toko A" });
+    const c2 = addCustomer({ salesmanId: salesman.id, nama: "Toko B" });
+    const c3 = addCustomer({ salesmanId: salesman.id, nama: "Toko C" });
+
+    deleteCustomersMany([c1.id, c3.id]);
+
+    const remaining = db.select().from(customers).all();
+    expect(remaining.map((c) => c.id)).toEqual([c2.id]);
+  });
+});
+
+describe("deleteSalesmenMany", () => {
+  beforeEach(() => resetDb());
+
+  it("deletes salesmen with no linked customers or transaksi", async () => {
+    const { salesman, salesmanB, supervisor } = await seedOrg();
+
+    deleteSalesmenMany([salesmanB.id]);
+
+    const remaining = db.select().from(salesmen).all();
+    expect(remaining.map((s) => s.id).sort()).toEqual(
+      [salesman.id, supervisor.id].sort(),
+    );
+  });
+
+  it("is all-or-nothing: a blocked salesman aborts the whole batch", async () => {
+    const { salesman, salesmanB } = await seedOrg();
+    addCustomer({ salesmanId: salesman.id, nama: "Toko A" });
+
+    expect(() => deleteSalesmenMany([salesmanB.id, salesman.id])).toThrow(
+      /masih punya 1 customer/,
+    );
+
+    const ids = db.select().from(salesmen).all().map((s) => s.id);
+    expect(ids).toContain(salesman.id);
+    expect(ids).toContain(salesmanB.id);
+  });
+});
+
+describe("deleteUsersMany", () => {
+  beforeEach(() => resetDb());
+
+  it("deletes the listed accounts", async () => {
+    const { admin, salesmanUser } = await seedOrg();
+
+    deleteUsersMany([salesmanUser.id], admin.id);
+
+    const remaining = db.select().from(users).all();
+    expect(remaining.map((u) => u.id)).toEqual([admin.id]);
+  });
+
+  it("refuses to delete the acting user's own account", async () => {
+    const { admin, salesmanUser } = await seedOrg();
+
+    expect(() => deleteUsersMany([admin.id, salesmanUser.id], admin.id)).toThrow(
+      /akun sendiri/,
+    );
+
+    const remaining = db.select().from(users).all();
+    expect(remaining).toHaveLength(2);
   });
 });

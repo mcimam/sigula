@@ -8,7 +8,6 @@ import {
   notificationBatches,
   notificationDeliveries,
   salesmen,
-  supervisors,
 } from "~/db/schema";
 import { requireRole } from "~/lib/auth.server";
 import {
@@ -35,13 +34,11 @@ export async function loader({ request }: Route.LoaderArgs) {
         .where(eq(notificationDeliveries.batchId, batch.id))
         .all()
         .map((d) => {
-          const name = d.salesmanId
-            ? db.select().from(salesmen).where(eq(salesmen.id, d.salesmanId)).get()?.nama
-            : db
-                .select()
-                .from(supervisors)
-                .where(eq(supervisors.id, d.supervisorId!))
-                .get()?.nama;
+          const name = db
+            .select()
+            .from(salesmen)
+            .where(eq(salesmen.id, d.salesmanId))
+            .get()?.nama;
           return { ...d, name: name ?? "?" };
         });
       return { ...batch, deliveries };
@@ -190,7 +187,12 @@ export default function AdminDashboard() {
             <ul className="mb-3 space-y-1 text-sm">
               {batch.deliveries.map((d) => (
                 <li key={d.id} className="flex flex-wrap items-center gap-2">
-                  <span>{d.name}</span>
+                  <span>
+                    {d.name}
+                    {d.recipientKind === "supervisor" ? (
+                      <span className="text-slate-400"> (supervisor)</span>
+                    ) : null}
+                  </span>
                   <StatusPill
                     tone={
                       d.status === "sent"

@@ -80,4 +80,6 @@ a limitation. A passing report on a path you did not test is worse than no repor
 
 Every category the track requires has actually run with output shown, edge cases
 and error paths were attacked deliberately rather than incidentally, every found
-bug has a reproduction, and the verdict states plainly what was not tested.
+bug has a reproduction, and the verdict states plainly what was not tested. If
+you added or changed test files or fixtures, the test table in the code map
+(`config.yml → paths.codemap`) reflects it and its `Last synced` line is bumped.

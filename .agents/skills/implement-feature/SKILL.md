@@ -83,4 +83,6 @@ Never make a test pass by weakening it. See `rules/testing.md`.
 The task is complete, format/lint/typecheck/tests are green and you have seen
 them green, the diff contains only what the task called for, and any shortcut
 taken has an entry in `.agents/work/DEBT.md` plus a `DEBT-NNN` marker at the spot
-in the code — logged when it was taken, not reconstructed afterwards.
+in the code — logged when it was taken, not reconstructed afterwards. The code
+map (`config.yml → paths.codemap`) matches what you changed and its `Last synced`
+line is bumped, in this same change.

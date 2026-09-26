@@ -7,7 +7,6 @@ import {
   customers,
   profiles,
   salesmen,
-  supervisors,
   users,
 } from "~/db/schema";
 import { todayIso } from "~/lib/dates";
@@ -45,9 +44,10 @@ async function runSeed() {
       return todayIso(d);
     };
 
+    // ADR-0004: a supervisor is just a salesman with subordinates.
     const supervisor = db
-      .insert(supervisors)
-      .values({ nama: "Budi Supervisor", nomorWa: "628111111111" })
+      .insert(salesmen)
+      .values({ nama: "Budi Supervisor", nomorWa: "628111111111", status: "aktif" })
       .returning()
       .get();
 
@@ -103,7 +103,7 @@ async function runSeed() {
       .values({
         userId: supervisorUser.id,
         role: "supervisor",
-        supervisorId: supervisor.id,
+        salesmanId: supervisor.id,
       })
       .run();
 

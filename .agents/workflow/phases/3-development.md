@@ -32,13 +32,19 @@ on `production` it means "obvious, defended, and covered".
    actually appeared, delete dead code, tighten obvious hot paths, and simplify
    what turned out more complex than it needed to be. Behaviour must not change
    — the tests that passed before must pass after, untouched.
+7. **Update the code map** with *every* change, not only at iteration end, when
+   `development.codemap_update` is not `skip`: compare `paths.codemap` with what
+   you changed, edit every section that is now wrong, and bump its `Last synced`
+   line even if nothing else needed editing. The `Stop` hook
+   (`.agents/hooks/codemap-guard.mjs`) enforces it when the gate is `required`.
 
 ## Gates consumed
 
 `development.code_standards`, `development.error_handling`,
 `development.logging`, `development.comments`,
 `development.optimization_pass`, `development.dead_code_cleanup`,
-`development.max_file_length_guidance`
+`development.max_file_length_guidance`, `development.codemap_update`
+(project override — not defined by the tracks)
 
 ## Exit criteria
 
@@ -46,6 +52,7 @@ on `production` it means "obvious, defended, and covered".
 - Lint, typecheck, and build are green.
 - No commented-out code, no `TODO` without an owner or an issue reference.
 - Shortcuts taken have an entry in `DEBT.md` and a `DEBT-NNN` marker in the code.
+- The code map matches the code (when `development.codemap_update` is not `skip`).
 
 ## Handoff to Testing
 

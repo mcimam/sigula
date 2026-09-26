@@ -7,11 +7,11 @@ import {
   customers,
   profiles,
   salesmen,
-  supervisors,
   users,
 } from "~/db/schema";
 
 const TABLES = [
+  "activity_logs",
   "app_settings",
   "notification_deliveries",
   "notification_batches",
@@ -23,7 +23,6 @@ const TABLES = [
   "profiles",
   "customers",
   "salesmen",
-  "supervisors",
   "users",
 ] as const;
 
@@ -47,11 +46,13 @@ export async function seedOrg(opts?: {
 }) {
   const passwordHash = await hashPassword("sigula123");
 
+  // ADR-0004: a supervisor is a salesman that other salesmen report to.
   const supervisor = db
-    .insert(supervisors)
+    .insert(salesmen)
     .values({
       nama: "Budi Supervisor",
       nomorWa: opts?.supervisorWa ?? "628111111111",
+      status: "aktif",
     })
     .returning()
     .get();

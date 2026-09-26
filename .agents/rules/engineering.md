@@ -37,6 +37,9 @@ Set by the active track's `definition_of_done`. Regardless of track:
 - It runs, and you have seen it run.
 - What you skipped is written down, not silently omitted.
 - `STATE.md` matches reality.
+- The code map (`config.yml → paths.codemap`) matches the code you changed, and
+  its `Last synced` line is bumped — unless `overrides.development.codemap_update`
+  is `skip`.
 
 ## The debt ledger
 

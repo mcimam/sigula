@@ -6,6 +6,22 @@
 | PRD | `docs/prd/sigula-pilot.md` |
 | Date | 2026-08-31 |
 
+> **Amendment 2026-09-26 (ADR-0004, `docs/adr/0004-salesman-hierarchy-replaces-supervisors.md`).**
+> "Supervisor" is no longer a separate entity: it is a salesman who has
+> subordinate salesmen (salesman 1—N salesman, any depth). Read every
+> "Supervisor"/`supervisor_id` below accordingly: `Supervisor.nama`/`nomor_wa`
+> are the leading salesman's; a supervisor-role user is linked to that salesman;
+> FR-14 assigns a salesman's *supervisor (another salesman)* with cycle
+> rejection; FR-28/BR-9 scope supervisor views to the **whole subtree** of the
+> acting supervisor's salesman, while the WhatsApp summary (FR-3) goes to the
+> **direct** supervisor only and management's per-supervisor view uses **direct
+> reports**. Also see FR-31 (record activity log) added the same day.
+>
+> **Amendment 2026-09-26 (WhatsApp session).** FR-32 lets Admin see the status of
+> the WAHA WhatsApp session and log it in/out from Pengaturan, like the WAHA
+> dashboard. Previously re-authenticating WAHA was out of app scope (TDD failure
+> modes).
+
 ## Scope
 
 This document specifies the behaviour of the SiGula pilot: overdue
@@ -20,7 +36,7 @@ protocol — those are covered in the TDD.
 
 | Actor | Can | Cannot |
 |---|---|---|
-| Admin | Trigger notification batches; manage master data (salesman, supervisor, customer); set `order_cycle_days`; reassign (mutate) a customer to a different salesman; toggle a salesman's active/inactive status; set salesman/supervisor WhatsApp numbers; import/export Excel; view all audit logs | Submit a reason code or record a new order (those are salesman actions); see the Supervisor/Management dashboards as a distinct role view |
+| Admin | Trigger notification batches; manage master data (salesman, supervisor, customer); set `order_cycle_days`; reassign (mutate) a customer to a different salesman; toggle a salesman's active/inactive status; set salesman/supervisor WhatsApp numbers; import/export Excel; view all audit logs; see the WhatsApp session status and log the WAHA session in (QR scan) or out (FR-32) | Submit a reason code or record a new order (those are salesman actions); see the Supervisor/Management dashboards as a distinct role view |
 | Salesman | View their own customers; see the list of customers currently pending a reminder reply; submit one of the 3 reason codes for a pending customer; record a new order for any of their own customers; export their own reminder list (Excel/text) | See other salesmen's customers; edit master data; trigger notifications; reassign customers |
 | Supervisor | View an aggregated dashboard for the salesmen mapped to them; drill into one salesman's full customer list, sorted by most overdue; manually reactivate an Inactive customer on their team; export a team report (Excel) | See other supervisors' teams; edit master data; trigger notifications; submit reason codes or record orders directly |
 | Management | View a cross-team aggregate dashboard (per-supervisor performance, per-salesman response rate, reason-code breakdown); export a summary report (Excel) | Edit anything; trigger notifications; see per-customer detail (aggregate only) |
@@ -59,6 +75,8 @@ protocol — those are covered in the TDD.
 | FR-28 | Supervisor-scoped views and exports shall include only customers whose salesman's `supervisor_id` matches the acting supervisor | Given salesmen A (supervisor X) and B (supervisor Y), when supervisor X views their dashboard, then B's customers never appear |
 | FR-29 | When WAHA is unreachable, overdue computation, reason-code capture, order recording, master-data editing, and all Excel import/export shall continue to function normally; only the WhatsApp send itself fails | Given WAHA is down, when Admin triggers a batch, then all deliveries are recorded as failed and every other feature remains usable |
 | FR-30 | Admin shall be able to search/filter the master customer list by customer name or salesman name | Given a search term, when entered, then only matching rows are shown |
+| FR-31 | Every create, update and delete of a Transaksi, Customer, Salesman or User made through the app shall be recorded as an activity entry with the acting user, timestamp and field-level before→after values (names, not ids); an update that changes nothing records nothing; passwords are never recorded (only "changed"); entries survive deletion of the record and of the actor. Admin can see a record's own trail in its edit panel and all entries in Log Audit (filter by record type, search) | Given Admin changes a transaksi's note, then the transaksi's panel and Log Audit show "Diubah oleh <admin>" with `Catatan old → new`; given a user's password is reset, then the entry says only that the password changed |
+| FR-32 | Admin shall be able to see the live status of the configured WAHA WhatsApp session (connected as which account / waiting for a QR scan / starting / not logged in / failed / WAHA unreachable / API key rejected / not configured) in Pengaturan → Koneksi WAHA, and to log the session in (WAHA creates or starts it and shows the QR to scan, refreshed automatically until scanned) and out (drops the linked WhatsApp login) — the same controls as the WAHA dashboard. Logout asks for an inline confirmation. Login on an already running session and logout on an already logged-out one change nothing. WAHA's own refusal message is shown. Only Admin can read the status or QR or change the session; the API key is never sent to the browser. | Given the session is stopped, when Admin presses Login, then a QR appears and, once scanned on the phone, the status turns to connected with the account name and number; given it is connected, when Admin confirms Logout, then the status turns to not logged in and Login is offered again; given WAHA is down, then the status says so and no Login/Logout is offered |
 
 ## User flows
 
@@ -155,6 +173,7 @@ state explains that mapping happens in the Admin panel.
 | BR-8 | Import only adds new customers or updates `last_order_date` on an exact (name + salesman) match; it never deletes or overwrites any other field | Excel import |
 | BR-9 | Supervisor- and Management-scoped views/exports are always filtered through the salesman→supervisor mapping; a salesman with no supervisor appears in no supervisor's view | Every supervisor/management screen and export |
 | BR-10 | Order history and audit logs (mutation, status) are append-only; nothing is ever edited or deleted from them | Always |
+| BR-11 | A salesman cannot be their own supervisor or (transitively) the supervisor of their own supervisor; a salesman who still has subordinates cannot be deleted (ADR-0004) | Assigning a supervisor; deleting a salesman |
 
 ## Data
 
@@ -195,6 +214,9 @@ concurrent, out-of-order, expired, malformed, absent.
 | Reason code submitted for a customer no longer pending (already handled by someone else, e.g. race between two devices) | Submission still records the reason entry (audit trail), but has no further effect since the customer is already not-pending |
 | Customer marked Inactive via "gone bankrupt" later reappears in a fresh Excel import with a new order date | Reactivated automatically per BR-5/FR-21, same as any other reactivation path |
 | WAHA send times out mid-batch | That recipient's delivery is marked failed; other recipients in the same batch are unaffected (FR-29) |
+| Session status/login while the session does not exist in WAHA | Status "Sesi belum dibuat"; Login creates it. Existence is read from WAHA's session list because WAHA answers 403 (not 404) for a missing session (FR-32) |
+| Two admins press Login/Logout at once, or a stale page is used | Login on a running session and logout on a logged-out one are no-ops that just return the fresh status; the status re-reads itself every few seconds (FR-32) |
+| The QR expires before it is scanned | WAHA issues a new one; the page picks it up on the next poll without a reload (FR-32) |
 
 ## Error handling
 
@@ -204,6 +226,8 @@ concurrent, out-of-order, expired, malformed, absent.
 | Excel file unreadable or wrong shape | Message explaining the expected template shape | Parses nothing, applies nothing, no preview shown |
 | Import preview has unresolved unknown sheets and Admin confirms without the override | Message asking to resolve the sheet names first, or explicitly opt into "treat as new salesmen" | Import is refused, no data changed |
 | Non-Admin attempts an Admin-only action | Action is not available/visible | Server-side check refuses it regardless of UI state (FR-27) |
+| Session status/login/logout while WAHA is unreachable or rejects the API key | Status "WAHA tidak terjangkau" / "API key ditolak" with the reason; no Login/Logout offered | Nothing is sent to WAHA; reminders/tracking are unaffected (FR-29) |
+| WAHA refuses a Login or Logout (e.g. 422) | WAHA's own message, status unchanged | Reports it; does not retry |
 
 ## Non-functional requirements
 

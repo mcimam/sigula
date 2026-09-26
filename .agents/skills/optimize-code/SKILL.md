@@ -70,4 +70,6 @@ list you hand back.
 The diff removes more than it adds or has a stated reason it does not, the full
 suite passes unchanged from the baseline, every performance claim has a
 before/after number, the debt ledger agrees with the code in both directions, and
-nothing outside the iteration's footprint was touched.
+nothing outside the iteration's footprint was touched, and the code map
+(`config.yml → paths.codemap`) matches the result (removed or merged code is
+gone from it too) with its `Last synced` line bumped.

@@ -1,10 +1,12 @@
 import { relations, sql } from "drizzle-orm";
 import {
   check,
+  index,
   integer,
   sqliteTable,
   text,
   uniqueIndex,
+  type AnySQLiteColumn,
 } from "drizzle-orm/sqlite-core";
 
 export const users = sqliteTable("users", {
@@ -14,21 +16,31 @@ export const users = sqliteTable("users", {
   displayName: text("display_name").notNull(),
 });
 
-export const supervisors = sqliteTable("supervisors", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  nama: text("nama").notNull(),
-  nomorWa: text("nomor_wa").notNull().default(""),
-});
-
-export const salesmen = sqliteTable("salesmen", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  nama: text("nama").notNull(),
-  nomorWa: text("nomor_wa").notNull().default(""),
-  supervisorId: integer("supervisor_id").references(() => supervisors.id),
-  status: text("status", { enum: ["aktif", "inactive"] })
-    .notNull()
-    .default("aktif"),
-});
+/**
+ * ADR-0004: a supervisor is just a salesman with subordinates.
+ * `supervisorId` points at another salesman (salesman 1—N salesman), any
+ * depth; cycles are rejected in `masterdata.server.ts`, self-reference here.
+ */
+export const salesmen = sqliteTable(
+  "salesmen",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    nama: text("nama").notNull(),
+    nomorWa: text("nomor_wa").notNull().default(""),
+    supervisorId: integer("supervisor_id").references(
+      (): AnySQLiteColumn => salesmen.id,
+    ),
+    status: text("status", { enum: ["aktif", "inactive"] })
+      .notNull()
+      .default("aktif"),
+  },
+  (t) => [
+    check(
+      "salesman_not_own_supervisor",
+      sql`${t.supervisorId} IS NULL OR ${t.supervisorId} <> ${t.id}`,
+    ),
+  ],
+);
 
 export const customers = sqliteTable(
   "customers",
@@ -64,16 +76,15 @@ export const profiles = sqliteTable(
     role: text("role", {
       enum: ["admin", "supervisor", "salesman", "management"],
     }).notNull(),
+    // For role `supervisor` this is the salesman who leads the team.
     salesmanId: integer("salesman_id").references(() => salesmen.id),
-    supervisorId: integer("supervisor_id").references(() => supervisors.id),
   },
   (t) => [
     check(
       "profile_role_link_matches_role",
       sql`(
-        (${t.role} = 'salesman' AND ${t.salesmanId} IS NOT NULL AND ${t.supervisorId} IS NULL)
-        OR (${t.role} = 'supervisor' AND ${t.supervisorId} IS NOT NULL AND ${t.salesmanId} IS NULL)
-        OR (${t.role} IN ('admin', 'management') AND ${t.salesmanId} IS NULL AND ${t.supervisorId} IS NULL)
+        (${t.role} IN ('salesman', 'supervisor') AND ${t.salesmanId} IS NOT NULL)
+        OR (${t.role} IN ('admin', 'management') AND ${t.salesmanId} IS NULL)
       )`,
     ),
   ],
@@ -129,23 +140,20 @@ export const notificationDeliveries = sqliteTable(
     batchId: integer("batch_id")
       .notNull()
       .references(() => notificationBatches.id),
-    salesmanId: integer("salesman_id").references(() => salesmen.id),
-    supervisorId: integer("supervisor_id").references(() => supervisors.id),
+    // The recipient salesman; `recipientKind` says which message they got
+    // (their own overdue customers vs. a summary of their direct reports).
+    salesmanId: integer("salesman_id")
+      .notNull()
+      .references(() => salesmen.id),
+    recipientKind: text("recipient_kind", { enum: ["salesman", "supervisor"] })
+      .notNull()
+      .default("salesman"),
     customerCount: integer("customer_count").notNull().default(0),
     status: text("status", {
       enum: ["sent", "failed", "skipped_no_phone"],
     }).notNull(),
     errorMessage: text("error_message").notNull().default(""),
   },
-  (t) => [
-    check(
-      "delivery_exactly_one_recipient",
-      sql`(
-        (${t.salesmanId} IS NOT NULL AND ${t.supervisorId} IS NULL)
-        OR (${t.salesmanId} IS NULL AND ${t.supervisorId} IS NOT NULL)
-      )`,
-    ),
-  ],
 );
 
 export const mutationLogs = sqliteTable("mutation_logs", {
@@ -186,6 +194,33 @@ export const statusLogs = sqliteTable("status_logs", {
   olehId: integer("oleh_id").references(() => users.id),
 });
 
+export const ACTIVITY_ENTITIES = ["transaksi", "customer", "salesman", "user"] as const;
+export type ActivityEntity = (typeof ACTIVITY_ENTITIES)[number];
+export type ActivityAction = "create" | "update" | "delete";
+
+/**
+ * Per-record audit trail. `entityLabel` and `actorName` are snapshots so the
+ * trail stays readable after the record or the user is deleted; `changes` is
+ * JSON `{ [field]: { from, to } }` (never contains secrets).
+ */
+export const activityLogs = sqliteTable(
+  "activity_logs",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    entityType: text("entity_type", { enum: ACTIVITY_ENTITIES }).notNull(),
+    entityId: integer("entity_id").notNull(),
+    entityLabel: text("entity_label").notNull().default(""),
+    action: text("action", { enum: ["create", "update", "delete"] }).notNull(),
+    actorId: integer("actor_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    actorName: text("actor_name").notNull().default(""),
+    changes: text("changes").notNull().default("{}"),
+    createdAt: text("created_at").notNull(),
+  },
+  (t) => [index("activity_entity_idx").on(t.entityType, t.entityId, t.id)],
+);
+
 export const usersRelations = relations(users, ({ one }) => ({
   profile: one(profiles, {
     fields: [users.id],
@@ -198,10 +233,6 @@ export const profilesRelations = relations(profiles, ({ one }) => ({
   salesman: one(salesmen, {
     fields: [profiles.salesmanId],
     references: [salesmen.id],
-  }),
-  supervisor: one(supervisors, {
-    fields: [profiles.supervisorId],
-    references: [supervisors.id],
   }),
 }));
 

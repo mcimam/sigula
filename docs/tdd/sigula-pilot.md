@@ -6,6 +6,17 @@
 | FRD | `docs/frd/sigula-pilot.md` |
 | Date | 2026-08-31 |
 
+> **Amendment 2026-09-26 (ADR-0004).** The `Supervisor` entity/table is gone:
+> `Salesman.supervisor_id` is a nullable self-FK (salesman 1—N salesman);
+> `Profile.supervisor_id` is removed (a supervisor-role `Profile` links to its
+> leading salesman via `salesman_id`); `NotificationDelivery` has
+> `salesman_id NOT NULL` plus `recipient_kind ('salesman'|'supervisor')`
+> instead of the "exactly one of salesman/supervisor" pair. New table
+> `activity_logs` (`entity_type`, `entity_id`, `entity_label`, `action`,
+> `actor_id`, `actor_name`, `changes` JSON, `created_at`) backs FR-31. Migration:
+> `migrateLegacySupervisors()` — see the ADR. Where the sections below still
+> describe a separate Supervisor row, this amendment wins.
+
 ## Summary
 
 A React Router 7 (framework-mode) JS monolith (React + Tailwind + SQLite)
@@ -44,6 +55,7 @@ admin-triggered rather than scheduled (ADR-0002).
 | From → To | Carries | Via | Sync/async | Failure behaviour |
 |---|---|---|---|---|
 | Admin UI → `reminders` | "trigger batch" command | Django view (HTTP POST, same request) | Sync | Whole request completes with a per-recipient result summary; a slow/hanging WAHA call is bounded by a short per-message timeout so one bad recipient can't hang the batch |
+| Pengaturan UI → WAHA (FR-32) | session list, `start`/`restart`/`logout` (or create with `start`), QR as base64 JSON | HTTP (WAHA REST: `GET /api/sessions?all=true`, `POST /api/sessions[/{name}/start\|restart\|logout]`, `GET /api/{name}/auth/qr`), through `app/routes/admin.settings.waha-session.tsx` | Sync, polled by the page every 4 s while visible | Unreachable / 401 / 403 → status `error` / `rejected`, nothing is attempted; a refusal is shown with WAHA's `message`; the response is `Cache-Control: no-store` (it can carry a QR) and never contains the API key |
 | `reminders` → WAHA | `{chatId, text}` per recipient | HTTP (WAHA's REST API) | Sync, one call per recipient, within the trigger request | Timeout/4xx/5xx → that delivery recorded `failed`; batch continues to the next recipient (FRD FR-29) |
 | `imports` → `masterdata`/`orders` | Parsed customer/order rows | In-process function call, after explicit confirm | Sync | Partial failure mid-commit is avoided by wrapping the commit in one DB transaction — either the whole confirmed batch applies, or none of it does |
 | `masterdata`/`reminders`/`imports` → `audit` | Mutation/status-change events | In-process function call at the point of change | Sync | If the log write fails, the triggering transaction fails too (same DB transaction) — the system never silently loses an audit entry for a change that did apply |
@@ -156,7 +168,7 @@ needed.
 |---|---|---|---|
 | WAHA entirely unreachable | Connection error/timeout on every send in a batch | All deliveries in the batch recorded `failed`; no customer's `notified` flips | Admin retries the batch once WAHA is back up (`POST .../retry`); nothing was lost since eligibility is recomputed, not stored |
 | WAHA reachable but one salesman's number is wrong/deregistered | 4xx from WAHA for that recipient only | That delivery `failed`; other recipients in the same batch unaffected | Admin corrects the number (FR-16) and retries |
-| WAHA session drops mid-pilot (needs QR re-auth) | All sends start failing at once | Same as "entirely unreachable" above | Operator re-authenticates WAHA (out of app scope); overdue tracking is unaffected the whole time (FR-29) |
+| WAHA session drops mid-pilot (needs QR re-auth) | All sends start failing at once | Same as "entirely unreachable" above | Admin re-authenticates from Admin → Pengaturan → Sesi WhatsApp: Login shows the QR, scan it on the phone (FR-32; the WAHA dashboard also works); overdue tracking is unaffected the whole time (FR-29) |
 | Excel file doesn't match the expected header/sheet shape | Header-row scan finds no "Nama Konsumen" column in any of the first 8 rows of a sheet | That sheet is skipped from the preview entirely (not treated as empty) | Admin fixes the file and re-uploads; nothing was applied (FR-19) |
 | Two Admins trigger a batch at nearly the same moment | Not specially detected — relies on eligibility recomputation | Second trigger's eligible set naturally excludes anything the first trigger's successful sends already marked `notified` | No special handling needed; the design is idempotent by construction |
 | SQLite write contention under concurrent multi-salesman actions | Django/SQLite raises a database-locked error under sustained concurrent writes | Acceptable at pilot's single-team scale (low concurrent-write volume) | Migrate to Postgres before full-scale, multi-team rollout — already the stated plan in `context/stack.md`; not re-litigated here |

@@ -32,6 +32,10 @@ export default [
   route("admin/masterdata", "routes/admin.masterdata.tsx"),
   route("admin/audit", "routes/admin.audit.tsx"),
   route("admin/settings", "routes/admin.settings.tsx"),
+  route(
+    "admin/settings/waha-session",
+    "routes/admin.settings.waha-session.tsx",
+  ),
   route("reports/salesman/:id", "routes/reports.salesman.$id.tsx"),
   route("reports/supervisor/:id", "routes/reports.supervisor.$id.tsx"),
   route("reports/management", "routes/reports.management.tsx"),

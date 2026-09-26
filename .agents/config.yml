@@ -53,6 +53,7 @@ paths:
   tests: tests
   state: .agents/work/STATE.md
   notes: .agents/work/notes
+  codemap: .agents/context/codemap.md   # read before code edits; updated with every code change
 
 # ── Commands ─────────────────────────────────────────────────────────────────
 # How to actually run things. An empty string means NOT CONFIGURED: the agent
@@ -103,7 +104,13 @@ debt:
 
 # ── Overrides ────────────────────────────────────────────────────────────────
 # Anything here beats the active track's default. Delete a key to fall back.
-overrides: {}
+overrides:
+  development:
+    # Every code change is checked against paths.codemap in the same change, and
+    # the map's "Last synced" line is bumped. Enforced by the Stop hook
+    # .agents/hooks/codemap-guard.mjs. required | recommended (warn only) | skip
+    codemap_update: required
+# Other examples:
 # overrides:
 #   testing:
 #     security_review: required   # POC that touches auth still gets a sec pass

@@ -8,6 +8,10 @@ This is the entry point. Everything the agent needs is under `.agents/`.
    commands, autonomy. **Behaviour is configured here, never hardcoded in a
    skill.**
 2. `.agents/work/STATE.md` — where this project actually stands right now.
+3. `.agents/context/codemap.md` — file/route/table/function map of the code.
+   **Before any code edit, read this instead of exploring the tree**, then open
+   only the files it points to. Every code change updates it in the same change
+   (see *Non-negotiable* below).
 
 Then read what the task needs, and not more.
 
@@ -79,6 +83,11 @@ When it conflicts with a general rule, the project's own conventions win.
 - **Record every shortcut** in `.agents/work/DEBT.md`, at the moment it is taken,
   with a `DEBT-NNN` marker in the code. That ledger is what makes a POC
   promotable instead of merely rewritable.
+- **Keep the code map in step.** Every change to code — or to its build, test,
+  or deploy config — is checked against `.agents/context/codemap.md` in the same
+  change: edit whatever is now wrong, and always bump its `Last synced` line
+  (gate `config.yml → overrides.development.codemap_update`). A `Stop` hook
+  (`.agents/hooks/codemap-guard.mjs`) refuses to end a turn that skipped it.
 
 ## Language
 

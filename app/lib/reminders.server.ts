@@ -8,9 +8,9 @@ import {
   reasonLogs,
   salesmen,
   statusLogs,
-  supervisors,
   type ReasonCode,
 } from "~/db/schema";
+import { logActivity } from "~/lib/activity.server";
 import { todayIso } from "~/lib/dates";
 import { notYetNotifiedEligible } from "~/lib/orders.server";
 import { createWahaClient, type WahaClient } from "~/lib/waha.server";
@@ -39,12 +39,10 @@ export function previewBatch(today = todayIso()) {
       .filter((id): id is number => id != null),
   );
 
+  // ADR-0004: a supervisor is a salesman; the summary goes to the *direct*
+  // supervisor only and covers that supervisor's direct reports.
   const supervisorRows = [...supervisorIds].map((id) => {
-    const supervisor = db
-      .select()
-      .from(supervisors)
-      .where(eq(supervisors.id, id))
-      .get()!;
+    const supervisor = db.select().from(salesmen).where(eq(salesmen.id, id)).get()!;
     const teamCustomers = eligible.filter((c) => {
       const sm = salesmanRows.find((s) => s.salesman.id === c.salesmanId)?.salesman;
       return sm?.supervisorId === id;
@@ -131,8 +129,10 @@ export function deleteBatch(batchId: number) {
     .from(notificationDeliveries)
     .where(eq(notificationDeliveries.batchId, batchId))
     .all()
-    .map((d) => d.salesmanId)
-    .filter((id): id is number => id != null);
+    // Only recipients of their *own* overdue list: a supervisor summary says
+    // nothing about the supervisor's own customers' notified flag.
+    .filter((d) => d.recipientKind === "salesman")
+    .map((d) => d.salesmanId);
 
   if (salesmanIds.length > 0) {
     const affected = db
@@ -173,6 +173,7 @@ async function deliverToSalesman(
       .values({
         batchId,
         salesmanId: salesman.id,
+        recipientKind: "salesman",
         customerCount: list.length,
         status: "skipped_no_phone",
       })
@@ -201,6 +202,7 @@ async function deliverToSalesman(
     .values({
       batchId,
       salesmanId: salesman.id,
+      recipientKind: "salesman",
       customerCount: list.length,
       status: result.ok ? "sent" : "failed",
       errorMessage: result.errorMessage ?? "",
@@ -211,14 +213,15 @@ async function deliverToSalesman(
 async function deliverToSupervisor(
   client: WahaClient,
   batchId: number,
-  supervisor: typeof supervisors.$inferSelect,
+  supervisor: typeof salesmen.$inferSelect,
   list: ReturnType<typeof notYetNotifiedEligible>,
 ) {
   if (!supervisor.nomorWa) {
     db.insert(notificationDeliveries)
       .values({
         batchId,
-        supervisorId: supervisor.id,
+        salesmanId: supervisor.id,
+        recipientKind: "supervisor",
         customerCount: list.length,
         status: "skipped_no_phone",
       })
@@ -233,7 +236,8 @@ async function deliverToSupervisor(
   db.insert(notificationDeliveries)
     .values({
       batchId,
-      supervisorId: supervisor.id,
+      salesmanId: supervisor.id,
+      recipientKind: "supervisor",
       customerCount: list.length,
       status: result.ok ? "sent" : "failed",
       errorMessage: result.errorMessage ?? "",
@@ -251,7 +255,7 @@ async function retryDelivery(
   let nomorWa = "";
   let message = "";
 
-  if (delivery.salesmanId) {
+  if (delivery.recipientKind === "salesman") {
     const salesman = db
       .select()
       .from(salesmen)
@@ -260,11 +264,11 @@ async function retryDelivery(
     list = eligible.filter((c) => c.salesmanId === salesman.id);
     nomorWa = salesman.nomorWa;
     message = salesmanMessage(salesman.nama, list);
-  } else if (delivery.supervisorId) {
+  } else {
     const supervisor = db
       .select()
-      .from(supervisors)
-      .where(eq(supervisors.id, delivery.supervisorId))
+      .from(salesmen)
+      .where(eq(salesmen.id, delivery.salesmanId))
       .get()!;
     const teamSalesmanIds = db
       .select()
@@ -290,7 +294,7 @@ async function retryDelivery(
   }
 
   const result = await client.sendText(nomorWa, message);
-  if (result.ok && delivery.salesmanId && list.length > 0) {
+  if (result.ok && delivery.recipientKind === "salesman" && list.length > 0) {
     db.update(customers)
       .set({ notified: true })
       .where(
@@ -328,7 +332,8 @@ export function submitReason(opts: {
   kodeAlasan: ReasonCode;
   actingUserId: number;
 }) {
-  return db.transaction((tx) => {
+  const inactivated = db.transaction((tx) => {
+    let becameInactive: { id: number; nama: string } | null = null;
     const customer = tx
       .select()
       .from(customers)
@@ -345,6 +350,9 @@ export function submitReason(opts: {
       .run();
 
     if (opts.kodeAlasan === "3") {
+      if (customer.statusCustomer !== "inactive") {
+        becameInactive = { id: customer.id, nama: customer.nama };
+      }
       tx.update(customers)
         .set({
           handledOn: todayIso(),
@@ -366,5 +374,16 @@ export function submitReason(opts: {
         .where(eq(customers.id, customer.id))
         .run();
     }
+    return becameInactive;
   });
+  if (inactivated) {
+    logActivity({
+      entityType: "customer",
+      entityId: inactivated.id,
+      entityLabel: inactivated.nama,
+      action: "update",
+      actorId: opts.actingUserId,
+      changes: { status_customer: { from: "aktif", to: "inactive" } },
+    });
+  }
 }

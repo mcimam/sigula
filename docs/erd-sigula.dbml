@@ -1,0 +1,573 @@
+// SiGula — ERD TARGET (desain untuk pengembangan), format DBML
+//
+// Status  : RANCANGAN, 2026-09-26. Belum diterapkan: skema yang berjalan masih
+//           app/db/schema.ts (SQLite). Perpindahan ke sini dilakukan bertahap lewat
+//           migrasi + tes, bukan dengan mengubah dokumen ini.
+// Lihat   : https://dbdiagram.io/d (tempel seluruh teks ini).
+//
+// Keputusan yang membentuk ERD ini (2026-09-26):
+//   D1 Database  : SQLite sekarang, PostgreSQL nanti -> tipe ditulis portabel.
+//   D2 Tenant    : satu perusahaan; tidak ada kolom cabang/tenant.
+//   D3 Transaksi : tetap sebatas "customer X order pada tanggal Y" (tanpa produk/nilai).
+//   D4 Hapus     : master data soft delete (deleted_at); tabel riwayat/log tidak pernah
+//                  diubah atau dihapus. Semua FK = RESTRICT kecuali ditulis lain.
+//   D5 Hierarki  : salesmen.supervisor_id self-reference (ADR-0004), bebas kedalaman.
+//                  "Supervisor" adalah fakta turunan: salesman yang punya bawahan.
+//   D6 Akses     : RBAC berbasis tabel (roles, permissions) dengan cakupan data
+//                  own/team/all; "team" = diri sendiri + seluruh bawahan di hierarki.
+//   D7 Kepemilikan customer : riwayat berjangka (customer_assignments), menggantikan
+//                  mutation_logs.
+//   D8 Notifikasi: multi-channel, template bisa diedit, dan customer per pesan
+//                  tercatat (menggantikan flag customers.notified).
+//
+// Konvensi tipe (berlaku di SQLite hari ini dan PostgreSQL nanti):
+//   id integer increment  -> SQLite INTEGER PRIMARY KEY AUTOINCREMENT
+//                            PostgreSQL bigint GENERATED ALWAYS AS IDENTITY
+//   date                  -> tanggal bisnis tanpa jam. SQLite TEXT 'YYYY-MM-DD'; PG date.
+//   timestamp             -> selalu UTC, diisi APLIKASI (bukan default DB).
+//                            SQLite TEXT ISO-8601 'YYYY-MM-DDTHH:MM:SSZ'; PG timestamptz.
+//   boolean               -> SQLite INTEGER 0/1; PG boolean.
+//   enum                  -> kolom TEXT + CHECK (bukan tipe ENUM PostgreSQL) agar migrasi
+//                            antar-DB sama. Nilai yang boleh diubah admin tidak memakai
+//                            enum, tapi tabel lookup (roles, permissions,
+//                            follow_up_reasons, message_templates).
+//   "tanggal hari ini" untuk kolom date dihitung dari zona waktu bisnis
+//   (app_settings 'business_timezone', default Asia/Jakarta), bukan dari UTC.
+//
+// Konvensi kolom:
+//   Master data : created_at, updated_at, deleted_at (+ *_by user). Baris dengan
+//                 deleted_at terisi dianggap tidak ada oleh aplikasi.
+//   Unique pada master data berlaku hanya untuk baris hidup
+//   (PostgreSQL: partial unique index "WHERE deleted_at IS NULL"; SQLite juga mendukung
+//   partial index). DBML tidak bisa menulisnya, jadi ditandai "[hidup]" di Note.
+//   Kolom *_name / *_label bertanda "snapshot" disalin saat kejadian supaya riwayat tetap
+//   terbaca walau sumbernya berubah.
+
+Project sigula {
+  database_type: 'PostgreSQL'
+  Note: '''
+  SiGula: pelacak siklus reorder customer + pengingat ke salesman.
+  database_type ditulis PostgreSQL sebagai target; skema tetap harus berjalan di SQLite.
+  '''
+}
+
+// ───────────────────────────── enum (TEXT + CHECK) ─────────────────────────────
+
+enum active_status {
+  aktif
+  inactive
+}
+
+enum customer_type {
+  lama
+  baru
+}
+
+enum order_source {
+  seed
+  import
+  manual
+}
+
+enum permission_scope {
+  own  [note: 'hanya data milik salesman yang terhubung ke user']
+  team [note: 'milik sendiri + seluruh bawahan (rekursif) di hierarki salesmen']
+  all  [note: 'semua data']
+}
+
+enum channel {
+  whatsapp
+  email
+  sms
+  push
+}
+
+enum recipient_kind {
+  salesman   [note: 'daftar customer milik penerima yang jatuh tempo']
+  supervisor [note: 'ringkasan customer jatuh tempo milik bawahan']
+}
+
+enum run_trigger {
+  manual
+  scheduled
+}
+
+enum delivery_status {
+  queued
+  sent
+  failed
+  skipped_no_contact
+}
+
+enum follow_up_outcome {
+  will_order      [note: 'customer akan order']
+  not_ordering    [note: 'tidak order; reason_id wajib']
+  unreachable
+}
+
+enum activity_action {
+  create
+  update
+  delete
+  restore
+}
+
+// ───────────────────────────── akses (RBAC) ─────────────────────────────
+
+Table users {
+  id integer [pk, increment]
+  username text [not null, note: 'unik [hidup]; disimpan huruf kecil']
+  password_hash text [not null]
+  display_name text [not null]
+  salesman_id integer [note: 'terisi bila user ini adalah seorang salesman; unik [hidup]']
+  is_active boolean [not null, default: true, note: 'false = tidak bisa login, data tetap']
+  last_login_at timestamp
+  created_at timestamp [not null]
+  updated_at timestamp [not null]
+  deleted_at timestamp
+
+  Note: '''
+  Menggantikan profiles: satu user = satu baris, kaitan ke salesman pindah ke sini,
+  role pindah ke user_roles.
+  Unique [hidup]: username; salesman_id.
+  '''
+}
+
+Table roles {
+  id integer [pk, increment]
+  code text [not null, unique, note: 'contoh: admin, management, salesman']
+  name text [not null]
+  description text [not null, default: '']
+  is_system boolean [not null, default: false, note: 'role bawaan, tidak bisa dihapus']
+  created_at timestamp [not null]
+  updated_at timestamp [not null]
+
+  Note: '''
+  Tidak ada role "supervisor". Salesman yang punya bawahan otomatis melihat data timnya
+  lewat scope = team (D5, D6), jadi role tidak bisa bertentangan dengan hierarki.
+  '''
+}
+
+Table permissions {
+  id integer [pk, increment]
+  code text [not null, unique, note: 'contoh: customer.read, customer.reassign, notification.trigger']
+  description text [not null, default: '']
+
+  Note: 'Daftar permission didefinisikan oleh kode aplikasi dan di-seed; admin hanya memetakannya ke role.'
+}
+
+Table role_permissions {
+  role_id integer [not null]
+  permission_id integer [not null]
+  scope permission_scope [not null, default: 'all']
+
+  indexes {
+    (role_id, permission_id) [pk]
+  }
+}
+
+Table user_roles {
+  user_id integer [not null]
+  role_id integer [not null]
+  granted_at timestamp [not null]
+  granted_by_id integer
+
+  indexes {
+    (user_id, role_id) [pk]
+    role_id
+  }
+
+  Note: 'Bila satu user punya beberapa role untuk permission yang sama, scope terluas yang berlaku.'
+}
+
+// ───────────────────────────── master data ─────────────────────────────
+
+Table salesmen {
+  id integer [pk, increment]
+  code text [note: 'kode salesman dari sistem lain/ERP; unik [hidup] bila terisi']
+  nama text [not null]
+  supervisor_id integer [note: 'atasan langsung; kosong = puncak hierarki']
+  status active_status [not null, default: 'aktif']
+  created_at timestamp [not null]
+  updated_at timestamp [not null]
+  deleted_at timestamp
+
+  indexes {
+    supervisor_id
+  }
+
+  Note: '''
+  ADR-0004: supervisor = salesman yang punya bawahan; hierarki bebas kedalaman.
+  CHECK supervisor_id IS NULL OR supervisor_id <> id.
+  Siklus lebih dalam ditolak aplikasi. Query tim memakai WITH RECURSIVE (SQLite & PG).
+  Nomor WA pindah ke salesman_contacts (D8).
+  '''
+}
+
+Table salesman_contacts {
+  id integer [pk, increment]
+  salesman_id integer [not null]
+  channel channel [not null]
+  address text [not null, note: 'nomor E.164 (628xx) / email / device token']
+  is_primary boolean [not null, default: false]
+  is_verified boolean [not null, default: false]
+  created_at timestamp [not null]
+  updated_at timestamp [not null]
+  deleted_at timestamp
+
+  indexes {
+    (salesman_id, channel)
+  }
+
+  Note: 'Unique [hidup]: satu is_primary per (salesman_id, channel).'
+}
+
+Table customers {
+  id integer [pk, increment]
+  code text [note: 'kode customer dari sistem lain/ERP; unik [hidup] bila terisi']
+  nama text [not null]
+  tipe_customer customer_type [not null]
+  order_cycle_days integer [not null, default: 30]
+  status_customer active_status [not null, default: 'aktif']
+  salesman_id integer [not null, note: 'CACHE: pemegang saat ini = customer_assignments yang valid_to kosong']
+  last_order_date date [note: 'CACHE: MAX(transaksi.tanggal_order) yang hidup; kosong = belum pernah order']
+  created_at timestamp [not null]
+  updated_at timestamp [not null]
+  deleted_at timestamp
+
+  indexes {
+    salesman_id
+    (status_customer, last_order_date) [note: 'daftar jatuh tempo']
+  }
+
+  Note: '''
+  CHECK order_cycle_days >= 1.
+  Unique [hidup]: (lower(nama), salesman_id) — nama sama tetap boleh antar salesman,
+  tapi "Toko Maju" dan "toko maju" di satu salesman dianggap sama.
+  Kolom notified / handled_on dihapus: status pengingat dibaca dari notification_items
+  dan follow_ups.
+  Kolom CACHE ditulis dalam transaksi yang sama dengan sumbernya.
+  '''
+}
+
+Table customer_assignments {
+  id integer [pk, increment]
+  customer_id integer [not null]
+  salesman_id integer [not null]
+  valid_from timestamp [not null]
+  valid_to timestamp [note: 'kosong = assignment yang sedang berlaku']
+  assigned_by_id integer [note: 'kosong untuk data awal / impor']
+  note text [not null, default: '']
+
+  indexes {
+    (customer_id, valid_from)
+    salesman_id
+  }
+
+  Note: '''
+  Menggantikan mutation_logs (D7). Immutable kecuali pengisian valid_to satu kali saat
+  customer dipindah.
+  Unique: satu baris dengan valid_to kosong per customer_id
+  (partial unique index WHERE valid_to IS NULL).
+  CHECK valid_to IS NULL OR valid_to > valid_from.
+  '''
+}
+
+// ───────────────────────────── transaksi dan riwayat ─────────────────────────────
+
+Table transaksi {
+  id integer [pk, increment]
+  customer_id integer [not null]
+  salesman_id integer [not null, note: 'snapshot: pemegang customer saat order; tidak ikut berubah saat customer dipindah']
+  tanggal_order date [not null]
+  sumber order_source [not null]
+  import_batch_id integer [note: 'terisi bila sumber = import']
+  catatan text [not null, default: '']
+  created_at timestamp [not null, note: 'menggantikan tanggal_input']
+  created_by_id integer
+  updated_at timestamp [not null]
+  updated_by_id integer
+  deleted_at timestamp
+  deleted_by_id integer
+
+  indexes {
+    (customer_id, tanggal_order)
+    (salesman_id, tanggal_order)
+  }
+
+  Note: '''
+  DEBT-009: transaksi boleh diedit dan dihapus. Dengan D4 "hapus" = soft delete, dan
+  jejak perubahan ada di activity_logs, sehingga BR-10 (tidak ada riwayat yang hilang)
+  terpenuhi kembali.
+  '''
+}
+
+Table import_batches {
+  id integer [pk, increment]
+  file_name text [not null]
+  file_sha256 text [not null, note: 'mencegah file yang sama diimpor dua kali tanpa sadar']
+  row_count integer [not null, default: 0]
+  imported_by_id integer [not null]
+  imported_at timestamp [not null]
+
+  Note: 'Asal-usul setiap baris transaksi hasil impor Excel; memungkinkan "batalkan impor ini".'
+}
+
+Table customer_status_history {
+  id integer [pk, increment]
+  customer_id integer [not null]
+  from_status active_status [not null]
+  to_status active_status [not null]
+  reason text [not null, default: '', note: 'contoh: manual, auto_reactivation (order baru masuk)']
+  changed_by_id integer [note: 'kosong = oleh sistem']
+  changed_at timestamp [not null]
+
+  indexes {
+    (customer_id, changed_at)
+  }
+
+  Note: 'Menggantikan status_logs. Immutable.'
+}
+
+Table follow_up_reasons {
+  id integer [pk, increment]
+  code text [not null, unique, note: 'kode lama 1/2/3 dipertahankan']
+  label text [not null, note: 'Kalah Harga, Stok Masih Ada, Sudah Bangkrut, ...']
+  deactivates_customer boolean [not null, default: false, note: 'mis. Sudah Bangkrut']
+  sort_order integer [not null, default: 0]
+  is_active boolean [not null, default: true]
+
+  Note: 'Lookup yang bisa ditambah admin tanpa migrasi (sebelumnya CHECK kode_alasan 1..3).'
+}
+
+Table follow_ups {
+  id integer [pk, increment]
+  customer_id integer [not null]
+  salesman_id integer [not null, note: 'yang melakukan follow-up']
+  notification_item_id integer [note: 'pengingat yang ditindaklanjuti; kosong = follow-up spontan']
+  outcome follow_up_outcome [not null]
+  reason_id integer [note: 'wajib bila outcome = not_ordering']
+  note text [not null, default: '']
+  follow_up_date date [not null]
+  created_at timestamp [not null]
+  created_by_id integer
+
+  indexes {
+    (customer_id, follow_up_date)
+    notification_item_id [unique]
+  }
+
+  Note: '''
+  Menggantikan reason_logs dan customers.handled_on. Immutable.
+  CHECK outcome <> 'not_ordering' OR reason_id IS NOT NULL.
+  '''
+}
+
+// ───────────────────────────── notifikasi ─────────────────────────────
+
+Table message_templates {
+  id integer [pk, increment]
+  code text [not null, note: 'contoh: reminder_salesman, reminder_supervisor']
+  channel channel [not null]
+  recipient_kind recipient_kind [not null]
+  body text [not null, note: 'teks dengan placeholder, mis. {{salesman_nama}}, {{daftar_customer}}']
+  version integer [not null, default: 1]
+  is_active boolean [not null, default: true]
+  created_at timestamp [not null]
+  created_by_id integer
+
+  indexes {
+    (code, channel, version) [unique]
+  }
+
+  Note: '''
+  Edit template = sisipkan versi baru (baris lama tidak diubah), supaya pesan lama tetap
+  bisa ditelusuri ke teks aslinya. Unique: satu is_active per (code, channel).
+  '''
+}
+
+Table notification_runs {
+  id integer [pk, increment]
+  trigger run_trigger [not null]
+  triggered_by_id integer [note: 'wajib bila trigger = manual; kosong bila scheduled']
+  as_of_date date [not null, note: 'tanggal bisnis yang dipakai menghitung jatuh tempo']
+  started_at timestamp [not null]
+  finished_at timestamp
+
+  Note: '''
+  Menggantikan notification_batches. Immutable setelah finished_at terisi.
+  CHECK trigger <> 'manual' OR triggered_by_id IS NOT NULL.
+  '''
+}
+
+Table notification_deliveries {
+  id integer [pk, increment]
+  run_id integer [not null]
+  salesman_id integer [not null, note: 'penerima']
+  recipient_kind recipient_kind [not null]
+  channel channel [not null]
+  contact_id integer [note: 'kontak yang dipakai; kosong bila skipped_no_contact']
+  address text [not null, default: '', note: 'snapshot alamat tujuan']
+  template_id integer [note: 'versi template yang dipakai']
+  message_body text [not null, default: '', note: 'snapshot teks final yang dikirim']
+  status delivery_status [not null]
+  provider_message_id text [note: 'id dari WAHA / provider lain, untuk status baca/terkirim']
+  error_message text [not null, default: '']
+  attempt integer [not null, default: 1]
+  sent_at timestamp
+
+  indexes {
+    run_id
+    (salesman_id, sent_at)
+  }
+
+  Note: 'Retry = baris baru dengan attempt + 1; baris lama tetap sebagai jejak kegagalan.'
+}
+
+Table notification_items {
+  id integer [pk, increment]
+  delivery_id integer [not null]
+  customer_id integer [not null]
+  last_order_date date [note: 'snapshot saat pesan dibuat']
+  days_overdue integer [not null, note: 'snapshot']
+
+  indexes {
+    (delivery_id, customer_id) [unique]
+    customer_id
+  }
+
+  Note: '''
+  Customer yang disebut dalam setiap pesan. Menggantikan customers.notified:
+  customer "sedang diingatkan" = punya notification_item dari delivery berstatus sent
+  yang belum punya follow_up dan belum tertutup order baru.
+  Immutable.
+  '''
+}
+
+// ───────────────────────────── audit dan konfigurasi ─────────────────────────────
+
+Table activity_logs {
+  id integer [pk, increment]
+  entity_type text [not null, note: 'nama tabel, mis. transaksi, customers, salesmen, users']
+  entity_id integer [not null, note: 'sengaja tanpa FK: jejak tetap ada walau entitas berubah']
+  entity_label text [not null, default: '', note: 'snapshot']
+  action activity_action [not null]
+  actor_id integer
+  actor_name text [not null, default: '', note: 'snapshot']
+  changes text [not null, default: '{}', note: 'JSON {field: {from, to}}; rahasia hanya "(diubah)". PG: jsonb']
+  created_at timestamp [not null]
+
+  indexes {
+    (entity_type, entity_id, id) [name: 'activity_entity_idx']
+    (actor_id, created_at)
+  }
+
+  Note: 'entity_type berupa text bebas (bukan enum) agar tabel baru bisa diaudit tanpa migrasi. Immutable.'
+}
+
+Table app_settings {
+  key text [pk, note: 'contoh: business_timezone, waha_url, reminder_cron']
+  value text [not null, default: '']
+  is_secret boolean [not null, default: false, note: 'true = tidak pernah ditampilkan/dicatat utuh']
+  updated_at timestamp [not null]
+  updated_by_id integer
+}
+
+// ───────────────────────────── relasi ─────────────────────────────
+// Semua ON DELETE RESTRICT (default) karena master memakai soft delete (D4),
+// kecuali yang ditulis eksplisit.
+
+Ref: users.salesman_id - salesmen.id
+Ref: user_roles.user_id > users.id [delete: cascade]
+Ref: user_roles.role_id > roles.id [delete: cascade]
+Ref: user_roles.granted_by_id > users.id
+Ref: role_permissions.role_id > roles.id [delete: cascade]
+Ref: role_permissions.permission_id > permissions.id [delete: cascade]
+
+Ref: salesmen.supervisor_id > salesmen.id
+Ref: salesman_contacts.salesman_id > salesmen.id
+
+Ref: customers.salesman_id > salesmen.id
+Ref: customer_assignments.customer_id > customers.id
+Ref: customer_assignments.salesman_id > salesmen.id
+Ref: customer_assignments.assigned_by_id > users.id
+
+Ref: transaksi.customer_id > customers.id
+Ref: transaksi.salesman_id > salesmen.id
+Ref: transaksi.import_batch_id > import_batches.id
+Ref: transaksi.created_by_id > users.id
+Ref: transaksi.updated_by_id > users.id
+Ref: transaksi.deleted_by_id > users.id
+Ref: import_batches.imported_by_id > users.id
+
+Ref: customer_status_history.customer_id > customers.id
+Ref: customer_status_history.changed_by_id > users.id
+
+Ref: follow_ups.customer_id > customers.id
+Ref: follow_ups.salesman_id > salesmen.id
+Ref: follow_ups.notification_item_id > notification_items.id
+Ref: follow_ups.reason_id > follow_up_reasons.id
+Ref: follow_ups.created_by_id > users.id
+
+Ref: message_templates.created_by_id > users.id
+Ref: notification_runs.triggered_by_id > users.id
+Ref: notification_deliveries.run_id > notification_runs.id
+Ref: notification_deliveries.salesman_id > salesmen.id
+Ref: notification_deliveries.contact_id > salesman_contacts.id
+Ref: notification_deliveries.template_id > message_templates.id
+Ref: notification_items.delivery_id > notification_deliveries.id
+Ref: notification_items.customer_id > customers.id
+
+Ref: activity_logs.actor_id > users.id [delete: set null]
+Ref: app_settings.updated_by_id > users.id
+
+// ───────────────────────────── pengelompokan (tampilan) ─────────────────────────────
+
+TableGroup akses {
+  users
+  roles
+  permissions
+  role_permissions
+  user_roles
+}
+
+TableGroup master_data {
+  salesmen
+  salesman_contacts
+  customers
+  customer_assignments
+}
+
+TableGroup transaksi_dan_riwayat {
+  transaksi
+  import_batches
+  customer_status_history
+  follow_up_reasons
+  follow_ups
+}
+
+TableGroup notifikasi {
+  message_templates
+  notification_runs
+  notification_deliveries
+  notification_items
+}
+
+TableGroup audit_dan_konfigurasi {
+  activity_logs
+  app_settings
+}
+
+// ───────────────────────────── pemetaan dari skema sekarang ─────────────────────────────
+//   profiles                  -> users.salesman_id + user_roles (role supervisor dihapus, D6)
+//   salesmen.nomor_wa         -> salesman_contacts (channel whatsapp, is_primary)
+//   mutation_logs             -> customer_assignments
+//   status_logs               -> customer_status_history
+//   reason_logs               -> follow_ups (outcome not_ordering) + follow_up_reasons
+//   customers.notified        -> notification_items tanpa follow_up (turunan)
+//   customers.handled_on      -> follow_ups.follow_up_date
+//   notification_batches      -> notification_runs
+//   transaksi.tanggal_input   -> transaksi.created_at
+//   hard delete               -> deleted_at (D4)
+// Tabel baru murni: roles, permissions, role_permissions, import_batches,
+//   message_templates, notification_items.

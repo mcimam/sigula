@@ -99,5 +99,7 @@ Remaining: <what is still open, or "nothing">
 ## Done when
 
 The cause is a stated mechanism rather than a suspicion, the regression test was
-observed failing before the fix, related instances were searched for, and
-`STATE.md` reflects reality again.
+observed failing before the fix, related instances were searched for,
+`STATE.md` reflects reality again, and the code map (`config.yml → paths.codemap`)
+matches the fix — a new quirk or a corrected contract belongs in it — with its
+`Last synced` line bumped.

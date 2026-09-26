@@ -105,4 +105,7 @@ look like from the outside. Written for someone who is not you, at 2am.
 
 The release runs in its target environment and you have observed it working,
 rollback is documented, no secret exists in the repo/image/logs, and the runbook
-would let someone else operate this without asking you.
+would let someone else operate this without asking you. If you changed the
+Dockerfile, compose file, or build/start config, the "Config, env, deploy"
+section of the code map (`config.yml → paths.codemap`) reflects it and its
+`Last synced` line is bumped.

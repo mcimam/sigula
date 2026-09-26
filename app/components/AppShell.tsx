@@ -1,15 +1,36 @@
-import { Form, Link, NavLink } from "react-router";
+import { Form, Link, NavLink, useLocation } from "react-router";
 
 import type { AuthUser } from "~/lib/auth.server";
 import type { Role } from "~/db/schema";
 
-const NAV: Record<Role, { to: string; label: string }[]> = {
+type NavEntry = {
+  to: string;
+  label: string;
+  children?: { tab: string; label: string }[];
+};
+
+const NAV: Record<Role, NavEntry[]> = {
   admin: [
     { to: "/admin/dashboard", label: "Dashboard" },
     { to: "/admin/transaksi", label: "Transaksi" },
-    { to: "/admin/masterdata", label: "Data Master" },
+    {
+      to: "/admin/masterdata",
+      label: "Data Master",
+      children: [
+        { tab: "customer", label: "Customer" },
+        { tab: "salesman", label: "Salesman" },
+        { tab: "user", label: "User" },
+      ],
+    },
     { to: "/admin/audit", label: "Log Audit" },
-    { to: "/admin/settings", label: "Pengaturan" },
+    {
+      to: "/admin/settings",
+      label: "Pengaturan",
+      children: [
+        { tab: "waha", label: "Koneksi WAHA" },
+        { tab: "cron", label: "Jadwal Cron" },
+      ],
+    },
   ],
   salesman: [
     { to: "/salesman", label: "Dashboard" },
@@ -26,19 +47,37 @@ const NAV: Record<Role, { to: string; label: string }[]> = {
 };
 
 function NavItems({ role }: { role: Role }) {
+  const { pathname, search } = useLocation();
+  // No `?tab=` means the first submenu entry.
+  const tabParam = new URLSearchParams(search).get("tab");
+
   return (
     <>
       {NAV[role].map((item) => (
-        <NavLink
-          key={item.to}
-          to={item.to}
-          className={({ isActive }) =>
-            `app-nav-link${isActive ? " app-nav-link--active" : ""}`
-          }
-          end={item.to === "/salesman" || item.to === "/supervisor" || item.to === "/management"}
-        >
-          {item.label}
-        </NavLink>
+        <div key={item.to}>
+          <NavLink
+            to={item.to}
+            className={({ isActive }) =>
+              `app-nav-link${isActive ? " app-nav-link--active" : ""}`
+            }
+            end={item.to === "/salesman" || item.to === "/supervisor" || item.to === "/management"}
+          >
+            {item.label}
+          </NavLink>
+          {item.children && pathname.startsWith(item.to) ? (
+            <div className="app-nav-sub">
+              {item.children.map((child, _i, siblings) => (
+                <Link
+                  key={child.tab}
+                  to={`${item.to}?tab=${child.tab}`}
+                  className={`app-nav-sub__link${(tabParam ?? siblings[0].tab) === child.tab ? " app-nav-sub__link--active" : ""}`}
+                >
+                  {child.label}
+                </Link>
+              ))}
+            </div>
+          ) : null}
+        </div>
       ))}
     </>
   );

@@ -6,6 +6,9 @@ import { db } from "~/db/client.server";
 import { customers, transaksi, statusLogs } from "~/db/schema";
 import {
   computeEligibleCustomers,
+  createTransaksi,
+  deleteTransaksiMany,
+  listTransaksi,
   notYetNotifiedEligible,
   recordOrder,
 } from "~/lib/orders.server";
@@ -130,5 +133,83 @@ describe("recordOrder (FR-9/FR-10, BR-5)", () => {
     expect(logs).toHaveLength(1);
     expect(logs[0].tipe).toBe("auto_reactivation");
     expect(logs[0].olehId).toBe(admin.id);
+  });
+});
+
+describe("deleteTransaksiMany", () => {
+  beforeEach(() => resetDb());
+
+  it("deletes every listed id and leaves the rest untouched", async () => {
+    const { salesman, admin } = await seedOrg();
+    const c = addCustomer({ salesmanId: salesman.id, nama: "Toko A" });
+    const t1 = createTransaksi({
+      customerId: c.id,
+      salesmanId: salesman.id,
+      tanggalOrder: "2026-08-01",
+      actingUserId: admin.id,
+    });
+    const t2 = createTransaksi({
+      customerId: c.id,
+      salesmanId: salesman.id,
+      tanggalOrder: "2026-08-15",
+      actingUserId: admin.id,
+    });
+    const t3 = createTransaksi({
+      customerId: c.id,
+      salesmanId: salesman.id,
+      tanggalOrder: "2026-09-01",
+      actingUserId: admin.id,
+    });
+    const all = listTransaksi();
+    expect(all).toHaveLength(3);
+
+    const [row1, row3] = all.filter((r) =>
+      [t1.tanggalOrder, t3.tanggalOrder].includes(r.tanggalOrder),
+    );
+
+    deleteTransaksiMany([row1.id, row3.id]);
+
+    const remaining = listTransaksi();
+    expect(remaining).toHaveLength(1);
+    expect(remaining[0].tanggalOrder).toBe(t2.tanggalOrder);
+  });
+
+  it("recomputes the customer's last order date from what remains", async () => {
+    const { salesman, admin } = await seedOrg();
+    const c = addCustomer({ salesmanId: salesman.id, nama: "Toko B" });
+    createTransaksi({
+      customerId: c.id,
+      salesmanId: salesman.id,
+      tanggalOrder: "2026-08-01",
+      actingUserId: admin.id,
+    });
+    const newest = createTransaksi({
+      customerId: c.id,
+      salesmanId: salesman.id,
+      tanggalOrder: "2026-09-10",
+      actingUserId: admin.id,
+    });
+    expect(getCustomer(c.id).lastOrderDate).toBe("2026-09-10");
+
+    const newestRow = listTransaksi().find(
+      (r) => r.tanggalOrder === newest.tanggalOrder,
+    )!;
+    deleteTransaksiMany([newestRow.id]);
+
+    expect(getCustomer(c.id).lastOrderDate).toBe("2026-08-01");
+  });
+
+  it("is a no-op for an empty list", async () => {
+    const { salesman, admin } = await seedOrg();
+    const c = addCustomer({ salesmanId: salesman.id, nama: "Toko C" });
+    createTransaksi({
+      customerId: c.id,
+      salesmanId: salesman.id,
+      tanggalOrder: "2026-08-01",
+      actingUserId: admin.id,
+    });
+
+    expect(() => deleteTransaksiMany([])).not.toThrow();
+    expect(listTransaksi()).toHaveLength(1);
   });
 });
