@@ -18,6 +18,7 @@ import { notYetNotifiedEligible } from "~/lib/orders.server";
 import { pageWindow } from "~/lib/pagination";
 import { activeTemplate, customerLines, orderByWait, renderTemplate, type TemplateCode } from "~/lib/templates.server";
 import { createWahaClient, type WahaClient } from "~/lib/waha.server";
+import { isPlausibleWhatsappNumber, normalizeWhatsappNumber } from "~/lib/whatsapp-number";
 
 /**
  * The reminder job (FR-3, ADR-0002, ADR-0006). A *run* is one trigger; it holds
@@ -163,6 +164,9 @@ export async function resendReminder(opts: {
   const salesman = salesmenWithWhatsapp([customer.salesmanId])[0];
   if (!salesman) throw new Error("Salesman tidak ditemukan");
   if (!salesman.nomorWa) throw new Error(`${salesman.nama} belum punya nomor WhatsApp`);
+  if (!isPlausibleWhatsappNumber(normalizeWhatsappNumber(salesman.nomorWa))) {
+    throw new Error(`Nomor WhatsApp ${salesman.nama} tidak valid (${salesman.nomorWa}) — perbaiki di Data Master → Salesman`);
+  }
 
   const recent = db
     .select({ sentAt: notificationDeliveries.sentAt })
@@ -333,6 +337,13 @@ async function deliver(opts: {
   const contact = primaryContact(recipient.id, channel);
   if (!contact) {
     db.insert(notificationDeliveries).values({ ...base, status: "skipped_no_contact" }).run();
+    return;
+  }
+  if (channel === "whatsapp" && !isPlausibleWhatsappNumber(normalizeWhatsappNumber(contact.address))) {
+    // Garbage in the number field: skip it with the reason instead of asking WAHA and getting a 500.
+    db.insert(notificationDeliveries)
+      .values({ ...base, contactId: contact.id, address: contact.address, status: "skipped_no_contact", errorMessage: `Nomor WhatsApp tidak valid: ${contact.address}` })
+      .run();
     return;
   }
 

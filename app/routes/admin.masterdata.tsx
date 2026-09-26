@@ -882,6 +882,8 @@ export default function AdminMasterdata() {
                   id="d-wa"
                   name="nomor_wa"
                   className="form-control"
+                  inputMode="tel"
+                  placeholder="0812xxxxxxxx atau 62812xxxxxxxx"
                   defaultValue={editing.salesman?.nomorWa ?? ""}
                 />
               </div>

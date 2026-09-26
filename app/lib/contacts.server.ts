@@ -3,6 +3,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { db } from "~/db/client.server";
 import { alive, salesmanContacts, type Channel } from "~/db/schema";
 import { nowIso } from "~/lib/dates";
+import { normalizeWhatsappNumber } from "~/lib/whatsapp-number";
 
 /**
  * How to reach a salesman (ERD D8). `salesman_contacts` holds one live primary
@@ -26,21 +27,20 @@ export function whatsappNumber(salesmanId: number): string {
   return primaryContact(salesmanId, "whatsapp")?.address ?? "";
 }
 
-/** The digits of a number as typed ("+62 812-…" and "62812…" are the same WhatsApp chat). */
-export const digitsOf = (address: string) => address.replace(/\D/g, "");
-
 /**
- * The salesman whose primary WhatsApp number is `digits` — who is writing to us. Numbers are
- * compared by their digits, the way `sendText` addresses a chat. Null for a stranger.
+ * The salesman whose primary WhatsApp number is `number` — who is writing to us. Both sides are
+ * compared as WhatsApp sees them (`normalizeWhatsappNumber`: "+62 812-…", "0812…" and "62812…" are
+ * one number), the way `sendText` addresses a chat. Null for a stranger.
  */
-export function salesmanIdByWhatsapp(digits: string): number | null {
+export function salesmanIdByWhatsapp(number: string): number | null {
+  const digits = normalizeWhatsappNumber(number);
   if (!digits) return null;
   const contacts = db
     .select({ salesmanId: salesmanContacts.salesmanId, address: salesmanContacts.address })
     .from(salesmanContacts)
     .where(primaryOn("whatsapp"))
     .all();
-  return contacts.find((c) => digitsOf(c.address) === digits)?.salesmanId ?? null;
+  return contacts.find((c) => normalizeWhatsappNumber(c.address) === digits)?.salesmanId ?? null;
 }
 
 /**

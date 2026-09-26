@@ -204,6 +204,103 @@ describe("pending: only a customer's newest reminder decides", () => {
   });
 });
 
+describe("numbers saved the way people write them (the production 500)", () => {
+  beforeEach(() => {
+    resetDb();
+    saveWahaSettings({ baseUrl: "http://waha.test", session: "Sigula", timeoutMs: 3000 });
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  const stubWaha = (respond?: () => Response) => {
+    const chats: string[] = [];
+    vi.stubGlobal("fetch", async (_url: string, init?: { body?: string }) => {
+      chats.push(JSON.parse(String(init?.body)).chatId);
+      return respond ? respond() : new Response(JSON.stringify({ id: "wamid.x" }), { status: 201 });
+    });
+    return chats;
+  };
+
+  it("a number saved as 0822-… is sent to 62822… — the reminder goes through instead of WAHA answering 500", async () => {
+    const { admin, salesman } = await seedOrg();
+    setWhatsappNumber(salesman.id, "0822-2222-222"); // 628222222222 as people write it
+    const c = addCustomer({ salesmanId: salesman.id, nama: "Toko", lastOrderDate: "2026-03-24" });
+    const chats = stubWaha();
+
+    await resendReminder({ customerId: c.id, triggeredById: admin.id, today: TODAY });
+
+    expect(chats).toEqual(["628222222222@c.us"]);
+    expect(deliveries()[0]).toMatchObject({ status: "sent", address: "0822-2222-222" }); // saved as typed, sent normalised
+  });
+
+  it("the same for a whole batch", async () => {
+    const { admin, salesman } = await seedOrg();
+    setWhatsappNumber(salesman.id, "08222222222");
+    addCustomer({ salesmanId: salesman.id, nama: "Toko", lastOrderDate: "2026-03-24" });
+    const chats = stubWaha();
+
+    await triggerBatch({ triggeredById: admin.id, today: TODAY });
+
+    expect(chats).toContain("628222222222@c.us");
+    expect(chats.every((chat) => !chat.startsWith("0"))).toBe(true);
+  });
+
+  it("when WAHA still refuses, the reason WAHA gave is in the message and on the delivery", async () => {
+    const { admin, salesman } = await seedOrg();
+    const c = addCustomer({ salesmanId: salesman.id, nama: "Toko", lastOrderDate: "2026-03-24" });
+    stubWaha(() => new Response('{"message":"No LID for user"}', { status: 500, statusText: "Internal Server Error" }));
+
+    await expect(resendReminder({ customerId: c.id, triggeredById: admin.id, today: TODAY })).rejects.toThrow(
+      'Pengingat gagal dikirim ke Andi Sales: WAHA returned 500: Internal Server Error — {"message":"No LID for user"}',
+    );
+    expect(deliveries()[0].errorMessage).toContain("No LID for user");
+  });
+
+  it("a number that cannot be a WhatsApp number is refused with its name, before anything is written or asked of WAHA", async () => {
+    const { admin, salesman } = await seedOrg();
+    setWhatsappNumber(salesman.id, "0812");
+    const c = addCustomer({ salesmanId: salesman.id, nama: "Toko", lastOrderDate: "2026-03-24" });
+    const chats = stubWaha();
+
+    await expect(resendReminder({ customerId: c.id, triggeredById: admin.id, today: TODAY })).rejects.toThrow(
+      "Nomor WhatsApp Andi Sales tidak valid (0812)",
+    );
+
+    expect(chats).toHaveLength(0);
+    expect(runs()).toHaveLength(0);
+  });
+
+  it("in a batch it is skipped with the reason, not sent", async () => {
+    const { admin, salesman } = await seedOrg();
+    setWhatsappNumber(salesman.id, "abc");
+    addCustomer({ salesmanId: salesman.id, nama: "Toko", lastOrderDate: "2026-03-24" });
+    const chats = stubWaha();
+
+    await triggerBatch({ triggeredById: admin.id, today: TODAY });
+
+    expect(chats.filter((chat) => chat.includes("abc"))).toHaveLength(0);
+    const mine = deliveries().find((d) => d.recipientKind === "salesman")!;
+    expect(mine).toMatchObject({ status: "skipped_no_contact", errorMessage: "Nomor WhatsApp tidak valid: abc" });
+    expect(pendingCustomerIds().size).toBe(0); // nobody was reminded, so nobody waits
+  });
+
+  it("a reply is recognised whichever way the salesman's number was saved", async () => {
+    const { admin, salesman } = await seedOrg();
+    const c = addCustomer({ salesmanId: salesman.id, nama: "Toko", lastOrderDate: "2026-03-24" });
+    await triggerBatch({ triggeredById: admin.id, client: fakeClient().client, today: TODAY });
+    const out = fakeClient();
+    const deps: InboundDeps = { client: out.client, lookupLid: async () => null };
+    const reply = (n: number) => ({ event: "message", session: "Sigula", payload: { id: `m${n}`, from: "628222222222@c.us", fromMe: false, body: "Kalah Harga", timestamp: 1790000000 } });
+
+    for (const [i, saved] of ["0822-2222-222", "+62 822 2222 222", "8222222222"].entries()) {
+      setWhatsappNumber(salesman.id, saved);
+      const result = await handleWahaEvent(reply(i), deps);
+      expect(result, saved).toMatchObject({ status: "handled" });
+      expect((result as { outcome: string }).outcome, saved).not.toBe("unknown_sender");
+    }
+    expect(pendingCustomerIds().has(c.id)).toBe(false); // the first one recorded it
+  });
+});
+
 describe("the menu action in Data Master", () => {
   beforeEach(() => {
     resetDb();

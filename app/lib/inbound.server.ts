@@ -13,7 +13,7 @@ import {
   type InboundOutcome,
 } from "~/db/schema";
 import { addComment } from "~/lib/activity.server";
-import { digitsOf, salesmanIdByWhatsapp } from "~/lib/contacts.server";
+import { salesmanIdByWhatsapp } from "~/lib/contacts.server";
 import { nowIso } from "~/lib/dates";
 import { listFollowUpReasons, submitReason } from "~/lib/follow-ups.server";
 import { pageWindow } from "~/lib/pagination";
@@ -21,6 +21,7 @@ import { pendingCustomerIds } from "~/lib/pending.server";
 import { OTHER_REASON_CODE } from "~/lib/reasons";
 import { parseReply } from "~/lib/reply-parser";
 import { getWahaSettings } from "~/lib/settings.server";
+import { normalizeWhatsappNumber } from "~/lib/whatsapp-number";
 import { createWahaClient, lookupPhoneByLid, type WahaClient } from "~/lib/waha.server";
 
 /**
@@ -337,7 +338,7 @@ export async function handleWahaEvent(
   const id = str(p.id);
   if (!id || !str(p.body).trim()) return { status: "ignored", reason: "tanpa teks" };
   let digits: string | null = null;
-  if (from.endsWith("@c.us")) digits = digitsOf(from.slice(0, -"@c.us".length));
+  if (from.endsWith("@c.us")) digits = normalizeWhatsappNumber(from.slice(0, -"@c.us".length));
   else if (from.endsWith("@lid")) digits = await deps.lookupLid(from);
   else return { status: "ignored", reason: "bukan chat pribadi" };
   if (!digits) return { status: "ignored", reason: "nomor pengirim tidak dikenali" };

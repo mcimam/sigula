@@ -31,6 +31,13 @@ the demo `salesman` account refused, every admin page 200, container healthy. Do
   source in the image and node-gyp's download of Node headers timed out). What worked: `podman build --jobs 1 --network=host -t
   localhost/sigula_app:latest .` then replace the container.
 
+**Hotfix (2026-09-26, after the deploy): "Kirim pengingat kembali" failed with WAHA 500 in production.** Cause: the salesmen's WhatsApp
+numbers were saved as `0812…` and the chat id was built from the digits as typed (`0812…@c.us`); production WAHA answers 500 for that and
+200 (`numberExists`) for `62812…`. Fix: `normalizeWhatsappNumber` for sending and for matching replies, a plausibility check before sending,
+and WAHA's explanation kept in the error (FR-47). Verified: 437 tests (6 mutations caught) and against production WAHA read-only
+(`check-exists` 500 for the stored form, 200 for the normalised one). The same bug would have hit the batch reminder and made replies from
+those salesmen "not a salesman".
+
 **ERD v2 — R1, R3 and R2 DONE on branch `feat/erd-v2-foundation` (2026-09-26, not committed, not deployed).**
 Design: `docs/erd-sigula.dbml`; decisions: ADR-0005 (R1), ADR-0006 (R3), ADR-0007 (R2). Migrations `drizzle/0000–0004`.
 - **R1:** versioned migrations (own runner, FK-safe), soft delete + "Terhapus"/Pulihkan on Transaksi and the 3 Data

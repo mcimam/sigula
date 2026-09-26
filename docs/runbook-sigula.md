@@ -211,6 +211,13 @@ rollback keeps the DB unless you explicitly remove the volume.
 - **Check:** `podman logs sigula` for `Bad Request` on `POST /login.data`
 - **Fix:** ensure `react-router.config.ts` includes `allowedActionOrigins: ["sigula.ceater.cc", …]` then rebuild
 
+### 5. A reminder fails with "WAHA returned 500"
+
+The message now carries WAHA's own explanation after the dash. Check the session first (Pengaturan → Koneksi WAHA → *Sesi WhatsApp*, or
+`GET {base}/api/sessions/{session}` → `WORKING`), then the number: `GET {base}/api/contacts/check-exists?phone=<62…>&session=<session>` answers
+`numberExists: true` for a real WhatsApp number and 500 for one WAHA cannot address. (2026-09-26: numbers saved as `0812…` made WAHA answer 500 —
+fixed by normalising to `62…` when sending; a number that is not a number at all is now skipped with its value shown.)
+
 ## Dependencies
 
 | Service | What breaks without it | Degraded behaviour |

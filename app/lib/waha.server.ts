@@ -1,4 +1,5 @@
 import { getWahaSettings } from "~/lib/settings.server";
+import { normalizeWhatsappNumber } from "~/lib/whatsapp-number";
 import {
   WAHA_SESSION_STATUSES,
   canLogin,
@@ -20,8 +21,16 @@ export type WahaClient = {
 };
 
 function chatId(nomorWa: string) {
-  const digits = nomorWa.replace(/\D/g, "");
-  return `${digits}@c.us`;
+  return `${normalizeWhatsappNumber(nomorWa)}@c.us`;
+}
+
+/** What WAHA said when it refused, on one short line — "500 Internal Server Error" alone says nothing. */
+async function readErrorDetail(res: Response): Promise<string> {
+  try {
+    return (await res.text()).replace(/\s+/g, " ").trim().slice(0, 160);
+  } catch {
+    return "";
+  }
 }
 
 export function createWahaClient(overrides?: {
@@ -62,9 +71,10 @@ export function createWahaClient(overrides?: {
           signal: controller.signal,
         });
         if (!res.ok) {
+          const detail = await readErrorDetail(res);
           return {
             ok: false,
-            errorMessage: `WAHA returned ${res.status}: ${res.statusText}`,
+            errorMessage: `WAHA returned ${res.status}: ${res.statusText}${detail ? ` — ${detail}` : ""}`,
           };
         }
         return { ok: true, messageId: await readMessageId(res) };
@@ -107,7 +117,7 @@ export async function lookupPhoneByLid(lid: string): Promise<string | null> {
     });
     if (!res.ok) return null;
     const body = (await res.json()) as { pn?: unknown };
-    return typeof body.pn === "string" ? body.pn.replace(/\D/g, "") || null : null;
+    return typeof body.pn === "string" ? normalizeWhatsappNumber(body.pn) || null : null;
   } catch {
     return null;
   } finally {
