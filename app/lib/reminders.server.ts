@@ -1,4 +1,4 @@
-import { and, count, desc, eq, inArray } from "drizzle-orm";
+import { and, count, desc, eq, gt, inArray } from "drizzle-orm";
 
 import { db } from "~/db/client.server";
 import {
@@ -9,10 +9,11 @@ import {
   type Channel,
   type RecipientKind,
 } from "~/db/schema";
+import { logActivity } from "~/lib/activity.server";
 import { attachWhatsapp, primaryContact } from "~/lib/contacts.server";
-import { daysSinceOrder, formatDateShort, nowIso, todayIso } from "~/lib/dates";
+import { daysSinceOrder, formatDateShort, isOverdue, nowIso, todayIso } from "~/lib/dates";
 import { listFollowUpReasons } from "~/lib/follow-ups.server";
-import { directReportIds } from "~/lib/masterdata.server";
+import { directReportIds, findLiveCustomer } from "~/lib/masterdata.server";
 import { notYetNotifiedEligible } from "~/lib/orders.server";
 import { pageWindow } from "~/lib/pagination";
 import { activeTemplate, customerLines, orderByWait, renderTemplate, type TemplateCode } from "~/lib/templates.server";
@@ -131,6 +132,86 @@ export async function triggerBatch(opts: {
 
   db.update(notificationRuns).set({ finishedAt: nowIso() }).where(eq(notificationRuns.id, run.id)).run();
   return db.select().from(notificationRuns).where(eq(notificationRuns.id, run.id)).get()!;
+}
+
+/** A customer is not reminded again within this many minutes of its last reminder (a double click, a second admin). */
+export const RESEND_COOLDOWN_MINUTES = 10;
+
+/**
+ * Admin's "Kirim pengingat kembali": one more reminder for one overdue customer, sent to
+ * its salesman right now — the same message as a batch (a list of one). It is an explicit
+ * action of an Admin, so ADR-0002 holds. Refused, before anything is written, for a customer
+ * that is inactive or not overdue, whose salesman has no WhatsApp number, or that was reminded
+ * a moment ago. It is a run of its own (visible on the dashboard); if the message cannot be
+ * sent that run is voided, so the dashboard does not offer a retry that would skip this
+ * customer (a retry only takes customers not yet reminded) — sending again is this action.
+ * A sent one is written to the customer's activity. Throws a readable `Error`.
+ */
+export async function resendReminder(opts: {
+  customerId: number;
+  triggeredById: number;
+  client?: WahaClient;
+  today?: string;
+  now?: Date;
+}) {
+  const today = opts.today ?? todayIso();
+  const now = opts.now ?? new Date();
+  const customer = findLiveCustomer(opts.customerId);
+  if (!customer) throw new Error("Customer tidak ditemukan");
+  if (customer.statusCustomer !== "aktif") throw new Error("Customer inactive tidak diingatkan");
+  if (!isOverdue(customer.lastOrderDate, customer.orderCycleDays, today)) throw new Error("Customer belum overdue");
+  const salesman = salesmenWithWhatsapp([customer.salesmanId])[0];
+  if (!salesman) throw new Error("Salesman tidak ditemukan");
+  if (!salesman.nomorWa) throw new Error(`${salesman.nama} belum punya nomor WhatsApp`);
+
+  const recent = db
+    .select({ sentAt: notificationDeliveries.sentAt })
+    .from(notificationItems)
+    .innerJoin(notificationDeliveries, eq(notificationDeliveries.id, notificationItems.deliveryId))
+    .where(
+      and(
+        eq(notificationItems.customerId, customer.id),
+        eq(notificationDeliveries.recipientKind, "salesman"),
+        eq(notificationDeliveries.status, "sent"),
+        gt(notificationDeliveries.sentAt, nowIso(new Date(now.getTime() - RESEND_COOLDOWN_MINUTES * 60_000))),
+      ),
+    )
+    .get();
+  if (recent) throw new Error(`Customer ini baru saja diingatkan — tunggu ${RESEND_COOLDOWN_MINUTES} menit sebelum mengirim lagi`);
+
+  activeTemplate(TEMPLATE_FOR.salesman, "whatsapp"); // missing reference data must fail before anything is written
+  const run = db
+    .insert(notificationRuns)
+    .values({ trigger: "manual", triggeredById: opts.triggeredById, asOfDate: today, startedAt: nowIso() })
+    .returning()
+    .get();
+  await deliver({
+    client: opts.client ?? createWahaClient(),
+    runId: run.id,
+    kind: "salesman",
+    recipient: salesman,
+    list: [customer],
+    channel: "whatsapp",
+    attempt: 1,
+    today,
+  });
+  db.update(notificationRuns).set({ finishedAt: nowIso() }).where(eq(notificationRuns.id, run.id)).run();
+
+  const delivery = db.select().from(notificationDeliveries).where(eq(notificationDeliveries.runId, run.id)).get()!;
+  if (delivery.status !== "sent") {
+    const why = delivery.errorMessage || "pesan tidak terkirim";
+    voidBatch({ batchId: run.id, voidedById: opts.triggeredById, reason: `Kirim ulang gagal: ${why}` });
+    throw new Error(`Pengingat gagal dikirim ke ${salesman.nama}: ${why}`);
+  }
+  logActivity({
+    entityType: "customer",
+    entityId: customer.id,
+    entityLabel: customer.nama,
+    action: "update",
+    actorId: opts.triggeredById,
+    changes: { pengingat_dikirim: { from: null, to: `${salesman.nama} (WhatsApp)` } },
+  });
+  return { runId: run.id, salesmanName: salesman.nama };
 }
 
 /**

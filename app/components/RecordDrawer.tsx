@@ -30,6 +30,18 @@ export function useDrawerHref() {
   };
 }
 
+/** An extra item in the panel's ⋮ menu that posts to the route's action after a question. */
+export type DrawerAction = {
+  label: string;
+  /** What the route's action reads: its `intent` and the record's id. */
+  fields: Record<string, string | number>;
+  /** Asked before it is done (the item is replaced by this question and a yes/no). */
+  confirm: string;
+  confirmLabel: string;
+  /** When set, the item is shown but disabled, with this as the reason. */
+  disabledReason?: string;
+};
+
 export type DrawerRemove = {
   /** Bulk-delete intent the route's action already understands. */
   intent: string;
@@ -46,6 +58,7 @@ export function RecordDrawer({
   submitLabel = "Simpan",
   activity,
   remove,
+  actions,
   viewOnly = false,
   children,
 }: {
@@ -56,6 +69,7 @@ export function RecordDrawer({
   /** Existing records only — omit in create mode. */
   activity?: ActivityFeedProps;
   remove?: DrawerRemove;
+  actions?: DrawerAction[];
   /** A panel to read, not to edit: no form, no Simpan/Batal (e.g. a salesman's view of a customer). */
   viewOnly?: boolean;
   children: ReactNode;
@@ -65,6 +79,7 @@ export function RecordDrawer({
   const [full, setFull] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  const [confirmingAction, setConfirmingAction] = useState<number | null>(null);
   const [copied, setCopied] = useState(false);
   const menuOpenRef = useRef(false);
   menuOpenRef.current = menuOpen;
@@ -72,6 +87,7 @@ export function RecordDrawer({
   function closeMenu() {
     setMenuOpen(false);
     setConfirming(false);
+    setConfirmingAction(null);
   }
 
   useEffect(() => {
@@ -167,7 +183,28 @@ export function RecordDrawer({
                 </button>
                 {menuOpen ? (
                   <div className="drawer__menu" role="menu">
-                    {confirming && remove ? (
+                    {confirmingAction !== null && actions?.[confirmingAction] ? (
+                      <div className="drawer__confirm">
+                        <p>{actions[confirmingAction].confirm}</p>
+                        <div className="drawer__confirm-actions">
+                          <Form method="post">
+                            {Object.entries(actions[confirmingAction].fields).map(([name, value]) => (
+                              <input key={name} type="hidden" name={name} value={value} />
+                            ))}
+                            <button type="submit" className="btn btn-sm">
+                              {actions[confirmingAction].confirmLabel}
+                            </button>
+                          </Form>
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-outline"
+                            onClick={() => setConfirmingAction(null)}
+                          >
+                            Batal
+                          </button>
+                        </div>
+                      </div>
+                    ) : confirming && remove ? (
                       <div className="drawer__confirm">
                         <p>Hapus record ini? Record masuk ke daftar Terhapus dan bisa dipulihkan.</p>
                         <div className="drawer__confirm-actions">
@@ -197,6 +234,21 @@ export function RecordDrawer({
                         >
                           Salin tautan
                         </button>
+                        {actions?.map((action, i) => (
+                          <div key={action.label}>
+                            <button
+                              type="button"
+                              role="menuitem"
+                              className="drawer__menu-item"
+                              disabled={!!action.disabledReason}
+                              title={action.disabledReason}
+                              onClick={() => setConfirmingAction(i)}
+                            >
+                              {action.label}
+                            </button>
+                            {action.disabledReason ? <p className="drawer__menu-note">{action.disabledReason}</p> : null}
+                          </div>
+                        ))}
                         {remove ? (
                           <button
                             type="button"

@@ -106,3 +106,6 @@ revisit condition) removes the ban-risk argument against scheduling.
 > **Note 2026-09-26 (ADR-0009).** Confirmations sent in answer to a salesman's WhatsApp reply are not reminders and
 > are not covered by this decision: each answers a message the salesman just sent (and the how-to is limited to once an
 > hour). Reminders themselves remain Admin-triggered (or the opt-in schedule, DEBT-010).
+>
+> **Note 2026-09-26 (FR-46).** "Kirim pengingat kembali" in the customer panel sends one reminder for one customer when an Admin
+> confirms it. It is an explicit Admin action like the batch button, so the decision above holds; it is limited to once per 10 minutes per customer.

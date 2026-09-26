@@ -55,6 +55,7 @@ export const FIELD_LABELS: Record<string, string> = {
   tipe_customer: "Tipe",
   status_customer: "Status",
   alasan_keterlambatan: "Alasan keterlambatan",
+  pengingat_dikirim: "Pengingat dikirim",
   order_cycle_days: "Siklus (hari)",
   nomor_wa: "Nomor WA",
   supervisor: "Supervisor",

@@ -25,7 +25,8 @@ import { TrashTable } from "~/components/TrashTable";
 import { db } from "~/db/client.server";
 import { alive, users } from "~/db/schema";
 import { requirePermission } from "~/lib/auth.server";
-import { PERM } from "~/lib/permissions";
+import { can, PERM } from "~/lib/permissions";
+import { resendReminder } from "~/lib/reminders.server";
 import { attachWhatsapp } from "~/lib/contacts.server";
 import { formatStamp } from "~/lib/activity-format";
 import { orderStanding, orderStatusText, sinceLabel, todayIso } from "~/lib/dates";
@@ -189,6 +190,13 @@ export async function loader({ request }: Route.LoaderArgs) {
     trash,
     roles: listRoles(),
     trashCounts: countDeleted(),
+    // What "Kirim pengingat kembali" in the customer panel needs to say and to check.
+    resend: editing.customer
+      ? (() => {
+          const salesman = allSalesmen.find((s) => s.id === editing.customer!.salesmanId);
+          return { salesmanName: salesman?.nama ?? "—", hasWhatsapp: Boolean(salesman?.nomorWa) };
+        })()
+      : null,
     activeCounts: { customer: allCustomers.length, salesman: allSalesmen.length, user: allUsers.length },
     customerTrash,
     salesmanTrash,
@@ -236,7 +244,28 @@ export async function action({ request }: Route.ActionArgs) {
   const bulkMessage = (n: number, noun: string) => `${n} ${noun} dihapus (bisa dipulihkan)`;
   const restoredMessage = (n: number, noun: string) => `${n} ${noun} dipulihkan`;
 
+  // Sending a WhatsApp message is Admin's action (`notification.manage`), not just anyone who edits master data.
+  if (intent === "resend_reminder" && !can(user, PERM.notificationManage)) {
+    throw new Response("Forbidden", { status: 403 });
+  }
+
   try {
+    if (intent === "resend_reminder") {
+      // Back to the same panel, so the new line in "Aktivitas & komentar" is what the admin sees.
+      const customerId = Number(form.get("customer_id"));
+      const back = (message: string) =>
+        Response.redirect(
+          new URL(`/admin/masterdata?tab=customer&edit=${customerId}&flash=${encodeURIComponent(message)}`, request.url),
+          302,
+        );
+      try {
+        const sent = await resendReminder({ customerId, triggeredById: user.id });
+        return back(`Pengingat dikirim ke ${sent.salesmanName}`);
+      } catch (err) {
+        return back(err instanceof Error ? err.message : "Gagal mengirim pengingat");
+      }
+    }
+
     if (intent === "create_customer") {
       const nama = String(form.get("nama") ?? "").trim();
       const salesmanId = Number(form.get("salesman_id"));
@@ -379,6 +408,7 @@ export default function AdminMasterdata() {
     salesmanTable,
     supervisorBlocked,
     activity,
+    resend,
     userTable,
     q,
     pageSize,
@@ -572,6 +602,24 @@ export default function AdminMasterdata() {
               remove={
                 editing.customer
                   ? { intent: "delete_many_customer", idName: "customer_id", id: editing.customer.id }
+                  : undefined
+              }
+              actions={
+                editing.customer && resend && editing.customer.overdue && can(user, PERM.notificationManage)
+                  ? [
+                      {
+                        label: "Kirim pengingat kembali",
+                        fields: { intent: "resend_reminder", customer_id: editing.customer.id },
+                        confirm: `Kirim pengingat WhatsApp untuk ${editing.customer.nama} ke ${resend.salesmanName} sekarang?`,
+                        confirmLabel: "Ya, kirim",
+                        disabledReason:
+                          editing.customer.statusCustomer !== "aktif"
+                            ? "Customer inactive tidak diingatkan"
+                            : !resend.hasWhatsapp
+                              ? `${resend.salesmanName} belum punya nomor WhatsApp`
+                              : undefined,
+                      },
+                    ]
                   : undefined
               }
               closeHref={drawerHref(null)}

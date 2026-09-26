@@ -58,7 +58,7 @@ Pesan, Terhapus, user list/drawer and the multi-section sidebar checked in a bro
   `submitReason` as the panel ("… (via WhatsApp)"), and answers with a short confirmation (how-to at most once an hour;
   strangers, groups and our own messages are never answered). Each message is processed once (`inbound_messages`,
   unique WhatsApp id) and listed in Log Audit ("Balasan WhatsApp", paged). Reminders now store each customer's line
-  number (`notification_items.position`). Verified: `npm test` 409/409 (+ 12 mutations on the new logic, all caught);
+  number (`notification_items.position`). Verified: `npm test` 421/421 (+ 12 mutations on the new logic, all caught);
   browser check of the settings field and audit section still to be done by a person. **Not done and needs you:** WAHA
   must be pointed at the endpoint (env `WHATSAPP_HOOK_URL`, `WHATSAPP_HOOK_EVENTS=message`, `WHATSAPP_HOOK_HMAC_KEY`,
   restart) and the same secret set in Pengaturan — see the runbook; nothing was tested against a live WAHA.
@@ -74,6 +74,12 @@ Pesan, Terhapus, user list/drawer and the multi-section sidebar checked in a bro
   password (the old build prints it on the login page), decide the webhook secret, approve the push and the production
   deploy — see the runbook's *Release checklist*. `.env.example` was not touched (access denied): add `ADMIN_USERNAME=`,
   `ADMIN_PASSWORD=`, `WAHA_WEBHOOK_SECRET=` if you want them listed.
+- **"Kirim pengingat kembali" (FR-46), not committed yet:** ⋮ menu of an overdue customer's panel → confirm → one reminder to
+  that customer's salesman (`resendReminder`), noted in the customer's activity, refused for inactive / not overdue / no
+  number / reminded < 10 min ago, needs `notification.manage`. Also changed: a customer's *newest* reminder alone decides
+  "pending" (before, an unanswered older reminder would have kept a customer pending after it was reminded again and
+  answered). Verified: 421 tests (+ 8 mutations, all caught) and in a browser against a fake WAHA — the message text, the
+  panel staying open with the result, the 10-minute refusal, no menu item for a customer that is not overdue.
 - **Dashboard review (no new behaviour):** KPI tiles restyled to the design system (`StatTile`), one stale sentence on
   the admin dashboard fixed. Findings not acted on (need a decision): salesman dashboard lists only *pending* customers
   while "Perlu follow-up" counts every overdue one, so after a reason the list is empty but the stat is not; the admin
@@ -89,7 +95,7 @@ Pesan, Terhapus, user list/drawer and the multi-section sidebar checked in a bro
   an admin can no longer free customers to be reminded again; that now happens only when the salesman gives a reason
   or an order arrives. Runs voided earlier keep their effect. Tests that voided a *sent* run were moved to
   `voidRunLegacy` (a fixture that writes the old-style voided row) so the pending logic stays covered; new tests for
-  the refusal (4 mutations caught + a fifth added after one survived) and for `runsPage`. Verified: `npm test` 409/409,
+  the refusal (4 mutations caught + a fifth added after one survived) and for `runsPage`. Verified: `npm test` 421/421,
   `tsc`, build (no server code in the client bundle); browser on a scratch DB with 15 runs at 1440 / 390 / 320 px:
   paging (Next, Prev, Go to, stale page clamps), retry / cancel / trigger flows, a stale POST voiding a sent run is
   refused, no horizontal scroll. Not changed: the shared pager still reads "Records 1–5 of 13 / Prev / Next / Go to".

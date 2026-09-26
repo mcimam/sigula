@@ -28,10 +28,15 @@ function LogText({ item }: { item: ActivityItem }) {
   if (item.action === "delete") return <>{actor} menghapus record ini</>;
   if (item.action === "restore") return <>{actor} memulihkan record ini</>;
 
-  const { alasan_keterlambatan: reason, ...others } = item.changes;
+  const { alasan_keterlambatan: reason, pengingat_dikirim: reminder, ...others } = item.changes;
   const changed = Object.entries(others);
   return (
     <>
+      {reminder ? (
+        <div>
+          {actor} mengirim pengingat ke <strong>{formatValue(reminder.to)}</strong>
+        </div>
+      ) : null}
       {reason ? (
         <div>
           {actor} memberi alasan keterlambatan: <strong>{formatValue(reason.to)}</strong>
