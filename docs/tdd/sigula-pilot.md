@@ -6,6 +6,16 @@
 | FRD | `docs/frd/sigula-pilot.md` |
 | Date | 2026-08-31 |
 
+> **Amendment 2026-09-26 (ADR-0005, ADR-0006).** The data model in this document is superseded by
+> `docs/erd-sigula.dbml` and `app/db/schema.ts` for: soft delete (`deleted_at` on users/salesmen/customers/transaksi,
+> reads through `alive()`), versioned migrations (`drizzle/`, applied by `app/db/migrations.server.ts`),
+> `customer_assignments`, `customer_status_history`, `import_batches`, `salesman_contacts`, `follow_ups` +
+> `follow_up_reasons`, `message_templates`, and `notification_runs` / `notification_deliveries` /
+> `notification_items` (which replace `notification_batches` and `customers.notified`). "Pending" is computed by
+> `app/lib/pending.server.ts`. Access control is ADR-0007: `roles` / `permissions` / `role_permissions` /
+> `user_roles` replace `profiles`; guards are `requirePermission` + `access.server.ts`. `.agents/context/codemap.md`
+> §5–§8 is the working map of these.
+
 > **Amendment 2026-09-26 (ADR-0004).** The `Supervisor` entity/table is gone:
 > `Salesman.supervisor_id` is a nullable self-FK (salesman 1—N salesman);
 > `Profile.supervisor_id` is removed (a supervisor-role `Profile` links to its
@@ -209,6 +219,10 @@ webhook + free-text-parsing infrastructure would have been unwarranted scope
 sitting on an ambiguity the FRD had already resolved in its flow description.
 **Revised:** the WAHA boundary is outbound-only; the row was removed from the
 Boundaries table above.
+
+> **Superseded 2026-09-26 (ADR-0009).** The user then asked for replies to be read: the reminder now ends
+> "Balas dengan alasan: …" and WAHA calls `POST /webhooks/waha` (HMAC-signed). The boundary is no longer
+> outbound-only; the reasoning above stands as the record of why it was once left out.
 
 **"The recipient reference on `NotificationDelivery` was a stringly-typed
 polymorphic FK."** An earlier draft stored a bare `recipient_type` +

@@ -1,8 +1,25 @@
 // SiGula — ERD TARGET (desain untuk pengembangan), format DBML
 //
-// Status  : RANCANGAN, 2026-09-26. Belum diterapkan: skema yang berjalan masih
-//           app/db/schema.ts (SQLite). Perpindahan ke sini dilakukan bertahap lewat
-//           migrasi + tes, bukan dengan mengubah dokumen ini.
+// Status  : 2026-09-26. Rilis R1 (fondasi, ADR-0005), R3 (notifikasi + follow-up, ADR-0006) dan
+//           R2 (RBAC, ADR-0007) SUDAH diterapkan di app/db/schema.ts + drizzle/ (belum di produksi).
+//           schema.ts adalah sumber kebenaran; dokumen ini menjelaskan maksudnya.
+//           Selisih dari rancangan awal yang muncul saat implementasi:
+//             - transaksi.deleted_with_customer_id (penanda ikut terhapus bersama customer).
+//             - notification_deliveries.customer_count dipertahankan (baris lama tak punya item).
+//             - notification_runs.voided_at/voided_by_id/void_reason (batch dibatalkan, bukan dihapus).
+//             - message_templates.subject (untuk email; template email ada tapi disembunyikan).
+//             - zona waktu bisnis = konstanta BUSINESS_TIMEZONE (app/lib/dates.ts), bukan app_settings.
+//             - indeks unik customers memakai lower(nama) (dibuat manual di migrasi 0001).
+//             - kode ERP (salesmen/customers.code) belum ada: belum ada yang memakainya.
+//             - record_comments (migrasi 0005, ADR-0008): komentar pada panel record, di samping activity_logs.
+//             - teks pengingat salesman (WhatsApp) versi 2 lewat migrasi data 0006 (ADR-0008).
+//             - inbound_messages + notification_items.position (migrasi 0007, ADR-0009): balasan WhatsApp
+//               salesman lewat webhook WAHA; position = nomor baris customer di pesan pengingat.
+//             - role 'supervisor' TETAP ada sebagai paket izin (cakupan team); tidak diturunkan dari
+//               hierarki (keputusan pengguna, ADR-0007). Tidak ada halaman kelola role/izin (DEBT-017).
+//             - users.salesman_id tidak unik (profiles dulu membolehkan dua login per salesman).
+//             - users.username tetap peka huruf besar/kecil dan tidak dipaksa huruf kecil.
+//             - aturan "role dengan izin own/team wajib punya salesman" dijaga aplikasi, bukan DB (DEBT-018).
 // Lihat   : https://dbdiagram.io/d (tempel seluruh teks ini).
 //
 // Keputusan yang membentuk ERD ini (2026-09-26):
@@ -12,9 +29,11 @@
 //   D4 Hapus     : master data soft delete (deleted_at); tabel riwayat/log tidak pernah
 //                  diubah atau dihapus. Semua FK = RESTRICT kecuali ditulis lain.
 //   D5 Hierarki  : salesmen.supervisor_id self-reference (ADR-0004), bebas kedalaman.
-//                  "Supervisor" adalah fakta turunan: salesman yang punya bawahan.
+//                  "Supervisor" sebagai posisi = salesman yang punya bawahan; "supervisor" sebagai
+//                  ROLE = paket izin terpisah (D6), tidak dipaksa cocok dengan hierarki.
 //   D6 Akses     : RBAC berbasis tabel (roles, permissions) dengan cakupan data
-//                  own/team/all; "team" = diri sendiri + seluruh bawahan di hierarki.
+//                  own/team/all; "team" = seluruh bawahan di hierarki (tidak termasuk diri sendiri).
+//                  Satu user boleh punya beberapa role; izin digabung, cakupan terluas menang.
 //   D7 Kepemilikan customer : riwayat berjangka (customer_assignments), menggantikan
 //                  mutation_logs.
 //   D8 Notifikasi: multi-channel, template bisa diedit, dan customer per pesan
@@ -32,7 +51,7 @@
 //                            enum, tapi tabel lookup (roles, permissions,
 //                            follow_up_reasons, message_templates).
 //   "tanggal hari ini" untuk kolom date dihitung dari zona waktu bisnis
-//   (app_settings 'business_timezone', default Asia/Jakarta), bukan dari UTC.
+//   (konstanta BUSINESS_TIMEZONE = Asia/Jakarta di app/lib/dates.ts), bukan dari UTC.
 //
 // Konvensi kolom:
 //   Master data : created_at, updated_at, deleted_at (+ *_by user). Baris dengan
@@ -71,7 +90,7 @@ enum order_source {
 
 enum permission_scope {
   own  [note: 'hanya data milik salesman yang terhubung ke user']
-  team [note: 'milik sendiri + seluruh bawahan (rekursif) di hierarki salesmen']
+  team [note: 'seluruh bawahan (rekursif) di hierarki salesmen, tanpa diri sendiri']
   all  [note: 'semua data']
 }
 
@@ -116,10 +135,10 @@ enum activity_action {
 
 Table users {
   id integer [pk, increment]
-  username text [not null, note: 'unik [hidup]; disimpan huruf kecil']
+  username text [not null, note: 'unik [hidup], peka huruf besar/kecil']
   password_hash text [not null]
   display_name text [not null]
-  salesman_id integer [note: 'terisi bila user ini adalah seorang salesman; unik [hidup]']
+  salesman_id integer [note: 'salesman yang diwakili login ini; wajib bila ada role dengan izin own/team (dijaga aplikasi); TIDAK unik']
   is_active boolean [not null, default: true, note: 'false = tidak bisa login, data tetap']
   last_login_at timestamp
   created_at timestamp [not null]
@@ -129,7 +148,7 @@ Table users {
   Note: '''
   Menggantikan profiles: satu user = satu baris, kaitan ke salesman pindah ke sini,
   role pindah ke user_roles.
-  Unique [hidup]: username; salesman_id.
+  Unique [hidup]: username.
   '''
 }
 
@@ -143,14 +162,15 @@ Table roles {
   updated_at timestamp [not null]
 
   Note: '''
-  Tidak ada role "supervisor". Salesman yang punya bawahan otomatis melihat data timnya
-  lewat scope = team (D5, D6), jadi role tidak bisa bertentangan dengan hierarki.
+  Role bawaan (di-seed): admin, salesman, supervisor, management. "supervisor" adalah paket izin
+  cakupan team (team.read, customer.reactivate, report.team); TIDAK diturunkan dari hierarki,
+  jadi bisa berbeda dengan pohon salesmen. Tidak ada editor role: role baru lewat migrasi.
   '''
 }
 
 Table permissions {
   id integer [pk, increment]
-  code text [not null, unique, note: 'contoh: customer.read, customer.reassign, notification.trigger']
+  code text [not null, unique, note: 'contoh: masterdata.manage, customer.follow_up, report.team; daftar lengkap di app/lib/permissions.ts']
   description text [not null, default: '']
 
   Note: 'Daftar permission didefinisikan oleh kode aplikasi dan di-seed; admin hanya memetakannya ke role.'
@@ -289,6 +309,7 @@ Table transaksi {
   updated_by_id integer
   deleted_at timestamp
   deleted_by_id integer
+  deleted_with_customer_id integer [note: 'terisi bila baris ikut terhapus karena customer-nya dihapus; pemulihan customer hanya memulihkan baris dengan penanda ini']
 
   indexes {
     (customer_id, tanggal_order)
@@ -370,7 +391,8 @@ Table message_templates {
   code text [not null, note: 'contoh: reminder_salesman, reminder_supervisor']
   channel channel [not null]
   recipient_kind recipient_kind [not null]
-  body text [not null, note: 'teks dengan placeholder, mis. {{salesman_nama}}, {{daftar_customer}}']
+  subject text [not null, default: '', note: 'khusus email']
+  body text [not null, note: 'teks dengan placeholder {{nama}}, {{jumlah}}, {{daftar_customer}}']
   version integer [not null, default: 1]
   is_active boolean [not null, default: true]
   created_at timestamp [not null]
@@ -393,9 +415,12 @@ Table notification_runs {
   as_of_date date [not null, note: 'tanggal bisnis yang dipakai menghitung jatuh tempo']
   started_at timestamp [not null]
   finished_at timestamp
+  voided_at timestamp [note: 'batch dibatalkan: tetap tercatat, tapi item-itemnya tak lagi dihitung pending']
+  voided_by_id integer
+  void_reason text [not null, default: '']
 
   Note: '''
-  Menggantikan notification_batches. Immutable setelah finished_at terisi.
+  Menggantikan notification_batches. Log: tidak dihapus, hanya dibatalkan (void).
   CHECK trigger <> 'manual' OR triggered_by_id IS NOT NULL.
   '''
 }
@@ -410,6 +435,7 @@ Table notification_deliveries {
   address text [not null, default: '', note: 'snapshot alamat tujuan']
   template_id integer [note: 'versi template yang dipakai']
   message_body text [not null, default: '', note: 'snapshot teks final yang dikirim']
+  customer_count integer [not null, default: 0, note: 'snapshot jumlah customer; juga untuk baris lama yang tak punya item']
   status delivery_status [not null]
   provider_message_id text [note: 'id dari WAHA / provider lain, untuk status baca/terkirim']
   error_message text [not null, default: '']
@@ -430,6 +456,7 @@ Table notification_items {
   customer_id integer [not null]
   last_order_date date [note: 'snapshot saat pesan dibuat']
   days_overdue integer [not null, note: 'snapshot']
+  position integer [note: 'nomor baris customer di pesan ("3. TOKO A …"); balasan "3" merujuk ke sini. Null untuk pesan lama']
 
   indexes {
     (delivery_id, customer_id) [unique]
@@ -465,6 +492,43 @@ Table activity_logs {
   Note: 'entity_type berupa text bebas (bukan enum) agar tabel baru bisa diaudit tanpa migrasi. Immutable.'
 }
 
+Table record_comments {
+  id integer [pk, increment]
+  entity_type text [not null, note: 'transaksi | customer | salesman | user; text bebas seperti activity_logs']
+  entity_id integer [not null, note: 'sengaja tanpa FK, seperti activity_logs']
+  body text [not null, note: 'tidak kosong (CHECK), maks 2000 karakter (aplikasi)']
+  author_id integer
+  author_name text [not null, default: '', note: 'snapshot']
+  created_at timestamp [not null]
+
+  indexes {
+    (entity_type, entity_id, id) [name: 'record_comments_entity_idx']
+  }
+
+  Note: 'Pesan orang pada panel sebuah record ("Aktivitas & komentar"). Tidak diubah/dihapus dari aplikasi.'
+}
+
+Table inbound_messages {
+  id integer [pk, increment]
+  provider_message_id text [not null, unique, note: 'id pesan WhatsApp; WAHA mengulang webhook, ini yang membuat ulangan tidak berefek']
+  session text [not null, default: '']
+  from_address text [not null, note: 'nomor pengirim, hanya digit']
+  salesman_id integer [note: 'terisi bila nomor itu kontak salesman']
+  body text [not null, default: '']
+  outcome text [not null, note: 'recorded | unrecognized | nothing_pending | unknown_sender (CHECK)']
+  detail text [not null, default: '']
+  reply_text text [not null, default: '', note: 'balasan yang kita kirim/coba kirim']
+  reply_status text [not null, default: 'none', note: 'none | sent | failed (CHECK)']
+  received_at timestamp [not null, note: 'waktu pesan dikirim (dari WhatsApp)']
+  created_at timestamp [not null]
+
+  indexes {
+    (salesman_id, id) [name: 'inbound_messages_salesman_idx']
+  }
+
+  Note: 'Setiap pesan masuk dari webhook WAHA yang kita proses (ADR-0009). Tidak diubah kecuali reply_status.'
+}
+
 Table app_settings {
   key text [pk, note: 'contoh: business_timezone, waha_url, reminder_cron']
   value text [not null, default: '']
@@ -498,6 +562,7 @@ Ref: transaksi.import_batch_id > import_batches.id
 Ref: transaksi.created_by_id > users.id
 Ref: transaksi.updated_by_id > users.id
 Ref: transaksi.deleted_by_id > users.id
+Ref: transaksi.deleted_with_customer_id > customers.id
 Ref: import_batches.imported_by_id > users.id
 
 Ref: customer_status_history.customer_id > customers.id
@@ -511,6 +576,7 @@ Ref: follow_ups.created_by_id > users.id
 
 Ref: message_templates.created_by_id > users.id
 Ref: notification_runs.triggered_by_id > users.id
+Ref: notification_runs.voided_by_id > users.id
 Ref: notification_deliveries.run_id > notification_runs.id
 Ref: notification_deliveries.salesman_id > salesmen.id
 Ref: notification_deliveries.contact_id > salesman_contacts.id
@@ -519,6 +585,8 @@ Ref: notification_items.delivery_id > notification_deliveries.id
 Ref: notification_items.customer_id > customers.id
 
 Ref: activity_logs.actor_id > users.id [delete: set null]
+Ref: record_comments.author_id > users.id [delete: set null]
+Ref: inbound_messages.salesman_id > salesmen.id
 Ref: app_settings.updated_by_id > users.id
 
 // ───────────────────────────── pengelompokan (tampilan) ─────────────────────────────

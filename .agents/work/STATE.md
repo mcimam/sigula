@@ -12,6 +12,99 @@
 
 ## Now
 
+**ERD v2 — R1, R3 and R2 DONE on branch `feat/erd-v2-foundation` (2026-09-26, not committed, not deployed).**
+Design: `docs/erd-sigula.dbml`; decisions: ADR-0005 (R1), ADR-0006 (R3), ADR-0007 (R2). Migrations `drizzle/0000–0004`.
+- **R1:** versioned migrations (own runner, FK-safe), soft delete + "Terhapus"/Pulihkan on Transaksi and the 3 Data
+  Master tabs, `customer_assignments`, `customer_status_history`, `import_batches`, ISO-UTC timestamps, Jakarta business
+  date, case-insensitive customer names.
+- **R3:** `notification_runs`/`deliveries`/`items` (pending is derived, batches are voided not deleted, a retry is a new
+  attempt), `salesman_contacts`, versioned `message_templates` (Pengaturan → Template Pesan; email seeded but hidden),
+  `follow_ups` + `follow_up_reasons`, `app_settings` audit columns.
+- **R2:** RBAC — `roles`/`permissions`/`role_permissions` (scope own/team/all)/`user_roles` replace `profiles`; several
+  roles per user (checkboxes), `supervisor` kept as a permission bundle, `users.salesman_id/is_active/last_login_at`,
+  `requirePermission` + `access.server.ts` guards, permission-driven sidebar, last-administrator guard.
+Verified: `npm test` 310/310 (23 files), `tsc` clean, `npm run build` OK (client bundle has no schema/server code),
+`drizzle-kit check` OK; migrations exercised on a legacy DB with data (tests; deliberate breakages caught) and on a copy
+of the real dev DB; HTTP matrix of 14 routes × 4 old roles identical to pre-RBAC behaviour; delete → trash → restore,
+template edit/reject, trigger → retry → void, follow-up, user/role admin flows checked over HTTP; dashboard, Template
+Pesan, Terhapus, user list/drawer and the multi-section sidebar checked in a browser.
+- **List search bar (UI, after the design system):** the Aktif/Terhapus filter now lives inside the search bar
+  (`app/components/TableSearch.tsx` — chip, "Bersihkan", suggestions with counts) on the three Data Master tabs and
+  Transaksi; the separate switch is gone. Transaksi **keeps** soft delete (decision: no hard delete, no data change).
+  Checked in a browser on customer/salesman/user tabs and Transaksi: pick filter with text typed, search inside
+  Terhapus, chip ×, Backspace in the empty input, "Bersihkan". Re-verified: `npm test` 267/267, `tsc` clean, build OK
+  (no server code in the client bundle), `drizzle-kit check` OK. No component tests exist (vitest runs in node), so
+  the bar's behaviour is covered by the browser check only.
+- **Customer panel & follow-up log (FR-33..35):** the drawer's ⤢ button now opens a true full page (design system:
+  100vw, two field columns, Aktivitas beside the form; was a 780px widening). Customer Status is a toggle at the
+  top of the panel (saved with Simpan; the design system's stand-alone toggle applies at once — say if that is
+  wanted). The customer list and panel show the last transaksi date and an order status (Overdue / On track,
+  BR-1 via `orderStanding`, computed at read time). Every reason a salesman gives is now written to the activity
+  log on the customer (`alasan_keterlambatan`, with the status change in the same entry when it deactivates) —
+  the old test that said "other reasons log nothing" was rewritten for the new rule. Not added: a free-text note
+  with the reason (`follow_ups.note` exists if wanted). Checked in a browser as admin (list columns, panel, full
+  page, deactivate → list → reactivate); the salesman reason flow is covered by unit tests only.
+- **Comments, reasons, paging, message v2 (ADR-0008, FR-36..39, migrations 0005–0006):** every record panel now has
+  "Aktivitas & komentar" (composer + log entries and comments in one newest-first list, 10 per page). Reasons for a
+  late customer are given from the customer's panel; the salesman dashboard no longer has reason buttons (a row opens
+  the view-only panel). Log Audit's three lists are paged in SQL (no 2,000-row cut). The salesman WhatsApp text is the
+  new format (numbered list, longest wait first, date, reasons). Verified: `npm test` 310/310 (7 + 6 mutations on the
+  new logic all caught), `tsc`, build; browser as admin (feed, composer, feed paging, Log Audit paging and search).
+  Production DB gets migrations 0005 and 0006 on first start after deploy (0007 too, see below).
+- **WhatsApp replies via the WAHA webhook (ADR-0009, FR-40..43, migration 0007):** `POST /webhooks/waha` (HMAC-SHA512
+  under `waha.webhook_secret` — **optional**: checked only when a secret is set; with none the endpoint is open, so a
+  forged reply from a known salesman's number would be accepted — the settings page and ADR-0009 say so) reads a salesman's reply — `3 Kalah Harga`, `1,2 …`,
+  `1-3 …`, one pair per line, or a bare reason for everyone still waiting in that reminder — records it through the same
+  `submitReason` as the panel ("… (via WhatsApp)"), and answers with a short confirmation (how-to at most once an hour;
+  strangers, groups and our own messages are never answered). Each message is processed once (`inbound_messages`,
+  unique WhatsApp id) and listed in Log Audit ("Balasan WhatsApp", paged). Reminders now store each customer's line
+  number (`notification_items.position`). Verified: `npm test` 409/409 (+ 12 mutations on the new logic, all caught);
+  browser check of the settings field and audit section still to be done by a person. **Not done and needs you:** WAHA
+  must be pointed at the endpoint (env `WHATSAPP_HOOK_URL`, `WHATSAPP_HOOK_EVENTS=message`, `WHATSAPP_HOOK_HMAC_KEY`,
+  restart) and the same secret set in Pengaturan — see the runbook; nothing was tested against a live WAHA.
+  **Risk accepted by the user:** a bare "Sudah Bangkrut" deactivates every customer of that reminder still waiting.
+- **Security review and release preparation (2026-09-26):** fixed — no default credentials in production (no demo seed, the
+  login page no longer prints the demo password in a production build, admin-set passwords ≥ 8 characters and never
+  `sigula123`), security headers, GET `/logout` no longer logs out, webhook body cap and privacy limits (strangers' text not
+  kept, rows bounded), unused imports. Open — DEBT-019…025 (no CSP; webhook signature optional = open without a secret;
+  container runs as root; `*.ceater.cc` in `allowedActionOrigins`; `uuid` advisory via exceljs, not reachable; no rate
+  limits; no written retention policy). The ledger is now past its review threshold (19 open) — worth a `/debt review`.
+  Rehearsed: production build against a copy of the dev DB rolled back to 0007 → 0008–0009 applied, integrity OK, every
+  role's pages 200/403, webhook 200/401/413. **Not done, needs you:** rotate any production account still on the demo
+  password (the old build prints it on the login page), decide the webhook secret, approve the push and the production
+  deploy — see the runbook's *Release checklist*. `.env.example` was not touched (access denied): add `ADMIN_USERNAME=`,
+  `ADMIN_PASSWORD=`, `WAHA_WEBHOOK_SECRET=` if you want them listed.
+- **Dashboard review (no new behaviour):** KPI tiles restyled to the design system (`StatTile`), one stale sentence on
+  the admin dashboard fixed. Findings not acted on (need a decision): salesman dashboard lists only *pending* customers
+  while "Perlu follow-up" counts every overdue one, so after a reason the list is empty but the stat is not; the admin
+  preview shows names as one comma list (the message is now a numbered list); no "recent activity" block although the
+  design has one and `listActivityPage` could feed it; the void action uses the browser's `confirm()`; page content is
+  capped at 1100px so wide screens leave empty space.
+- **Admin dashboard rework (2026-09-26, user request; no schema change):** copy rewritten in Indonesian ("Perlu
+  diingatkan" instead of "eligible", "pengiriman" instead of "batch", delivery statuses as "terkirim / gagal /
+  dilewati — tanpa nomor WA", shorter empty-state text); the run history is paged 5 per page (`runsPage`,
+  `TablePagination`, `?page=`; retry/cancel stay on the page, a new send lands on page 1). **Behaviour change
+  (decided by the user, amends ADR-0006):** a message that was sent cannot be cancelled — `voidBatch` refuses a run
+  with any `sent` delivery and the dashboard shows "Batalkan pengiriman" only for a run that delivered nothing, so
+  an admin can no longer free customers to be reminded again; that now happens only when the salesman gives a reason
+  or an order arrives. Runs voided earlier keep their effect. Tests that voided a *sent* run were moved to
+  `voidRunLegacy` (a fixture that writes the old-style voided row) so the pending logic stays covered; new tests for
+  the refusal (4 mutations caught + a fifth added after one survived) and for `runsPage`. Verified: `npm test` 409/409,
+  `tsc`, build (no server code in the client bundle); browser on a scratch DB with 15 runs at 1440 / 390 / 320 px:
+  paging (Next, Prev, Go to, stale page clamps), retry / cancel / trigger flows, a stale POST voiding a sent run is
+  refused, no horizontal scroll. Not changed: the shared pager still reads "Records 1–5 of 13 / Prev / Next / Go to".
+**Before any production deploy (ask-first):** back up the volume; run the case-insensitive duplicate-name query from the
+runbook ("Upgrade note — ERD v2") — migration 0001 aborts on such names. Not yet done: commit, push/PR, production migration.
+**Fixed 2026-09-26 (user-reported `SqliteError: no such column: users.salesman_id`):** migrations were triggered only by the root
+loader, so a first request that skipped it ran on the old schema. They now run when the database is opened
+(`client.server.ts`), in dev on the first request and in production at server start; regression test
+`tests/boot-migration.test.ts`. The dev DB was backed up before it got migrated (pre-R3/R2 state, outside the repo).
+**Heads-up:** a running `npm run dev` already migrated `data/sigula.db` (no backup of the pre-R1 state); a first page load
+after a fresh dev-server start re-optimises dependencies and can freeze a browser tab once (dev only).
+Open debts from this work: DEBT-013 (no purge), 014 (only WhatsApp sends), 015 (follow-up outcomes without UI), 016 (import
+file hash not checked), 017 (no role/permission editor), 018 (role↔salesman rule is app-level); DEBT-009 mitigated;
+DEBT-012 extended.
+
 **Pengaturan tabs → sidebar submenu (2026-09-26):** "Koneksi WAHA" and "Jadwal
 Cron" are now submenu entries under Pengaturan in the sidebar (same `NAV`
 `children` mechanism as Data Master; `?tab=waha|cron`, no `?tab` = Koneksi WAHA).

@@ -10,12 +10,12 @@
 > they rot; functions are named instead. If a file disagrees with this map,
 > **the file wins**: fix the map in the same change.
 >
-> **Last synced:** 2026-09-26 — Pengaturan's WAHA / Cron tabs became a sidebar submenu
-> (`NAV` `children` in `AppShell.tsx`; in-page tab bar removed from `admin.settings.tsx`,
-> page title is now `Pengaturan · <tab>`; `NavItems` default tab is the first child instead
-> of a hardcoded "customer"). The WhatsApp session panel (`WahaSessionCard`, `waha-session`,
-> `admin.settings.waha-session`) was mapped by a parallel change and is untouched here.
-> *Update this line on every code change, even when no other
+> **Last synced:** 2026-09-26 — branch `feat/erd-v2-foundation`: ERD v2 releases **R1** (ADR-0005: versioned
+> migrations, soft delete + "Terhapus", assignment/status history, import batches, ISO timestamps),
+> **R3** (ADR-0006: runs/deliveries/items, derived "pending", void, templates, contacts, follow-ups) and
+> **R2** (ADR-0007: RBAC — roles, permissions with scope, many roles per user; `profiles` is gone).
+> Review + production prep (2026-09-26): no default credentials in production (`seedDatabase`, login hint hidden in a production build, password policy `assertPasswordAcceptable`), `root.tsx` headers, GET `/logout` no longer logs out, webhook body cap / no stranger text / bounded `inbound_messages`, free-text and quoted replies (`reasons.ts`, migrations 0008–0009), reminder text v3; open findings are DEBT-019…025. Earlier: WhatsApp replies (ADR-0009): `POST /webhooks/waha` → `inbound.server.ts` / `reply-parser.ts`, table `inbound_messages` + `notification_items.position` (migration 0007), secret `waha.webhook_secret` (Pengaturan → Koneksi WAHA), Log Audit "Balasan WhatsApp"; `submitReason` takes `actingUserId: number | null` and `via`; `templates.server.ts` has `orderByWait` (one ordering for the message and the stored positions). Earlier: Admin dashboard reworded and paged: Indonesian copy throughout ("Perlu diingatkan" for eligible, "pengiriman" for batch), the history is paged 5 per page via `runsPage` + `TablePagination` (`?page=`), delivery statuses are labelled, and a run that delivered any message can no longer be voided (`voidBatch` refuses it; the dashboard hides the button). Dashboards reviewed: `StatTile` follows the design system's KPI tile (dot + uppercase label above the number; the tone colours the dot). Comments + reasons + paging + message v2 (ADR-0008): `record_comments` (migration 0005), "Aktivitas & komentar" feed with a composer on every record panel (`ActivityFeed.tsx`, `/comments`, `comments.server.ts`), reasons are given from the customer panel (dashboard reason buttons and `/salesman/customers/:id/reason` are gone), Log Audit and feeds paged in SQL (`pagination.ts`; `TablePagination` takes `pageParam`), reminder text v2 (migration 0006; `tanggal`/`daftar_alasan`, numbered `daftar_customer`). Earlier: customer edit panel — ⤢ now means full page, Status is a `ToggleField` at the top, last transaksi date + order status (Overdue / On track, `orderStanding`) shown read-only there and as list columns; every follow-up reason is logged in the activity log (`submitReason`). Earlier: the Aktif/Terhapus switch moved into the list search bar (`TableSearch.tsx`, replaces `TrashSwitch` + the old `TableToolbar`); transaksi keeps soft delete (decision). Fix: migrations now run when the database is opened, not from the root loader (see §5 Bootstrap timing). DEBT markers added in `masterdata.server.ts` / `roles.server.ts` / `access.server.ts` (DEBT-017/018). Cleanup pass: unused and
+> duplicate code removed (shared `names.server.ts`, `listLive*` / `liveCustomersOf`, reports reuse `salesmenWithStats`). `Tx` is now private to `client.server.ts`; use `DbHandle`. *Update this line on every code change, even when no other
 > section needed editing — it is the record that the review happened.*
 >
 > Business rules and requirement IDs (FR-/BR-) live in `docs/frd/`. Design
@@ -26,8 +26,8 @@
 
 SiGula — a React Router 7 (framework mode, SSR) monolith on Node 22+. It tracks
 each customer's reorder cycle, flags overdue accounts, and sends WhatsApp
-nudges (via WAHA) to salesmen and their supervisors. Four roles: `admin`,
-`salesman`, `supervisor`, `management`. SQLite via Drizzle + better-sqlite3.
+nudges (via WAHA) to salesmen and their supervisors. Access is RBAC (ADR-0007): a user holds
+roles; built-in roles `admin`, `salesman`, `supervisor`, `management` are bundles of permissions. SQLite via Drizzle + better-sqlite3.
 UI strings are Indonesian; code identifiers are English (domain nouns like
 `nama`, `transaksi`, `tanggal_order` stay Indonesian).
 
@@ -52,33 +52,56 @@ password `sigula123`. Production deploy is **ask-first** (`config.yml`).
 
 ```
 app/
-  root.tsx                 HTML shell + ErrorBoundary; root loader = DB bootstrap + cron start
+  root.tsx                 HTML shell + ErrorBoundary; root loader = DB bootstrap + cron start; `headers` = security headers on every page
+                           (nosniff, X-Frame-Options DENY, Referrer-Policy, Permissions-Policy, HSTS in production; no CSP — DEBT-019)
   routes.ts                EXPLICIT route table (not file-based) — every route is registered here
   app.css                  Tailwind 4 import + `--sg-*` tokens + all custom classes (BEM-ish)
   components/
-    AppShell.tsx           AppShell (sidebar/topbar + per-role NAV), PageHeader, StatTile, StatusPill
-    DataTable.tsx          paginate, resolvePageSize, useRowSelection, TableToolbar, TablePagination,
-                           BulkActionBar, SelectAllCheckbox
-    RecordDrawer.tsx       URL-driven side drawer: parseDrawer, useDrawerHref, RecordDrawer,
-                           EditLink, AddLink, useRowOpen (+ activity timeline)
+    AppShell.tsx           AppShell (sidebar/topbar, NAV built from the user's permissions), PageHeader, StatTile, StatusPill
+    DataTable.tsx          paginate, resolvePageSize, useRowSelection, TablePagination, BulkActionBar
+                           (variant delete | restore), SelectAllCheckbox
+    RecordDrawer.tsx       URL-driven side drawer: parseDrawer, useDrawerHref, RecordDrawer (⤢ button =
+                           "full page": 100vw, no scrim, fields in two columns, Aktivitas as a side column;
+                           `.drawer--full`, state is local), ReadonlyField, EditLink, AddLink, useRowOpen
+                           (+ activity timeline)
+    ToggleField.tsx        design-system toggle (`role="switch"`) for a two-state form field; submits its
+                           value via a hidden input, saved with the form's own button (Customer → Status)
+    TemplateEditor.tsx     one editable message template card (Pengaturan → Template Pesan) + live preview
+    TableSearch.tsx        TableToolbar: the list search bar after the design system — one bordered box with
+                           the icon, the status filter as a chip ("Status adalah Terhapus ×"), the text input
+                           and "Bersihkan", plus a suggestion list (pick a column → pick Aktif/Terhapus, or
+                           Enter to search every column). State is the URL (`q`, `trash`, `pageSize`, `tab`);
+                           `statusFilter` is optional (Audit log has none). Exports StatusFilter
+    TrashTable.tsx         "Terhapus" view: read-only rows + Pulihkan (row and bulk)
     UploadDialog.tsx       record-agnostic upload modal: UploadButton (icon + native <dialog>,
                            drop/pick → preview → confirm/cancel), UploadPreviewView type
     WahaSessionCard.tsx    "Sesi WhatsApp" panel on Pengaturan → Koneksi WAHA: status pill, QR,
                            Login / Logout (inline confirm); polls the resource route every 4 s
   db/
-    schema.ts              Drizzle tables, enums, relations, REASON_LABELS, Role/ReasonCode types
-    client.server.ts       opens SQLite (WAL, foreign_keys ON); exports `db`, `sqlite`, `DB_PATH`
-    migrate.server.ts      idempotent raw-SQL bootstrap + migrateLegacySupervisors (ADR-0004)
-    seed.server.ts         seedIfEmpty(): migrate() then demo org/users/customers if `users` is empty
+    schema.ts              Drizzle tables (source of truth), enum lists + `oneOf` CHECK helper, `alive()`
+    client.server.ts       opens SQLite (WAL, foreign_keys ON) **and migrates it on open** (`migrateDatabase`), so the
+                           schema is current before any query; exports `db`, `sqlite`, `DB_PATH`, and the type
+                           `DbHandle` (`db` or an open transaction) for helpers that work in both
+    migrate.server.ts      `migrateDatabase(dbh)` = frozen ADR-0004 baseline (only on a DB with no recorded migration)
+                           + runMigrations; also migrateLegacySupervisors. Does not import client.server (no cycle)
+    migrations.server.ts   runMigrations: applies drizzle/*.sql, foreign_keys OFF, 1 txn per migration,
+                           foreign_key_check before commit; PREFLIGHT checks per tag
+    seed.server.ts         seedIfEmpty(): on an empty `users` table — outside production the demo org (four accounts, published password);
+                           **in production no demo accounts ever**: one administrator from `ADMIN_PASSWORD` (+ optional `ADMIN_USERNAME`), none
+                           without it (`seedDatabase({production,…})` is the testable core)
   lib/                     business logic — one module per ownership area (see §6)
     auth.server.ts  masterdata.server.ts  orders.server.ts  reminders.server.ts
     imports.server.ts  reports.server.ts  activity.server.ts  settings.server.ts
     cron.server.ts  waha.server.ts  upload.server.ts
+    customer-history.server.ts  trash.server.ts  contacts.server.ts  pending.server.ts
+    follow-ups.server.ts  templates.server.ts  roles.server.ts  access.server.ts  inbound.server.ts
+    names.server.ts  comments.server.ts  permissions.ts  activity-entities.ts
+    dates.ts  activity-format.ts  pagination.ts  reply-parser.ts  upload.ts  template-vars.ts
     dates.ts  activity-format.ts  upload.ts  waha-session.ts   (no `.server` → safe to import in components)
   routes/                  one file per route: loader/action + page component
 tests/
   setup.ts                 sets DATABASE_PATH (temp dir) + SESSION_SECRET BEFORE app modules load
-  helpers/fixtures.ts      resetDb, seedOrg, addCustomer, getCustomer, TODAY
+  helpers/fixtures.ts      resetDb, seedOrg, addCustomer, getCustomer, voidRunLegacy, TODAY
   *.test.ts                service-level tests (no route/HTTP tests)
 docs/                      prd/ frd/ tdd/ adr/ runbook-sigula.md user-input/
                            erd-sigula.dbml (TARGET ERD draft, not yet implemented — schema.ts is the running schema)
@@ -98,10 +121,12 @@ Not app code, ignore unless asked: `.agents/skills|workflow|templates|commands`,
   — generated by `react-router typegen` (part of `npm run typecheck`).
 - **Route file naming** is a convention only; registration is in `app/routes.ts`.
 - **Auth guard first line of every loader/action**:
-  `const user = await requireRole(request, "admin")` (or array of roles).
-  Wrong role → `Response("Forbidden", 403)`; no session → redirect `/login?next=…`.
-  Ownership checks (salesman owns customer; supervisor subtree) are done in the
-  route/action itself and throw 403/404 `Response`s.
+  `const user = await requirePermission(request, PERM.settingsManage)` (`PERM` from `~/lib/permissions`).
+  Missing permission → `Response("Forbidden", 403)`; no session → redirect `/login?next=…`.
+  Row-level checks use the permission's *scope* via `access.server.ts`: `assertOwnOrAll(user, PERM.x,
+  salesmanId)` (all → any salesman, else only the user's own; `canOwnOrAll` is the boolean form) and `assertInTeamOrAll` (team → subordinates
+  only, not oneself); `requireSalesmanId(user)` refuses a user with no linked salesman (never read that as
+  "everyone"). Other lookups throw 403/404 `Response`s in the route.
 - **Forms** are RR `<Form method="post">` with a hidden `intent` field; the
   action dispatches on `intent` (`create` / `update` / `delete_many` /
   `create_customer` / `delete_many_user` …). Bulk-delete posts repeated
@@ -123,89 +148,141 @@ Not app code, ignore unless asked: `.agents/skills|workflow|templates|commands`,
   (`.app-*`, `.btn[-sm|-outline|-ghost|-danger|-warn]`, `.card`, `.table-wrap`,
   `table.data`, `.form-field`, `.form-control`, `.alert[-ok|-warn|-danger]`,
   `.status-pill--{ok,warn,danger,muted}`, `.stat-grid/.stat-tile`,
-  `.drawer*`, `.upload-dialog*`, `.dropzone*`, `.btn-icon`, `.activity-list*`, `.table-toolbar`, `.bulk-bar`,
+  `.drawer*`, `.upload-dialog*`, `.dropzone*`, `.btn-icon`, `.activity-list*`, `.table-toolbar`,
+  `.search-wrap/.search-bar*/.search-chip*/.search-suggest*/.search-echo` (list search bar), `.toggle-field*`, `.drawer--full`, `.bulk-bar`,
   `.table-pagination`, `.page-btn`, `.login-*`, `.action-row`, `.hide-sm`).
   Palette tokens `--sg-*` (teal brand, slate neutrals). Light theme only.
 - **Comments** are sparse; they carry BR/FR/ADR/DEBT ids (`// DEBT-009`).
   Every shortcut needs a `DEBT-NNN` marker + a row in `.agents/work/DEBT.md`.
 
-## 5. Database (`app/db/schema.ts` is the typed source; DDL is duplicated in `migrate.server.ts`)
+## 5. Database (`app/db/schema.ts` is the source of truth; the SQL that builds it is `drizzle/*.sql`)
 
 | Table | Key columns / constraints |
 |---|---|
-| `users` | id, `username` UNIQUE, `password_hash` (bcrypt), `display_name` |
-| `profiles` | `user_id` UNIQUE → users (CASCADE), `role` ∈ admin/supervisor/salesman/management, `salesman_id` → salesmen. CHECK: salesman/supervisor ⇒ salesman_id NOT NULL; admin/management ⇒ NULL |
-| `salesmen` | `nama`, `nomor_wa` (default ''), **`supervisor_id` → salesmen (self-FK)**, `status` aktif/inactive. CHECK `supervisor_id <> id` |
-| `customers` | `nama`, `salesman_id` → salesmen, `tipe_customer` lama/baru, `order_cycle_days` (CHECK ≥ 1, default 30), `status_customer` aktif/inactive, `last_order_date`, `notified` bool, `handled_on`. UNIQUE(`nama`,`salesman_id`) |
-| `transaksi` | `customer_id`, `salesman_id`, `tanggal_order`, `sumber` seed/import/manual, `tanggal_input`, `catatan`. Editable/deletable (DEBT-009). `orderHistory` is a deprecated alias export |
-| `reason_logs` | customer, salesman, `tanggal`, `kode_alasan` '1'/'2'/'3' |
-| `notification_batches` | `tanggal` (datetime), `triggered_by_id` → users |
-| `notification_deliveries` | batch, `salesman_id` (the *recipient*), `recipient_kind` salesman/supervisor, `customer_count`, `status` sent/failed/skipped_no_phone, `error_message` |
-| `mutation_logs` | customer reassignment: `dari_salesman_id`, `ke_salesman_id`, `oleh_id` |
-| `status_logs` | `tipe` manual_inactive/manual_reactivation/auto_reactivation, `oleh_id` nullable |
-| `activity_logs` | `entity_type` transaksi/customer/salesman/user, `entity_id`, `entity_label` + `actor_name` (snapshots), `action` create/update/delete, `changes` JSON `{field:{from,to}}`, `created_at`; index (entity_type, entity_id, id); `actor_id` SET NULL on user delete |
-| `app_settings` | key/value store: `waha.{base_url,session,api_key,timeout_ms}`, `cron.{enabled,expression,last_run_at,last_run_status,last_run_message}` |
+| `users` | id, `username` (unique among live rows), `password_hash` (bcrypt), `display_name`, **`salesman_id`** (the salesman this login acts as; needed by roles with `own`/`team` permissions — enforced in the app, not the DB), **`is_active`** (false = cannot sign in), **`last_login_at`**, timestamps + `deleted_at` |
+| `roles` | `code` (admin, salesman, supervisor, management), `name`, `description`, `is_system`. Reference data seeded by migration 0004; no editor |
+| `permissions` | `code` (the same 13 codes as `PERM` in `app/lib/permissions.ts` — a test keeps them equal), `description` |
+| `role_permissions` | (`role_id`, `permission_id`) PK + `scope` own/team/all |
+| `user_roles` | (`user_id`, `role_id`) PK, `granted_at`, `granted_by_id`. A user may hold several roles; permissions merge, widest scope wins |
+| `salesmen` | `nama`, **`supervisor_id` → salesmen (self-FK)**, `status`, timestamps + `deleted_at`. CHECK `supervisor_id <> id`; index on supervisor_id. The WhatsApp number is **not** here any more → `salesman_contacts` |
+| `salesman_contacts` | `salesman_id`, `channel` (whatsapp/email/sms/push), `address`, `is_primary`, `is_verified`, timestamps + `deleted_at`. One live primary per (salesman, channel). Only WhatsApp is written/sent today (DEBT-014) |
+| `customers` | `nama`, `salesman_id` (CACHE of the open assignment), `tipe_customer`, `order_cycle_days` (CHECK ≥ 1), `status_customer`, `last_order_date` (CACHE of max live tanggal_order), timestamps + `deleted_at`. UNIQUE(`lower(nama)`,`salesman_id`) among live rows (expression index made by hand in 0001 — drizzle-kit cannot express it) |
+| `transaksi` | `customer_id`, `salesman_id` (snapshot), `tanggal_order`, `sumber`, `import_batch_id`, `catatan`, `created_at/by`, `updated_at/by`, `deleted_at/by`, **`deleted_with_customer_id`** (set when it went to the trash with its customer). `tanggal_input` is gone (= `created_at`). Editable, soft-deleted (DEBT-009). `orderHistory` is a deprecated alias |
+| `follow_up_reasons` | lookup: `code` ("1" Kalah Harga, "2" Stok Masih Ada, "3" Sudah Bangkrut), `label`, `deactivates_customer`, `sort_order`, `is_active`. Seeded by migration 0003, plus `other` / "Lainnya" (migration 0009): what a free-text answer is recorded as — never offered, never deactivates; `listFollowUpReasons` filters it out, `reasonCounts` shows it |
+| `follow_ups` | replaces `reason_logs` + `customers.handled_on`: `customer_id`, `salesman_id`, `notification_item_id` (the reminder it answers; unique), `outcome` (will_order/not_ordering/unreachable), `reason_id` (required for not_ordering), `follow_up_date`, `created_by_id`. Immutable |
+| `notification_runs` | replaces `notification_batches` (ids kept): `trigger` manual/scheduled, `triggered_by_id` (null = scheduler), `as_of_date`, `started_at`, `finished_at`, **`voided_at/by/reason`** |
+| `message_templates` | `code` (reminder_salesman / reminder_supervisor), `channel`, `recipient_kind`, `subject` (email), `body` with `{{nama}}`/`{{jumlah}}`/`{{tanggal}}`/`{{daftar_customer}}`/`{{daftar_alasan}}`, `version`, `is_active`. Edit = new version. Seeded (whatsapp + email; email hidden); migration 0006 makes v2 the active salesman WhatsApp text where v1 was untouched |
+| `notification_deliveries` | one message: `run_id`, `salesman_id` (the *recipient*), `recipient_kind`, `channel`, `contact_id`, `address` + `message_body` + `template_id` (snapshots), `customer_count`, `status` queued/sent/failed/skipped_no_contact, `provider_message_id`, `error_message`, `attempt` (a retry is a new row), `sent_at` |
+| `notification_items` | which customers a message covered: `delivery_id`, `customer_id`, `last_order_date` + `days_overdue` (snapshots), **`position`** (the line number in the message; a reply's "3" means this row; null for messages sent before ADR-0009); unique (delivery, customer) |
+| `customer_assignments` | replaces `mutation_logs`: `customer_id`, `salesman_id`, `valid_from`, `valid_to` (null = current), `assigned_by_id`, `note`. One open row per customer (partial unique). Immutable except `valid_to` set once |
+| `customer_status_history` | replaces `status_logs`: `from_status`, `to_status`, `reason` (manual_inactive / manual_reactivation / auto_reactivation), `changed_by_id` (null = system), `changed_at`. Only real transitions |
+| `import_batches` | one Excel import: `file_name`, `file_sha256`, `row_count`, `imported_by_id`, `imported_at`; `transaksi.import_batch_id` points here |
+| `activity_logs` | `entity_type` (free text, no CHECK), `entity_id`, `entity_label` + `actor_name` (snapshots), `action` create/update/delete/**restore**, `changes` JSON, `created_at` ISO; indexes (entity_type, entity_id, id) and (actor_id, created_at); `actor_id` SET NULL |
+| `inbound_messages` | a WhatsApp message from the WAHA webhook (ADR-0009): `provider_message_id` (unique = exactly once), `session`, `from_address` (digits), `salesman_id` (null = stranger), `body` ("" for a stranger: their text is never kept), `reply_to` (the quoted message id as WAHA sent it, migration 0008), `outcome` recorded/unrecognized/nothing_pending/unknown_sender (CHECK), `detail`, `reply_text`, `reply_status` none/sent/failed (CHECK), `received_at`, `created_at` |
+| `record_comments` | messages on a record's panel: `entity_type` (transaksi/customer/salesman/user, no CHECK), `entity_id` (no FK), `body` (CHECK not empty; ≤2000 in app), `author_id` (set null) + `author_name` snapshot, `created_at`; index (entity_type, entity_id, id). Never edited or deleted |
+| `app_settings` | key/value store + `is_secret`, `updated_at`, `updated_by_id`: `waha.{base_url,session,api_key,timeout_ms,webhook_secret}` (api_key and webhook_secret are secrets), `cron.{enabled,expression,last_run_at,last_run_status,last_run_message}` |
 
-**Two places define the schema** — `schema.ts` (Drizzle) and `migrate.server.ts`
-(raw `CREATE TABLE IF NOT EXISTS`). Keep both in sync by hand; there is no
-drizzle-kit config. `IF NOT EXISTS` **never alters an existing table**, so a
-new column/constraint needs an explicit upgrade step like
-`migrateLegacySupervisors` (rebuild table in one transaction, `foreign_key_check`
-before commit). Migrating **production** is ask-first and needs a file backup.
+**Schema source of truth is `schema.ts`.** Change it, then `npm run db:generate` (drizzle-kit
+writes `drizzle/NNNN_*.sql` + snapshot; it needs a TTY for rename prompts — answer "create").
+Hand-edit the SQL when data must be backfilled/converted (see 0001). `npm run db:check`
+validates the snapshot chain. `migrate.server.ts` holds the **frozen** ADR-0004 baseline DDL; never
+add to it. **Conventions** (ERD v2): enums = TEXT + CHECK (`oneOf` helper), timestamps = ISO-8601
+UTC `YYYY-MM-DDTHH:MM:SSZ` filled by the app (`nowIso()`, `$defaultFn`/`$onUpdate` — no DB default),
+master data soft-deleted (`deleted_at`; read through `alive(table)`), logs immutable.
+`tests/migrations.test.ts` checks the migrated DB against `schema.ts` (columns, NOT NULL, PK, FKs, indexes).
+Migrating **production** is ask-first and needs a file backup; the `drizzle/` folder must be in the image
+(Dockerfile copies it). A rebuilt table must carry its `sqlite_sequence` counter (0001 does).
 
-Legacy path still in `migrate()`: one-time `order_history → transaksi` lift, then
-`migrateLegacySupervisors()` (no-op once the `supervisors` table is gone).
-
-**Bootstrap timing**: nothing runs at process start. The root loader calls
-`seedIfEmpty()` (→ `migrate()` + demo seed if `users` empty, memoised promise,
-`BEGIN IMMEDIATE`) and `ensureCronScheduler()` on page requests.
+**Bootstrap timing**: the schema is migrated **when the database is opened** — the first import of
+`client.server.ts` (server start in production, first request in dev) — never from a route, because a first
+request can skip the root loader (a client-side navigation in a tab that outlived a server restart; resource routes)
+and would then query the old schema (`no such column: users.salesman_id`). A failing migration throws there, so the
+server does not come up on a schema it cannot use. `npm run build` does not open the database. The root loader
+still calls `seedIfEmpty()` (demo seed if `users` is empty, memoised promise, `BEGIN IMMEDIATE`) and
+`ensureCronScheduler()` on page requests.
 
 ## 6. `app/lib` — who owns what (public functions)
 
 **`auth.server.ts`** — cookie session `__sigula_session` (12 h, httpOnly, secure
 in prod; **throws at import in production if `SESSION_SECRET` is unset/default**).
-`getAuthUser`, `requireUser`, `requireRole`, `createUserSession`,
-`destroyUserSession`, `verifyLogin`, `hashPassword`, `homeForRole`, in-memory
-login throttle (`checkLoginThrottle` / `recordLoginFailure` / `clearLoginFailures`,
-10 tries / 15 min per `x-forwarded-for:username`). `AuthUser.salesmanId` — for
-role `supervisor` it is the **leading salesman** of the team.
+`getAuthUser` (live + `is_active` user whose linked salesman, if any, is live; loads role names and the merged
+`permissions` map — 2 queries per request), `requireUser`, **`requirePermission`**, `createUserSession`,
+`destroyUserSession`, `verifyLogin`, `recordLogin` (sets `last_login_at`), `hashPassword`, in-memory
+login throttle (`checkLoginThrottle` / `recordLoginFailure` / `clearLoginFailures`, 10 tries / 15 min per
+`x-forwarded-for:username`). `AuthUser = Access & {id, username, displayName, roleNames}`; `Access = {permissions,
+salesmanId}`.
+
+**`permissions.ts`** (client-safe) — `PERM` (the 13 codes), `Scope`, `can`, `scopeOf`, `mergeGrants`, `homeFor`
+(admin dashboard → management → team → salesman; null = nothing to open, `/` answers 403). **`roles.server.ts`** —
+`listRoles`, `roleIdsByCode`, `rolesNeedingSalesman` (a role needs a salesman iff it has an `own`/`team`
+permission), `rolesForUsers`, `roleNamesOf`, `setUserRoles`, `assertAdministrationRemains` (the last live active
+holder of `masterdata.manage` cannot lose it / be deactivated / deleted). **`access.server.ts`** — see §4.
 
 **`dates.ts`** — `todayIso`, `daysBetween`, `parseIsoDate`, `daysSinceOrder`,
 **`isOverdue`** (BR-1: never ordered ⇒ overdue; `days > cycle`, equal is *not*
-overdue). Overdue is computed at read time everywhere, never stored.
+overdue), **`orderStanding`** (`daysSinceOrder` + `overdue` for list/drawer display). Overdue is computed at
+read time everywhere, never stored.
 
 **`orders.server.ts`** — `computeEligibleCustomers` (BR-2: `aktif` + overdue),
-`notYetNotifiedEligible` (FR-3: also `!notified`), `eligibleCustomerCount`,
+`notYetNotifiedEligible` (FR-3: also not *pending*),
 `syncCustomerLastOrderDate`, **`recordOrder`** (one transaction: insert
-transaksi, `last_order_date = max(tanggal_order)`, force `aktif`, clear
-`notified`/`handled_on`, `auto_reactivation` status log if it was inactive; then
+transaksi, `last_order_date = max(tanggal_order)`, force `aktif`, `auto_reactivation` status history row if it was inactive; then
 logs activity), `listTransaksi`, `createTransaksi` (wraps `recordOrder`),
 `updateTransaksi`, `deleteTransaksi`, `deleteTransaksiMany` (loop, not one tx).
 
-**`masterdata.server.ts`** — hierarchy: `subordinateIds` (whole subtree, BFS),
+**`masterdata.server.ts`** — `assertPasswordAcceptable` (≥ 8 characters, not the published demo password; used by user create/update and the production first-admin seed) and the "live rows" lookups every module reuses: `findLiveCustomer`, `findLiveSalesman`,
+`listLiveSalesmen`, `listLiveCustomers`, `liveCustomersOf(salesmanId)`; hierarchy: `subordinateIds` (whole subtree, BFS),
 `directReportIds`, `assertValidSupervisor` (rejects unknown/self/cycle).
 Customers: `createCustomer`, `updateCustomer` (a salesman change delegates to
 `reassignCustomer`, which writes `mutation_logs`), `reactivateCustomer`
-(`manual_reactivation`), `deleteCustomerRecord` (cascades reason/transaksi/
-status/mutation rows), `deleteCustomersMany`, `clampCycleDays` (BR-6).
+(`manual_reactivation`), `deleteCustomerRecord` (**soft**: also soft-deletes its live transaksi with `deleted_with_customer_id`; history rows stay), `deleteCustomersMany`, `clampCycleDays` (BR-6).
 Salesmen: `createSalesman`, `updateSalesman`, `deleteSalesman` (blocked by
-customers / transaksi / remaining direct reports; also deletes linked
-`profiles`), `deleteSalesmenMany` (**all-or-nothing**, children first).
-Users: `createUserAccount`, `updateUserAccount` (password only logged as
-"(diubah)"), `deleteUserAccount`, `deleteUsersMany` (refuses the actor's own id).
+customers / transaksi / remaining direct reports), `deleteSalesmenMany` (**all-or-nothing**, children first).
+Users: `createUserAccount({roles: codes[], salesmanId?, isActive?})` (needs ≥ 1 role; a salesman when a chosen role
+needs one, otherwise the link is dropped), `updateUserAccount` (password only logged as "(diubah)"; roles diffed
+and logged by name), `loadUser`, `deleteUserAccount`, `deleteUsersMany` (refuses the actor's own id).
 Stats: `salesmenWithStats(supervisorId?)` (subtree, excludes supervisor),
 `supervisorsWithStats()` (management: **direct reports only** — a partition).
 
-**`reminders.server.ts`** — `previewBatch` (per-salesman groups + per *direct*
-supervisor groups), `triggerBatch` (null if nobody eligible; sends salesman
-messages then supervisor summaries; flips `notified` only when a salesman-kind
-send succeeds), `retryBatch` (re-sends `failed` deliveries), `deleteBatch`
-(clears `notified` for salesman-kind recipients' customers), `submitReason`
-(reason `3` ⇒ `inactive` + `manual_inactive`; every code sets `handled_on=today`,
-`notified=false`), plus private `salesmanMessage` / `supervisorMessage` text.
-`WahaClient` is injectable (`opts.client`) — tests pass a fake.
-Note: `eligibleCustomerCount` is exported from **both** `orders.server` and
-`reminders.server`; routes and cron use the `reminders` one.
+**`customer-history.server.ts`** — append-only customer history (ERD D7): `openAssignment`,
+`moveAssignment` (closes the open row, opens the next at the same instant), `listAssignmentMovesPage` (a move =
+an assignment that took over from an earlier one; paged in SQL), `recordStatusChange`, `listStatusChangesPage`. Write it in the same transaction as
+`customers.salesman_id` / `status_customer` (the cache columns). Rows are created only via
+`insertCustomer` (masterdata) so every customer has an open assignment.
+
+**`trash.server.ts`** — "Terhapus" views and restore. `listDeleted{Transaksi,Customers,Salesmen,Users}`,
+`countDeleted`, `restore{Transaksi,Customer,Salesman,User}` and `restore*Many` (all-or-nothing, salesmen
+supervisors-first). A restore refuses, with a message, when it would leave a live row pointing at a deleted
+one (customer→salesman, transaksi→customer/salesman, salesman→supervisor) or a taken name/username.
+`restoreCustomer` also brings back transaksi with `deleted_with_customer_id = id`.
+
+**`reminders.server.ts`** — the reminder job (ADR-0006). `previewBatch` (per-salesman groups + per *direct*
+supervisor groups, each recipient with `nomorWa`), `triggerBatch({triggeredById|null, client?, today?})` (null if
+nobody eligible and nothing written; creates a **run**; per recipient×channel a **delivery** written `queued`
+*before* sending, items for the customers covered, then `sent`/`failed`; no contact ⇒ `skipped_no_contact`),
+`retryBatch` (each recipient's latest failed attempt is re-sent as a **new** delivery `attempt+1`, lists
+recomputed once per pass; refuses a voided run), `voidBatch` (cancels a run that delivered **nothing** — every message failed or was skipped — so it is no longer retried; it throws for a run with any `sent` delivery, or one already voided; the run stays on record. Runs voided under the *old* rule, when a sent run could be voided, still free their customers: `pending.server.ts` ignores voided runs),
+`runsPage(page, pageSize = RUNS_PAGE_SIZE)` (dashboard history: newest first, paged in SQL with `pageWindow`, each run with its deliveries, recipient names and `needsRetry`; returns `{rows,total,page,totalPages,pageSize}`), `eligibleCustomerCount` (dashboard + cron; the only copy). `ACTIVE_CHANNELS = ["whatsapp"]`. `WahaClient` is injectable (`opts.client`) — tests
+pass a fake.
+
+**`pending.server.ts`** — "pending" (was `customers.notified`) is **derived**: `pendingCustomerIds()` /
+`pendingItemId` (both built on one shared SQL fragment; tests use `isPending` from `tests/helpers/fixtures.ts`). Pending ⇔ an item on a *sent*, `salesman`-kind delivery of a non-voided run, no
+`follow_ups` row on that item, and `customers.last_order_date` still equals the item's snapshot; live customers
+only. One SQL query; callers filter in JS.
+
+**`follow-ups.server.ts`** — `listFollowUpReasons` (the offered reasons, not `other`), `findFollowUpReason`, **`submitReason`** (`note`: the words for `other`, a remark for an offered one; inserts a
+`follow_ups` row linked to the customer's pending item; a reason with `deactivates_customer` also marks it inactive +
+status history when it really changes; **every** reason is written to the activity log on the customer as an
+`update` with `alasan_keterlambatan: — → <reason label or the free text> [(via WhatsApp)]`, plus `status_customer` in the same entry when it deactivated), `reasonCounts`, `followUpCountBySalesman`. DEBT-015: only `not_ordering`.
+
+**`contacts.server.ts`** — `primaryContact`, `whatsappNumber`, `setWhatsappNumber` (blank ⇒ soft-delete; a new
+number resets `is_verified`), `attachWhatsapp(rows)` (adds `nomorWa`, one query). The salesman form's "Nomor WA"
+field and every `nomorWa` read go through it.
+
+**`templates.server.ts`** (+ `template-vars.ts`) — `renderTemplate`, `unknownPlaceholders`, `customerLines` (the numbered
+`{{daftar_customer}}`: longest wait first, never-ordered first, ties by name), `SAMPLE_VARS`, `activeTemplate`,
+`listEditableTemplates` (whatsapp only, `EDITABLE_TEMPLATE_CHANNELS`, DEBT-014),
+`saveTemplateVersion` (validates, inserts v+1, retires v, logs activity entity `template`; same text = no-op).
 
 **`waha.server.ts`** — `createWahaClient` → `sendText(nomorWa, text)` POSTs
 `{baseUrl}/api/sendText` `{session, chatId: "<digits>@c.us", text}` with
@@ -233,8 +310,7 @@ when already logged out. Mutating calls use `max(timeoutMs, 15 s)`. WAHA's JSON
 
 **`cron.server.ts`** — in-process `croner` job on `globalThis.__sigulaCron`
 (Asia/Jakarta). `ensureCronScheduler` (idempotent), `refreshCronScheduler`
-(after saving settings), `runScheduledBatch` (uses the first admin as
-`triggeredById`, records ok/skipped/failed), `stopCronSchedulerForTests`.
+(after saving settings), `runScheduledBatch` (`triggeredById: null` ⇒ run `trigger=scheduled`; records ok/skipped/failed), `stopCronSchedulerForTests`.
 
 **`imports.server.ts`** — Excel import. Workbook sheet name = salesman name
 (case-insensitive); header row found within first 8 rows by exact titles
@@ -256,16 +332,39 @@ check, the in-memory token store (30 min TTL, **single-use**, DEBT-006) and turn
 the user as-is, anything else from `confirm` propagates (500). A record supplies
 only `parse` (file → preview payload, **no writes**) and `confirm` (apply).
 
-**`reports.server.ts`** — three `.xlsx` builders: `buildSalesmanReminderReport`
-(notified customers only), `buildSupervisorTeamReport` (subtree; sheets
+**`reports.server.ts`** — three `.xlsx` builders (all counts come from `salesmenWithStats`, one definition of aktif / inactive / follow-up / pending): `buildSalesmanReminderReport`
+(pending customers only), `buildSupervisorTeamReport` (subtree; sheets
 "Ringkasan Salesman", "Detail Customer"), `buildManagementSummaryReport`
 (sheets "Per Supervisor" [direct reports], "Per Salesman", "Alasan").
 
-**`activity.server.ts`** + **`activity-format.ts`** — per-record audit trail.
+**`activity.server.ts`** + **`activity-format.ts`** — per-record audit trail and comments.
 `logActivity` (skips an `update` with no changes; snapshots actor name),
-`diffChanges`, `snapshotChanges`, `listActivityFor(entity,id,limit=30)`,
-`listRecentActivity(limit=1000)`. `activity-format` holds the labels
-(`ENTITY_LABELS`, `ACTION_LABELS`, `FIELD_LABELS`), `formatValue`, `formatStamp`.
+`diffChanges`, `snapshotChanges`, `addComment` / `normalizeComment` (2,000-char limit), **`listFeedFor(entity,id,page,
+size=10)`** (a record's log entries + comments, newest first, paged in SQL by a UNION of both tables' keys; within one
+second a comment sorts before the log entry) and **`listActivityPage({entity,q,page,pageSize})`** (Log Audit: filter and
+search in SQL, `json_each` over `changes`, matching the Indonesian labels the page shows; `%`/`_` are literal).
+`activity-format` holds the labels (`ENTITY_LABELS`, `ACTION_LABELS`, `FIELD_LABELS`), `formatValue`, `formatStamp`,
+`initials`, the feed types (`FeedEntry`, `FeedPage`, `CommentItem`), `COMMENT_MAX_LENGTH`, `FEED_PAGE_PARAM`
+(`activityPage`). **`pagination.ts`** — `pageWindow(total,page,size)` (clamps a stale page), `parsePage`.
+
+**`inbound.server.ts`** + **`reply-parser.ts`** — WhatsApp replies (ADR-0009). `verifyWebhookSignature`
+(HMAC-SHA512 of the raw body, hex or base64, timing-safe), `handleWahaEvent` (only a text `message` on the configured
+session, not `fromMe`, from `@c.us` or a resolvable `@lid`; ignores everything else; sends the confirmation with
+`WahaClient`), **`receiveReply`** (one synchronous step: duplicate check by WhatsApp id → sender = salesman by
+`salesmanIdByWhatsapp` → `pickDelivery` (quoted, else newest with someone waiting, else newest; sent salesman
+deliveries only) → `parseReply` → targets by `notification_items.position` (unnumbered = every customer of that
+reminder still waiting) → `submitReason(via "WhatsApp")` per customer, note → comment → the `inbound_messages` row),
+`composeConfirmation`, `composeHelp`, `listInboundPage`. **Free text**: after a number, or anywhere in a message that quotes the
+reminder (`quoted` = `replyTo` matched a sent message; `detail` says "membalas pengiriman #N" / "mengutip pesan lain"), the words are
+the reason (`OTHER_REASON_CODE`, `reasons.ts`); without either they are chatter. **Limits**: a stranger's text is never stored and only the
+latest 200 such rows are kept, a salesman's rows 180 days (`prune`), text is cut at 2,000 characters; help replies at most one per hour
+per salesman. `reply-parser.ts` is pure: `parseReply(body, reasons, {quoted})` → entries `{numbers|null, reasonCode, note}` + unrecognized lines.
+
+**`comments.server.ts`** — the composer's rules for every record panel: `assertCanUseThread` (whoever manages that
+record kind — `transaksi.manage` / `masterdata.manage` — and, for a customer, its own salesman via
+`customer.follow_up`; 403/404 `Response`s) and **`postNote`** (comment and/or, on a customer, a reason: validates the
+text first, then `submitReason`, then `addComment`; a reason needs `customer.follow_up` for that customer's salesman —
+the admin role has none). `isCommentEntity`.
 **Logging is manual**: each mutation function calls `logActivity` itself, using
 human-readable *names* (not ids) as field values. A new mutation path must do
 the same, and any new field needs a `FIELD_LABELS` entry.
@@ -274,33 +373,41 @@ the same, and any new field needs a `FIELD_LABELS` entry.
 
 | URL | File | Who | What it does |
 |---|---|---|---|
-| `/` | `home.tsx` | any | redirect to `homeForRole` or `/login` |
+| `/` | `home.tsx` | any | redirect to `homeFor(user)` (permissions.ts) or `/login`; a signed-in user with no permission gets 403 |
 | `/login` | `login.tsx` | public | POST username/password/`next`; throttled |
-| `/logout` | `logout.tsx` | any | destroys session (GET and POST) |
-| `/salesman` | `salesman._index.tsx` | salesman | own **notified** customers, stats, `?q=`; buttons post to the two routes below |
-| `/salesman/customers/:id/reason` | `salesman.customers.$id.reason.tsx` | salesman | POST `kode_alasan` 1/2/3 → `submitReason`; 403 if not own customer |
-| `/salesman/customers/:id/record-order` | `…record-order.tsx` | salesman | POST → `recordOrder` (today, manual) |
-| `/supervisor` | `supervisor._index.tsx` | supervisor | `salesmenWithStats(user.salesmanId)` |
-| `/supervisor/salesmen/:id` | `supervisor.salesmen.$id.tsx` | supervisor | customer list; 403 unless in subtree |
-| `/supervisor/customers/:id/reactivate` | `…reactivate.tsx` | supervisor | POST → `reactivateCustomer`; subtree-scoped |
-| `/management` | `management._index.tsx` | management | `supervisorsWithStats` + reason counts |
-| `/admin/dashboard` | `admin.dashboard.tsx` | admin | preview + last 5 batches; intents `trigger`(default) / `retry` / `delete` (`batch_id`) |
+| `/logout` | `logout.tsx` | any | POST destroys the session; a GET only redirects to `/` (a link cannot log anyone out) |
+| `/salesman` | `salesman._index.tsx` | `customer.follow_up` | own **pending** customers, stats, `?q=`; **no reason buttons** — a row (or "Alasan & aktivitas") opens the customer's view-only panel (`?edit=<id>`, own customers only) with the composer + reasons for a late customer; "Catat Order" posts to the route below |
+| `/webhooks/waha` | `webhooks.waha.tsx` | none; HMAC (`X-Webhook-Hmac`) checked **only when** `waha.webhook_secret` is set (optional, as in WAHA; with none the call is taken on trust) | POST from WAHA → `handleWahaEvent`; 401 bad/missing signature (secret set), 400 not JSON, else 200 with the outcome (WAHA retries non-2xx; a retry is a no-op) |
+| `/comments` | `comments.tsx` | any signed-in user; access per record in `postNote` | POST `entity_type`, `entity_id`, `body`, optional `kode_alasan`; returns `{ok}` / 400 `{ok:false,error}`; 403/404 for access. Every panel's composer posts here with a fetcher |
+| `/salesman/customers/:id/record-order` | `…record-order.tsx` | `customer.follow_up` (own) | POST → `recordOrder` (today, manual) |
+| `/supervisor` | `supervisor._index.tsx` | `team.read` | `salesmenWithStats(requireSalesmanId(user))` |
+| `/supervisor/salesmen/:id` | `supervisor.salesmen.$id.tsx` | `team.read` (team) | customer list; 403 unless in subtree |
+| `/supervisor/customers/:id/reactivate` | `…reactivate.tsx` | `customer.reactivate` (team) | POST → `reactivateCustomer`; subtree-scoped |
+| `/management` | `management._index.tsx` | `management.read` | `supervisorsWithStats` + reason counts |
+| `/admin/dashboard` | `admin.dashboard.tsx` | admin | preview + history of runs, 5 per page (`?page=`, `TablePagination` below the cards); intents `trigger`(default) / `retry` / `void` (`batch_id`, optional `reason`). `retry`/`void` post back to `?page=N` and redirect there; `trigger` lands on page 1. Runs show trigger, an Indonesian label per delivery status (`DELIVERY_STATUS`), attempt, voided state. "Kirim ulang yang gagal" shows for a live run with a failed latest attempt; "Batalkan pengiriman" only for a live run with no `sent` delivery |
 | `/admin/reminders` | `admin.reminders.redirect.tsx` | – | redirect → `/admin/dashboard` |
 | `/admin/transaksi` | `admin.transaksi.tsx` | admin | Transaksi table + drawer; intents `create` / `update` / `delete_many`; the Excel import (icon left of "+ Tambah transaksi" → `UploadButton`) posts `preview` (multipart `.xlsx` ≤ 10 MB) / `confirm` (`preview_token`, `treat_unknown`) / `discard`, all routed through `handleUpload`. The route holds only the record-specific bits: `describeImportPreview`, `describeImportResult`, and the `parse`/`confirm` callbacks |
 | `/admin/transaksi/template.xlsx` | `admin.transaksi.template.tsx` | admin | import template download |
 | `/admin/imports` | `admin.imports.redirect.tsx` | – | redirect → `/admin/transaksi` |
-| `/admin/masterdata?tab=` | `admin.masterdata.tsx` | admin | 3 tabs × drawer; intents `create_/update_/delete_many_` + `customer`/`salesman`/`user`; errors caught → flash |
-| `/admin/audit` | `admin.audit.tsx` | admin | activity feed (filter `entity`, `q`, paging) + last 50 `mutation_logs` + last 50 `status_logs` |
-| `/admin/settings?tab=waha\|cron` | `admin.settings.tsx` | admin | sidebar submenu "Koneksi WAHA" (default) / "Jadwal Cron", no in-page tab bar; intents `save_waha` / `test_waha` / `save_cron`; the WAHA tab also mounts `<WahaSessionCard />` |
+| `/admin/masterdata?tab=` | `admin.masterdata.tsx` | admin | 3 tabs × drawer; intents `create_/update_/delete_many_` + `customer`/`salesman`/`user`; errors caught → flash. Customer rows carry `daysSinceOrder` + `overdue` (loader, `orderStanding`): columns *Transaksi terakhir* and *Status order* (Overdue / On track); the drawer shows both read-only (`ReadonlyField`, not submitted) under a `ToggleField` for Aktif/Inactive at the top |
+| `/admin/audit` | `admin.audit.tsx` | admin | four lists, each paged in SQL with its own page param: activity (`page`; filter `entity`, `q`), salesman moves (`movePage`), status changes (`statusPage`), WhatsApp replies received (`replyPage`, `listInboundPage`); `pageSize` shared |
+| `/admin/settings?tab=waha\|cron\|templates` | `admin.settings.tsx` | admin | sidebar submenu "Koneksi WAHA" (default) / "Jadwal Cron", no in-page tab bar; intents `save_waha` / `test_waha` / `save_cron` / `save_template` (whatsapp only, also enforced server-side; rejected text comes back as `draft`); the WAHA tab also mounts `<WahaSessionCard />` |
 | `/admin/settings/waha-session` | `admin.settings.waha-session.tsx` | admin | resource route (no page): GET → `{view, error:null}` (status + QR), POST intent `login` / `logout` → `{view, error}`; unknown intent → 400. `Cache-Control: no-store` via **both** `data()` and the `headers` export (the QR is sensitive) |
 | `/reports/salesman/:id` | `reports.salesman.$id.tsx` | salesman, admin | `.xlsx`; `me` = own salesman |
 | `/reports/supervisor/:id` | `reports.supervisor.$id.tsx` | supervisor, admin | `.xlsx` (id = leading salesman id) |
 | `/reports/management` | `reports.management.tsx` | management, admin | `.xlsx` |
 
-Admin is **not** allowed on `/salesman`, `/supervisor`, `/management` pages
-(those require their own role); admin only reaches the report downloads.
-Sidebar entries per role are the `NAV` map in `AppShell.tsx` — add a nav item
-there when adding a page. A `NAV` entry with `children` (`{tab,label}[]`) renders a
+**Terhapus view** (soft delete, ADR-0005): `/admin/transaksi` and each `/admin/masterdata` tab take
+`?trash=1`, chosen from the status filter inside the search bar (`TableToolbar`; suggestions show the Aktif / Terhapus counts, the active choice is a removable chip; Backspace in the empty input removes it). It lists soft-deleted rows read-only with **Pulihkan** (row + bulk,
+intents `restore_many` on Transaksi, `restore_many_customer|salesman|user` on Data Master); a failed restore
+flashes the reason and stays in the trash view. "Hapus" now soft-deletes (flash says it can be restored).
+
+The **Who** column above shows the permission a route requires (the admin routes need `admin.dashboard`,
+`transaksi.manage`, `masterdata.manage`, `audit.read`, `settings.manage`; batch trigger/retry/void need
+`notification.manage`; exports need `report.salesman` / `report.team` / `report.management`). The built-in roles map
+to them exactly as the old `profiles.role` did — e.g. admin has no `customer.follow_up`, so `/salesman` is 403 for
+admin. Sidebar entries are the `NAV` list in `AppShell.tsx`, each tied to a permission; a user with several
+sections sees a small heading per section. Add a nav item there when adding a page. A `NAV` entry with `children` (`{tab,label}[]`) renders a
 submenu, shown only while on that route and keyed by `?tab=`; **the first child is the
 default** when `?tab` is absent. Data Master and Pengaturan use it.
 
@@ -309,33 +416,29 @@ The upload preview keeps the uploaded bytes in a module-level `Map` in
 
 ## 8. Domain rules you will trip over
 
-- **Overdue / eligible**: see `dates.ts` / `orders.server.ts` above. `notified`
-  means "reminder sent, waiting for the salesman". It is set **only** on a
-  confirmed WAHA success for a salesman-kind delivery, and cleared by
-  `recordOrder`, `submitReason`, and `deleteBatch`.
-- **Reason codes** (`REASON_LABELS` in `schema.ts`): `1` Kalah Harga, `2` Stok
-  Masih Ada, `3` Sudah Bangkrut. Changing them touches: `schema.ts`, the CHECK
-  in `migrate.server.ts`, `submitReason`, the `["1","2","3"]` loops in
-  `salesman._index.tsx`, `management._index.tsx`, `reports.server.ts`.
+- **Overdue / eligible**: see `dates.ts` / `orders.server.ts` above. **Pending** (was `notified`) = "reminder
+  sent, waiting for the salesman", derived by `pending.server.ts`; it ends with a follow-up, a newer order, deleting
+  the customer, or voiding the run. Nothing stores or clears a flag.
+- **Reason codes** are rows of `follow_up_reasons` (seeded "1"/"2"/"3"); adding one is an INSERT, no code change
+  (UI, management page and exports read the table). `deactivates_customer` replaces the hard-coded "code 3 ⇒ inactive".
 - **Hierarchy (ADR-0004)**: a supervisor *is* a salesman with subordinates
   (`salesmen.supervisor_id`, any depth, no cycles). "Team" = the whole subtree
   for the supervisor dashboard/export/authorisation; **direct reports only**
   for WhatsApp summaries and management's per-supervisor table (so nothing is
-  double counted). A `supervisor` role user links to their salesman row via
-  `profiles.salesman_id`.
+  double counted). A user links to their salesman row via `users.salesman_id`. The `supervisor` **role** is a
+  permission bundle (scope `team`), *not* derived from the hierarchy — the two can disagree by design (ADR-0007).
 - **Notifications**: each eligible salesman gets a list message; each *direct*
   supervisor of an eligible salesman gets a count-only summary as a **separate
   delivery** (`recipient_kind='supervisor'`). A supervisor's own overdue
-  customers arrive as a normal salesman message. No `nomor_wa` ⇒
-  `skipped_no_phone` and `notified` is not flipped (FR-17). WAHA down must not
-  break tracking (FR-29).
-- **Delete semantics**: hard deletes (DEBT-009). Customer delete cascades its
-  transaksi/reason/status/mutation rows. Salesman delete is refused while they
-  own customers/transaksi/direct reports. `deleteCustomersMany`,
-  `deleteTransaksiMany`, `deleteUsersMany` loop item by item (only
-  `deleteSalesmenMany` pre-validates the whole batch).
+  customers arrive as a normal salesman message. No WhatsApp contact ⇒ `skipped_no_contact`, no items, nobody becomes pending (FR-17). A failed send is recorded, never thrown, and makes nobody pending (FR-29). The text comes from the active template; the delivery keeps a snapshot.
+- **Delete semantics (ADR-0005)**: soft delete everywhere for users/salesmen/customers/transaksi
+  (`deleted_at`); nothing is hard-deleted (notification runs are voided, not deleted). Customer delete
+  cascades its live transaksi (marked). Salesman delete is still refused while they own *live*
+  customers/transaksi/direct reports. A user whose linked salesman is deleted cannot sign in. Usernames and
+  customer names are unique among live rows only. Bulk deletes loop item by item (`deleteSalesmenMany`
+  pre-validates the batch); bulk restores are all-or-nothing.
 
-## 9. Tests (`npm test` — 132 passing in 14 files, run 2026-09-26)
+## 9. Tests (`npm test` — 262 passing in 20 files on `feat/erd-v2-foundation`, run 2026-09-26)
 
 `vitest.config.ts`: `tests/**/*.test.ts`, `setupFiles: tests/setup.ts`, forks,
 `maxWorkers: 1`, `~` alias. `setup.ts` points `DATABASE_PATH` at a temp file
@@ -344,8 +447,9 @@ precedes it.
 
 Pattern: `beforeEach(() => resetDb())`, then `await seedOrg()` (returns
 `supervisor` "Budi Supervisor" as the top node, `salesman` "Andi Sales" and
-`salesmanB` "Citra Sales" both reporting to that supervisor, `admin`, `salesmanUser`), `addCustomer({...})`,
-and `TODAY = "2026-09-12"` passed as `today`. WAHA is faked with a local
+`salesmanB` "Citra Sales" both reporting to that supervisor, `admin`, `salesmanUser`), `addCustomer({...})`
+(option `pending: true` makes the customer pending; fixtures also export `isPending`, `assignmentHistory`,
+`createUser`), and `TODAY = "2026-09-12"` passed as `today`. WAHA is faked with a local
 `fakeClient()` (`calls[]`, `failFor`, `alwaysFail`) — see `tests/reminders.test.ts`.
 **`resetDb()` deletes from the explicit `TABLES` list in `fixtures.ts` — add any
 new table there.**
@@ -354,13 +458,27 @@ new table there.**
 |---|---|
 | BR-1 dates | `dates.test.ts` |
 | eligibility, `recordOrder`, `deleteTransaksiMany` | `orders.test.ts` |
-| trigger/preview/retry/delete batch, `submitReason` | `reminders.test.ts` |
+| trigger/preview/retry/void (incl. refusing a delivered run), `runsPage`, pending derivation, follow-ups (`submitReason`) | `reminders.test.ts` |
+| message templates (render, versioning, validation, audit) | `templates.test.ts` |
+| WhatsApp replies: signature, who/what counts, numbers and "everyone", reminder choice, exactly once, confirmations and their limit | `inbound.test.ts` |
+| reply text parsing (numbers, ranges, labels, notes, free text after a number or in a quoted reply, what it refuses to guess) | `reply-parser.test.ts` |
+| first boot: demo seed outside production, none in production (first admin from `ADMIN_PASSWORD`) | `seed.test.ts` |
+| `/logout`: GET redirects only, POST clears the cookie | `logout.test.ts` |
+| the webhook route: unsigned accepted with no secret, 401 with a secret, 400, 200 | `webhook-route.test.ts` |
+| salesman contacts / WhatsApp number | `contacts.test.ts` |
+| schema is migrated on open (a DB left at an older schema, a fresh file, a failing migration) | `boot-migration.test.ts` |
+| RBAC: catalogue = seeded table, role matrix, merged scopes, sessions, scope helpers, user form rules, password policy (≥ 8, not the demo one), last-admin guard | `rbac.test.ts` |
 | reassign, reactivate, stats, bulk deletes | `masterdata.test.ts` |
 | hierarchy rules + supervisor notifications | `hierarchy.test.ts` |
 | legacy supervisors → salesmen migration | `migrate-supervisors.test.ts` (own in-memory DB) |
 | activity log | `activity.test.ts` |
+| comments, a record's paged feed, `postNote` rules (who may comment / give a reason, nothing written on refusal) | `comments.test.ts` |
+| Log Audit: SQL search and paging, salesman moves, status changes | `audit-pages.test.ts` |
+| `pageWindow`, `parsePage` | `pagination.test.ts` |
 | Excel import | `imports.test.ts` |
 | upload flow (token single-use, TTL, discard, size, unreadable) | `upload.test.ts` |
+| migrations: schema drift vs `schema.ts`, legacy upgrade with data, rollback, preflight | `migrations.test.ts` |
+| soft delete + restore invariants, name/username uniqueness | `trash.test.ts` |
 | reports | `reports.test.ts` |
 | auth helpers/throttle | `auth.test.ts` |
 | WAHA/cron settings, `runScheduledBatch` | `settings.test.ts` |
@@ -390,16 +508,16 @@ manual/Playwright checks recorded in `.agents/work/STATE.md`.
 
 | Request | Touch |
 |---|---|
-| Add a field to Customer / Salesman / User | `schema.ts` + `migrate.server.ts` (new install DDL **and** an upgrade step for existing DBs) → the entity's create/update in `masterdata.server.ts` incl. its `*Fields()` helper (feeds the activity log) → `FIELD_LABELS` in `activity-format.ts` → `admin.masterdata.tsx` (search filter, table column, drawer input, action parsing) → tests |
+| Add a field to Customer / Salesman / User | `schema.ts` → `npm run db:generate` (edit the SQL by hand if existing rows need a backfill) → the entity's create/update in `masterdata.server.ts` incl. its `*Fields()` helper (feeds the activity log) → `FIELD_LABELS` in `activity-format.ts` → `admin.masterdata.tsx` (search filter, table column, drawer input, action parsing) → tests |
 | Add a field to Transaksi | same, but `orders.server.ts` (`transaksiFields`, create/update) and `admin.transaksi.tsx` |
-| Add a new admin CRUD table | copy the Transaksi/Data Master pattern: loader (`q`/`paginate`/`parseDrawer`), `useRowSelection` + `BulkActionBar`, `TableToolbar`, `TablePagination`, `<RecordDrawer>` with `remove`; add `ACTIVITY_ENTITIES` value **and** the CHECK list in `migrate.server.ts`; add `OPEN_HREF` entry in `admin.audit.tsx`; add to `TABLES` in `fixtures.ts` |
-| Add a page / route | file in `app/routes/`, register in `app/routes.ts`, `requireRole`, nav item in `AppShell.tsx` `NAV`, `homeForRole` if it is a landing page |
+| Add a new admin CRUD table | copy the Transaksi/Data Master pattern: loader (`q`/`paginate`/`parseDrawer`), `useRowSelection` + `BulkActionBar`, `TableToolbar` (from `TableSearch.tsx`), `TablePagination`, `<RecordDrawer>` with `remove`; add the value to `ACTIVITY_ENTITIES` (`activity-entities.ts`; `entity_type` has no DB CHECK); add `OPEN_HREF` entry in `admin.audit.tsx`; add to `TABLES` in `fixtures.ts` |
+| Add a page / route | file in `app/routes/`, register in `app/routes.ts`, `requirePermission`, nav item in `AppShell.tsx` `NAV`, `homeFor` in `permissions.ts` if it is a landing page |
 | Add an Excel export | builder in `reports.server.ts`, thin loader route like `reports.management.tsx`, register in `routes.ts` |
 | Change the overdue rule | only `isOverdue` in `dates.ts` (dashboards, stats, reports all call it) + `dates.test.ts` |
-| Change the WhatsApp text | `salesmanMessage` / `supervisorMessage` at the bottom of `reminders.server.ts` |
+| Change the WhatsApp text | Pengaturan → Template Pesan (a new template version), or `saveTemplateVersion`; default texts are seeded in migration 0003 |
 | Add upload/import to another record | write its `parse` (→ preview, no writes) and `confirm`; in the route's action call `handleUpload(form, { parse, confirm })` and `if (upload) return upload;`; render `<UploadButton>` with `describePreview` / `describeResult` (module-level functions — keep them referentially stable) and a `template` link if there is one. Nothing in `UploadDialog`/`upload.server` needs editing. Only Transaksi uses it today |
 | Change import columns/format | `HEADER_*` constants and `sheetRows`/`excelDateToIso` in `imports.server.ts`; `buildImportTemplate` must match |
-| Change who sees what | the `requireRole` list in the route + ownership check in that route/action; supervisor scope = `subordinateIds` |
+| Change who sees what | the permission a route requires + the row-level check (`access.server.ts`). A **new permission** = add to `PERM`, a migration that inserts it into `permissions` and grants it to roles (the catalogue test fails until both agree). **Role changes** are data (`roles`/`role_permissions`), not code |
 | Change WAHA transport | `waha.server.ts` only (keep the `WahaClient` interface so tests can fake it). Session panel: `waha.server.ts` session functions + `waha-session.ts` (states/labels) + `WahaSessionCard.tsx`; tests stub global `fetch` (see `waha-session.test.ts`) |
 | Change scheduling | `cron.server.ts` / `settings.server.ts` / `admin.settings.tsx` (DEBT-010, contradicts ADR-0002) |
 | Tweak look & feel | `app.css` (classes above) and the shared bits in `components/` |
@@ -409,20 +527,31 @@ manual/Playwright checks recorded in `.agents/work/STATE.md`.
 - `SESSION_SECRET` guard runs at **module import** in production — a missing
   secret crashes the build/boot (the Dockerfile sets a placeholder for build).
 - Drizzle+SQLite mishandles ``sql`(datetime('now'))` `` column defaults on some
-  INSERTs (seen on `notification_batches`); `activity.server.ts` and
-  `triggerBatch` therefore pass an explicit timestamp. Do the same for new
-  timestamp columns.
-- `deleteSalesman` also deletes `profiles` rows pointing at that salesman,
-  leaving the `users` row without a profile (such a user can no longer resolve
-  via `getAuthUser`).
+  INSERTs (seen on the old `notification_batches`); all timestamps are therefore filled by the app
+  (`nowIso()`, `$defaultFn`/`$onUpdate`). Do the same for new timestamp columns. `upsert` (`onConflictDoUpdate`)
+  does not run `$onUpdate` — `writeSetting` sets `updatedAt` itself.
+- `deleteSalesman` is a soft delete and keeps the users linked to it; `getAuthUser`/`verifyLogin` treat a user
+  whose salesman is deleted, or who is inactive/deleted, as not signed-in (`canSignIn`). Restoring restores access.
+  A session of a user who is deactivated mid-session is refused on its next request (permissions are read per request).
+- **Client bundle**: anything a component uses at *runtime* (not just a type) must come from a module with no
+  database imports, or the whole Drizzle schema ships to the browser (found on the audit page). That is why
+  `permissions.ts`, `template-vars.ts`, `activity-entities.ts`, `activity-format.ts` and `dates.ts` are plain modules and
+  `schema.ts` re-exports from them. After adding such an import, `grep -l "sqliteTable" build/client -r` should print nothing.
+  In dev, the first page load after a fresh `react-router dev` re-optimises dependencies and reloads once (can freeze a
+  browser tab briefly) — harmless.
+- **Migrations**: `foreign_keys` must be OFF *outside* the transaction (the pragma is a no-op inside one),
+  which is why drizzle's own SQLite migrator is not used. **A running `npm run dev` on the shared tree
+  migrates `data/sigula.db` on the first request** — that DB is at R1/0002 now; going back to `master`
+  needs a pre-R1 backup. drizzle-kit renders an expression index as a quoted column name (bad SQL) and
+  `ADD COLUMN … NOT NULL` without default is invalid in SQLite — both are why 0001 is hand-written.
 - Loaders load whole tables and filter in JS (`listTransaksi(2000)`,
-  `listRecentActivity(2000)`, all customers/salesmen) — fine at pilot scale, not
+  all customers/salesmen; Log Audit and the record feeds are paged in SQL) — fine at pilot scale, not
   beyond it. SQLite write contention is a known pilot limit.
 - Login throttle and the upload-preview store are per-process memory.
 - A native `<dialog>` is centred by the UA's `margin: auto`, which Tailwind's
   preflight zeroes — `.upload-dialog` sets `margin: auto` itself. Copy that for
   any new `<dialog>`.
-- `admin.dashboard.tsx` confirms batch deletion with `window.confirm`; the
+- `admin.dashboard.tsx` confirms cancelling a run with `window.confirm`; the
   drawer's delete uses an inline confirm instead (avoid modal dialogs).
 - **WAHA answers 403 (not 404) for a session that does not exist**
   (`GET /api/sessions/{name}`, WAHA 2026.8.2 CORE) — indistinguishable from a rejected

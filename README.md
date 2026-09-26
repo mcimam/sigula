@@ -24,9 +24,13 @@ npm run dev
 
 Open http://localhost:5173
 
-On first boot the app creates `data/sigula.db` and seeds demo users
-(`admin`, `salesman`, `supervisor`, `management`) with password `sigula123`.
-Change those before any shared environment.
+On first boot the app creates `data/sigula.db`. Outside production it seeds a demo
+organisation with four users (`admin`, `salesman`, `supervisor`, `management`) sharing the
+published password `sigula123` — local use only. In production (`NODE_ENV=production`) it
+never creates demo accounts: an empty database gets one administrator, from `ADMIN_PASSWORD`
+(and optionally `ADMIN_USERNAME`, default `admin`); without `ADMIN_PASSWORD` nothing is seeded
+and the log says what to set. Passwords an admin sets must be at least 8 characters, and
+`sigula123` is refused.
 
 Optional WAHA (WhatsApp gateway): set `WAHA_BASE_URL` in `.env`, or configure
 under Admin → Pengaturan.

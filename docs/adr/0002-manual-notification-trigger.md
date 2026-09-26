@@ -102,3 +102,7 @@ The pilot graduates to a scale where relying on an Admin to remember becomes
 the actual bottleneck (e.g. multiple teams, each needing their own cadence),
 or once official, compliance-grade sending (Meta's Cloud API, per ADR-0001's
 revisit condition) removes the ban-risk argument against scheduling.
+
+> **Note 2026-09-26 (ADR-0009).** Confirmations sent in answer to a salesman's WhatsApp reply are not reminders and
+> are not covered by this decision: each answers a message the salesman just sent (and the how-to is limited to once an
+> hour). Reminders themselves remain Admin-triggered (or the opt-in schedule, DEBT-010).
