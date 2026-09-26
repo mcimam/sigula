@@ -8,7 +8,7 @@
 | Project | SiGula |
 | Track | production |
 | Phase | deployment |
-| Updated | 2026-09-26 (deployed) |
+| Updated | 2026-09-27 |
 
 ## Now
 
@@ -37,6 +37,14 @@ numbers were saved as `0812…` and the chat id was built from the digits as typ
 and WAHA's explanation kept in the error (FR-47). Verified: 437 tests (6 mutations caught) and against production WAHA read-only
 (`check-exists` 500 for the stored form, 200 for the normalised one). The same bug would have hit the batch reminder and made replies from
 those salesmen "not a salesman".
+
+**Fix (2026-09-27): "Kirim pengingat kembali" said sent but no WhatsApp arrived.** Two causes, found on production (read-only): (1) the
+WAHA session `Sigula` is under a WhatsApp *reachout timelock* (`me.reachoutTimelock` = `RESTRICT_ALL_COMPANIONS`, active until 2026-09-26T23:00:48Z =
+06:00 WIB 27 Sep): it may only message people who wrote first, so WhatsApp refused the message (ack -1 ERROR); (2) SiGula recorded it as
+`sent` because WAHA answers `sendText` 201 before WhatsApp decides. Fix (FR-48/FR-49, DEBT-027): `sendText` now reads WhatsApp's `ack` and a
+refused message is `failed` with the reason (timelock + end time); the session panel shows the restriction; new "Kirim pesan tes" action on
+the salesman panel. Until the restriction ends a salesman must message the SiGula number first for a reminder to reach them. Status of the
+release: see the Deployed line below.
 
 **ERD v2 — R1, R3 and R2 DONE on branch `feat/erd-v2-foundation` (2026-09-26, not committed, not deployed).**
 Design: `docs/erd-sigula.dbml`; decisions: ADR-0005 (R1), ADR-0006 (R3), ADR-0007 (R2). Migrations `drizzle/0000–0004`.

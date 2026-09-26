@@ -28,13 +28,18 @@ function LogText({ item }: { item: ActivityItem }) {
   if (item.action === "delete") return <>{actor} menghapus record ini</>;
   if (item.action === "restore") return <>{actor} memulihkan record ini</>;
 
-  const { alasan_keterlambatan: reason, pengingat_dikirim: reminder, ...others } = item.changes;
+  const { alasan_keterlambatan: reason, pengingat_dikirim: reminder, pesan_tes_dikirim: test, ...others } = item.changes;
   const changed = Object.entries(others);
   return (
     <>
       {reminder ? (
         <div>
           {actor} mengirim pengingat ke <strong>{formatValue(reminder.to)}</strong>
+        </div>
+      ) : null}
+      {test ? (
+        <div>
+          {actor} mengirim pesan tes ke <strong>{formatValue(test.to)}</strong>
         </div>
       ) : null}
       {reason ? (

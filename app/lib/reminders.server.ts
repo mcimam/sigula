@@ -1,7 +1,8 @@
-import { and, count, desc, eq, gt, inArray } from "drizzle-orm";
+import { and, count, desc, eq, gt, inArray, like } from "drizzle-orm";
 
 import { db } from "~/db/client.server";
 import {
+  activityLogs,
   notificationDeliveries,
   notificationItems,
   notificationRuns,
@@ -10,10 +11,10 @@ import {
   type RecipientKind,
 } from "~/db/schema";
 import { logActivity } from "~/lib/activity.server";
-import { attachWhatsapp, primaryContact } from "~/lib/contacts.server";
+import { attachWhatsapp, primaryContact, whatsappNumber } from "~/lib/contacts.server";
 import { daysSinceOrder, formatDateShort, isOverdue, nowIso, todayIso } from "~/lib/dates";
 import { listFollowUpReasons } from "~/lib/follow-ups.server";
-import { directReportIds, findLiveCustomer } from "~/lib/masterdata.server";
+import { directReportIds, findLiveCustomer, findLiveSalesman } from "~/lib/masterdata.server";
 import { notYetNotifiedEligible } from "~/lib/orders.server";
 import { pageWindow } from "~/lib/pagination";
 import { activeTemplate, customerLines, orderByWait, renderTemplate, type TemplateCode } from "~/lib/templates.server";
@@ -216,6 +217,67 @@ export async function resendReminder(opts: {
     changes: { pengingat_dikirim: { from: null, to: `${salesman.nama} (WhatsApp)` } },
   });
   return { runId: run.id, salesmanName: salesman.nama };
+}
+
+/** The same salesman is not sent a test message again within this many seconds (a double click). */
+export const TEST_MESSAGE_COOLDOWN_SECONDS = 60;
+
+/** The test message: no template on purpose — it is not a reminder, and must never look like one. */
+const testMessageText = (nama: string) =>
+  `🔔 Pesan tes SiGula\n\nHalo ${nama}, ini pesan tes dari SiGula. Jika Anda membacanya, pengingat akan sampai ke nomor WhatsApp ini. Tidak perlu dibalas.`;
+
+/**
+ * Admin's "Kirim pesan tes" on a salesman: one short message to the salesman's WhatsApp number,
+ * to find out whether reminders reach that number at all — WhatsApp refuses some numbers (not on
+ * WhatsApp) and some senders (a restricted account), and the reminder run only shows that after
+ * the fact. It is not a reminder: no run, no delivery, nothing that changes who is pending.
+ * A sent one is written to the salesman's activity. Throws a readable `Error`, with WhatsApp's
+ * reason when the message was refused.
+ */
+export async function sendTestMessage(opts: {
+  salesmanId: number;
+  sentById: number;
+  client?: WahaClient;
+  now?: Date;
+}) {
+  const now = opts.now ?? new Date();
+  const salesman = findLiveSalesman(opts.salesmanId);
+  if (!salesman) throw new Error("Salesman tidak ditemukan");
+  const number = whatsappNumber(salesman.id);
+  if (!number) throw new Error(`${salesman.nama} belum punya nomor WhatsApp`);
+  if (!isPlausibleWhatsappNumber(normalizeWhatsappNumber(number))) {
+    throw new Error(`Nomor WhatsApp ${salesman.nama} tidak valid (${number}) — perbaiki di Data Master → Salesman`);
+  }
+
+  const recent = db
+    .select({ id: activityLogs.id })
+    .from(activityLogs)
+    .where(
+      and(
+        eq(activityLogs.entityType, "salesman"),
+        eq(activityLogs.entityId, salesman.id),
+        like(activityLogs.changes, '%"pesan_tes_dikirim"%'),
+        gt(activityLogs.createdAt, nowIso(new Date(now.getTime() - TEST_MESSAGE_COOLDOWN_SECONDS * 1000))),
+      ),
+    )
+    .get();
+  if (recent) {
+    throw new Error(`Pesan tes baru saja dikirim ke ${salesman.nama} — tunggu ${TEST_MESSAGE_COOLDOWN_SECONDS} detik sebelum mengirim lagi`);
+  }
+
+  const result = await (opts.client ?? createWahaClient()).sendText(number, testMessageText(salesman.nama));
+  if (!result.ok) {
+    throw new Error(`Pesan tes gagal dikirim ke ${salesman.nama}: ${result.errorMessage || "pesan tidak terkirim"}`);
+  }
+  logActivity({
+    entityType: "salesman",
+    entityId: salesman.id,
+    entityLabel: salesman.nama,
+    action: "update",
+    actorId: opts.sentById,
+    changes: { pesan_tes_dikirim: { from: null, to: `${number} (WhatsApp)` } },
+  });
+  return { salesmanName: salesman.nama, number };
 }
 
 /**

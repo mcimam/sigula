@@ -1,3 +1,4 @@
+import { formatStamp } from "~/lib/activity-format";
 import { getWahaSettings } from "~/lib/settings.server";
 import { normalizeWhatsappNumber } from "~/lib/whatsapp-number";
 import {
@@ -33,11 +34,28 @@ async function readErrorDetail(res: Response): Promise<string> {
   }
 }
 
+/**
+ * WAHA answers `sendText` with 201 as soon as it has *handed the message to WhatsApp* — before
+ * WhatsApp has accepted it. The verdict comes later as the message's `ack`: -1 error, 0 pending,
+ * 1 reached WhatsApp's server, 2 reached the phone, 3 read. A message WhatsApp refuses (for example
+ * while the account is under a reachout timelock) is therefore a 201 followed by -1, and a sender
+ * that stops at the 201 reports a message that never left as sent.
+ */
+const ACK_ERROR = -1;
+const ACK_PENDING = 0;
+const ACK_POLL_MS = 500;
+/** How long a send waits for WhatsApp's verdict while it is still pending. */
+const DEFAULT_ACK_WAIT_MS = 4000;
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 export function createWahaClient(overrides?: {
   baseUrl?: string;
   session?: string;
   apiKey?: string;
   timeoutMs?: number;
+  /** How long to wait for WhatsApp's verdict after WAHA accepted the message. 0 = look once. */
+  ackWaitMs?: number;
 }): WahaClient {
   const saved = getWahaSettings();
   const baseUrl = (
@@ -48,6 +66,7 @@ export function createWahaClient(overrides?: {
   const session = overrides?.session ?? saved.session ?? "default";
   const apiKey = overrides?.apiKey ?? saved.apiKey ?? "";
   const timeoutMs = overrides?.timeoutMs ?? saved.timeoutMs ?? 8000;
+  const ackWaitMs = overrides?.ackWaitMs ?? DEFAULT_ACK_WAIT_MS;
 
   return {
     async sendText(nomorWa, text) {
@@ -77,7 +96,18 @@ export function createWahaClient(overrides?: {
             errorMessage: `WAHA returned ${res.status}: ${res.statusText}${detail ? ` — ${detail}` : ""}`,
           };
         }
-        return { ok: true, messageId: await readMessageId(res) };
+        const messageId = await readMessageId(res);
+        clearTimeout(timer); // the send is over; waiting for WhatsApp's verdict has its own limit
+        if (messageId) {
+          const refusal = await findRefusal(
+            { ...saved, baseUrl, session, apiKey, timeoutMs },
+            chatOfMessage(messageId) ?? chatId(nomorWa),
+            messageId,
+            ackWaitMs,
+          );
+          if (refusal) return { ok: false, errorMessage: refusal, messageId };
+        }
+        return { ok: true, messageId };
       } catch (err) {
         const reason = err instanceof Error ? err.message : String(err);
         return { ok: false, errorMessage: `WAHA unreachable: ${reason}` };
@@ -86,6 +116,53 @@ export function createWahaClient(overrides?: {
       }
     },
   };
+}
+
+/** WAHA message ids are `true_<chat>_<short id>`; the chat may be `…@lid` rather than the `…@c.us` we addressed. */
+function chatOfMessage(messageId: string): string | null {
+  return /^(?:true|false)_(.+)_[^_]+$/.exec(messageId)?.[1] ?? null;
+}
+
+/**
+ * Asks WhatsApp's verdict on a message WAHA accepted and returns why it was refused, or null when
+ * it was not (accepted, still pending after `waitMs`, or WAHA cannot say — in doubt the message is
+ * reported as sent, never as failed). DEBT-027: a message still pending when `waitMs` is over is not
+ * followed up; WAHA could push the verdict (`message.ack`), which SiGula does not subscribe to.
+ */
+async function findRefusal(conn: WahaConn, chat: string, messageId: string, waitMs: number): Promise<string | null> {
+  const path = `/api/${encodeURIComponent(conn.session)}/chats/${encodeURIComponent(chat)}/messages/${encodeURIComponent(messageId)}`;
+  const deadline = Date.now() + waitMs;
+  for (;;) {
+    const call = await wahaCall(conn, path);
+    const ack = call.reached && call.ok && isRecord(call.body) && typeof call.body.ack === "number" ? call.body.ack : null;
+    if (ack === null || ack > ACK_PENDING) return null;
+    if (ack === ACK_ERROR) return refusalMessage(conn);
+    if (Date.now() >= deadline) return null;
+    await sleep(ACK_POLL_MS);
+  }
+}
+
+/** Why WhatsApp refused a message, in words an admin can act on. */
+async function refusalMessage(conn: WahaConn): Promise<string> {
+  const restriction = await readRestriction(conn);
+  if (restriction) {
+    return (
+      "WhatsApp menolak pesan ini: akun pengirim sedang dibatasi WhatsApp (reachout timelock), " +
+      "hanya bisa mengirim ke kontak yang lebih dulu mengirim pesan ke nomor SiGula" +
+      (restriction.until ? `, sampai ${formatStamp(restriction.until)} WIB` : "") +
+      ". Minta penerima mengirim satu pesan ke nomor SiGula, lalu kirim ulang."
+    );
+  }
+  return (
+    "WhatsApp menolak pesan ini (status ERROR): nomor penerima tidak terdaftar di WhatsApp, " +
+    "atau akun pengirim sedang dibatasi. Periksa nomornya dan status Sesi WhatsApp di Pengaturan."
+  );
+}
+
+/** The session's own record: `me.reachoutTimelock` is there, not always in the session list. */
+async function readRestriction(conn: WahaConn): Promise<WahaSessionView["restriction"]> {
+  const call = await wahaCall(conn, `/api/sessions/${encodeURIComponent(conn.session)}`);
+  return call.reached && call.ok && isRecord(call.body) ? parseRestriction(call.body.me) : null;
 }
 
 /** WAHA answers a send with the message; its id is a string or `{ _serialized }`. Best effort — never fails the send. */
@@ -252,6 +329,18 @@ function parseAccount(me: unknown): WahaSessionView["account"] {
   return { name, number: digits ? `+${digits}` : null };
 }
 
+/**
+ * `me.reachoutTimelock` = `{ isActive, enforcementType, timeEnforcementEnds }` (seconds since the
+ * epoch). One that already ended is not a restriction, whatever `isActive` still says.
+ */
+function parseRestriction(me: unknown, now = Date.now()): WahaSessionView["restriction"] {
+  if (!isRecord(me) || !isRecord(me.reachoutTimelock) || me.reachoutTimelock.isActive !== true) return null;
+  const ends = me.reachoutTimelock.timeEnforcementEnds;
+  if (typeof ends !== "number" || !Number.isFinite(ends)) return { until: null };
+  const untilMs = ends > 1e12 ? ends : ends * 1000;
+  return untilMs <= now ? null : { until: new Date(untilMs).toISOString() };
+}
+
 /** The QR ends up in an <img src="data:…">, so only trust a plain base64 image. */
 function parseQr(body: unknown): WahaSessionView["qr"] {
   if (!isRecord(body)) return null;
@@ -276,6 +365,7 @@ async function readView(conn: WahaConn): Promise<WahaSessionView> {
     account: null,
     qr: null,
     message: null,
+    restriction: null,
   };
   if (!conn.baseUrl) return view;
 
@@ -304,7 +394,16 @@ async function readView(conn: WahaConn): Promise<WahaSessionView> {
   if (!status) return { ...view, state: "UNKNOWN" };
 
   if (status === "WORKING") {
-    return { ...view, state: status, account: parseAccount(found.me) };
+    return {
+      ...view,
+      state: status,
+      account: parseAccount(found.me),
+      // The list may leave `reachoutTimelock` out of `me`; the session's own record has it.
+      restriction:
+        "reachoutTimelock" in (isRecord(found.me) ? found.me : {})
+          ? parseRestriction(found.me)
+          : await readRestriction(conn),
+    };
   }
   if (status === "SCAN_QR_CODE") {
     // The QR may not be ready yet; the card polls, so a miss is just "not yet".

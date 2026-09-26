@@ -26,7 +26,7 @@ import { db } from "~/db/client.server";
 import { alive, users } from "~/db/schema";
 import { requirePermission } from "~/lib/auth.server";
 import { can, PERM } from "~/lib/permissions";
-import { resendReminder } from "~/lib/reminders.server";
+import { resendReminder, sendTestMessage } from "~/lib/reminders.server";
 import { attachWhatsapp } from "~/lib/contacts.server";
 import { formatStamp } from "~/lib/activity-format";
 import { orderStanding, orderStatusText, sinceLabel, todayIso } from "~/lib/dates";
@@ -245,11 +245,27 @@ export async function action({ request }: Route.ActionArgs) {
   const restoredMessage = (n: number, noun: string) => `${n} ${noun} dipulihkan`;
 
   // Sending a WhatsApp message is Admin's action (`notification.manage`), not just anyone who edits master data.
-  if (intent === "resend_reminder" && !can(user, PERM.notificationManage)) {
+  if ((intent === "resend_reminder" || intent === "send_test_message") && !can(user, PERM.notificationManage)) {
     throw new Response("Forbidden", { status: 403 });
   }
 
   try {
+    if (intent === "send_test_message") {
+      // Back to the salesman's panel, where the new line in "Aktivitas & komentar" is what the admin sees.
+      const salesmanId = Number(form.get("salesman_id"));
+      const back = (message: string) =>
+        Response.redirect(
+          new URL(`/admin/masterdata?tab=salesman&edit=${salesmanId}&flash=${encodeURIComponent(message)}`, request.url),
+          302,
+        );
+      try {
+        const sent = await sendTestMessage({ salesmanId, sentById: user.id });
+        return back(`Pesan tes dikirim ke ${sent.salesmanName}`);
+      } catch (err) {
+        return back(err instanceof Error ? err.message : "Gagal mengirim pesan tes");
+      }
+    }
+
     if (intent === "resend_reminder") {
       // Back to the same panel, so the new line in "Aktivitas & komentar" is what the admin sees.
       const customerId = Number(form.get("customer_id"));
@@ -854,6 +870,19 @@ export default function AdminMasterdata() {
               remove={
                 editing.salesman
                   ? { intent: "delete_many_salesman", idName: "salesman_id", id: editing.salesman.id }
+                  : undefined
+              }
+              actions={
+                editing.salesman && can(user, PERM.notificationManage)
+                  ? [
+                      {
+                        label: "Kirim pesan tes",
+                        fields: { intent: "send_test_message", salesman_id: editing.salesman.id },
+                        confirm: `Kirim pesan tes WhatsApp ke ${editing.salesman.nama} (${editing.salesman.nomorWa}) sekarang?`,
+                        confirmLabel: "Ya, kirim",
+                        disabledReason: editing.salesman.nomorWa ? undefined : `${editing.salesman.nama} belum punya nomor WhatsApp`,
+                      },
+                    ]
                   : undefined
               }
               closeHref={drawerHref(null)}

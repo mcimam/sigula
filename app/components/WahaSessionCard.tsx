@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useFetcher } from "react-router";
 
 import { StatusPill } from "~/components/AppShell";
+import { formatStamp } from "~/lib/activity-format";
 import {
   WAHA_SESSION_STATUSES,
   canLogin,
@@ -140,6 +141,17 @@ export function WahaSessionCard() {
             <p className="text-sm text-slate-500">{shown.hint}</p>
           </div>
 
+          {view.restriction ? (
+            <div className="alert alert-warn mt-3" role="alert">
+              <strong>WhatsApp membatasi nomor ini.</strong> Untuk sementara pesan
+              hanya sampai ke kontak yang lebih dulu mengirim pesan ke nomor ini
+              {view.restriction.until
+                ? `, sampai ${formatStamp(view.restriction.until)} WIB`
+                : ""}
+              . Pengingat ke salesman yang belum pernah menghubungi nomor ini ditolak
+              WhatsApp — minta salesman mengirim satu pesan ke nomor ini lebih dulu.
+            </div>
+          ) : null}
           {view.message ? (
             <div className="alert alert-danger mt-3" role="alert">
               {view.message}

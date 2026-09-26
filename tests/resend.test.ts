@@ -311,8 +311,10 @@ describe("the menu action in Data Master", () => {
   const stubWaha = () => {
     const calls: { url: string; body: string }[] = [];
     vi.stubGlobal("fetch", async (url: string, init?: { body?: string }) => {
+      // Only what is *sent* is recorded; WhatsApp's verdict on it (`ack` 1 = reached its server) is asked separately.
+      if (!String(url).endsWith("/api/sendText")) return Response.json({ ack: 1 });
       calls.push({ url: String(url), body: String(init?.body ?? "") });
-      return new Response(JSON.stringify({ id: "wamid.web" }), { status: 201, headers: { "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({ id: "true_628222222222@c.us_WEB" }), { status: 201, headers: { "Content-Type": "application/json" } });
     });
     return calls;
   };

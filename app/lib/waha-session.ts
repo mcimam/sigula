@@ -36,6 +36,12 @@ export type WahaSessionView = {
   qr: { mimetype: string; data: string } | null;
   /** Why the session could not be read (`error` / `rejected`). */
   message: string | null;
+  /**
+   * WhatsApp is limiting the linked account ("reachout timelock"): it may only message contacts
+   * who wrote to it first. `until` is when WhatsApp lifts it (ISO), null when it did not say.
+   * Only while `WORKING`.
+   */
+  restriction: { until: string | null } | null;
 };
 
 /** What a login/logout call returns: the fresh view plus what went wrong, if anything. */

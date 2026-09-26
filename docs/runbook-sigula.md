@@ -218,6 +218,18 @@ The message now carries WAHA's own explanation after the dash. Check the session
 `numberExists: true` for a real WhatsApp number and 500 for one WAHA cannot address. (2026-09-26: numbers saved as `0812…` made WAHA answer 500 —
 fixed by normalising to `62…` when sending; a number that is not a number at all is now skipped with its value shown.)
 
+### 6. A reminder is "sent" (or the salesman got nothing) but no WhatsApp arrives
+
+Since 2026-09-27 SiGula no longer records a message as sent until WhatsApp has accepted it (FR-48), so a refused message shows up as
+*failed* with a reason. Use Data Master → Salesman → ⋮ → **Kirim pesan tes** to check one number without touching any reminder.
+- **"akun pengirim sedang dibatasi WhatsApp (reachout timelock)"** — WhatsApp limits the linked account: it may message only people who
+  wrote to it first, until the end time shown (also in Pengaturan → Koneksi WAHA → Sesi WhatsApp). Nothing to fix in SiGula. Ask the
+  salesman to send any message to the SiGula number, then send again; or wait until the restriction ends. (Seen 2026-09-26: WAHA's session
+  record had `me.reachoutTimelock` = `RESTRICT_ALL_COMPANIONS`, active until 06:00 WIB on 27 Sep.)
+- **"WhatsApp menolak pesan ini (status ERROR)"** with no restriction — the number is probably not on WhatsApp: `GET {base}/api/contacts/check-exists?phone=<62…>&session=<session>`.
+- WAHA itself answers 201 before WhatsApp decides; the verdict is the message's `ack` (-1 error, 0 pending, 1 server, 2 device, 3 read):
+  `GET {base}/api/{session}/chats/{chat}/messages/{messageId}`. A message still pending after 4 s is recorded as sent (DEBT-027).
+
 ## Dependencies
 
 | Service | What breaks without it | Degraded behaviour |
