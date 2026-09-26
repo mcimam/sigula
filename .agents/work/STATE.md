@@ -43,8 +43,11 @@ WAHA session `Sigula` is under a WhatsApp *reachout timelock* (`me.reachoutTimel
 06:00 WIB 27 Sep): it may only message people who wrote first, so WhatsApp refused the message (ack -1 ERROR); (2) SiGula recorded it as
 `sent` because WAHA answers `sendText` 201 before WhatsApp decides. Fix (FR-48/FR-49, DEBT-027): `sendText` now reads WhatsApp's `ack` and a
 refused message is `failed` with the reason (timelock + end time); the session panel shows the restriction; new "Kirim pesan tes" action on
-the salesman panel. Until the restriction ends a salesman must message the SiGula number first for a reminder to reach them. Status of the
-release: see the Deployed line below.
+the salesman panel. Until the restriction ends a salesman must message the SiGula number first for a reminder to reach them.
+**Deployed to production 2026-09-26 22:31Z — `master` = `e9dac10`** (user approved). No migration (still 10, integrity ok); container healthy,
+public headers unchanged. Image before: `localhost/sigula_app:pre-ack-20260926T222923Z`. Rollback (DB is compatible, no schema change):
+`cd /home/sigula/sigula && podman stop sigula && podman rm sigula; podman tag localhost/sigula_app:pre-ack-20260926T222923Z localhost/sigula_app:latest;
+git checkout 79c1289; podman-compose up -d`. Not yet checked live: a real "Kirim pesan tes" from the production UI (needs the admin login).
 
 **ERD v2 — R1, R3 and R2 DONE on branch `feat/erd-v2-foundation` (2026-09-26, not committed, not deployed).**
 Design: `docs/erd-sigula.dbml`; decisions: ADR-0005 (R1), ADR-0006 (R3), ADR-0007 (R2). Migrations `drizzle/0000–0004`.
