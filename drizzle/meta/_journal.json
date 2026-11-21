@@ -71,6 +71,13 @@
       "when": 1790437478724,
       "tag": "0009_free_text_reason",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1795432800000,
+      "tag": "0010_export_logs",
+      "breakpoints": true
     }
   ]
 }

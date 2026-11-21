@@ -10,7 +10,15 @@
 > they rot; functions are named instead. If a file disagrees with this map,
 > **the file wins**: fix the map in the same change.
 >
-> **Last synced:** 2026-09-27 — branch `feat/erd-v2-foundation`: ERD v2 releases **R1** (ADR-0005: versioned
+> **Last synced:** 2026-11-21 — List Excel export extended to **Salesman, User, Log Audit** (plus prior
+> Customer + Transaksi). Routes `GET|POST /admin/export/{salesman,user}` and `GET /admin/export/audit`
+> (`section` picker: activity|moves|statuses|replies|exports; activity keeps `q`/`entity`). Helpers
+> `masterdata-export.server.ts`, `audit-export.server.ts`, `transaksi-export.server.ts`; column catalogues
+> in `export-columns.ts`. Toolbars: Salesman/User/Audit (+ Export terpilih on master tabs). Audit listKey
+> `audit.<section>`. Earlier same day: Master Data toolbars match Transaksi (Export + Tambah); Export
+> modal portals to `document.body`. Customer filters ADR-0010 (`sm`/`smTeam`, `standing`, `tipe`, dates,
+> `export_logs` / migration 0010).
+> Earlier — branch `feat/erd-v2-foundation`: ERD v2 releases **R1** (ADR-0005: versioned
 > migrations, soft delete + "Terhapus", assignment/status history, import batches, ISO timestamps),
 > **R3** (ADR-0006: runs/deliveries/items, derived "pending", void, templates, contacts, follow-ups) and
 > **R2** (ADR-0007: RBAC — roles, permissions with scope, many roles per user; `profiles` is gone).
@@ -59,7 +67,10 @@ app/
   components/
     AppShell.tsx           AppShell (sidebar/topbar, NAV built from the user's permissions), PageHeader, StatTile, StatusPill
     DataTable.tsx          paginate, resolvePageSize, useRowSelection, TablePagination, BulkActionBar
-                           (variant delete | restore), SelectAllCheckbox
+                           (variant delete | restore, optional `extra` e.g. Export terpilih), SelectAllCheckbox
+    ListFilterBar.tsx      CustomerFilterBar — structured GET filters (`sm`, `smTeam`, `standing`, `tipe`, dates)
+    ExportToolbar.tsx      Export dialog (portal) + Customer/Transaksi/Salesman/User/Audit toolbars
+                           (+ Export terpilih); Audit has section picker → per-section columns/localStorage
     RecordDrawer.tsx       URL-driven side drawer: parseDrawer, useDrawerHref, RecordDrawer (⤢ button =
                            "full page": 100vw, no scrim, fields in two columns, Aktivitas as a side column;
                            `.drawer--full`, state is local), ReadonlyField, EditLink, AddLink, useRowOpen
@@ -98,8 +109,10 @@ app/
     customer-history.server.ts  trash.server.ts  contacts.server.ts  pending.server.ts
     follow-ups.server.ts  templates.server.ts  roles.server.ts  access.server.ts  inbound.server.ts
     names.server.ts  comments.server.ts  permissions.ts  activity-entities.ts
+    export.server.ts  customer-export.server.ts  transaksi-export.server.ts  masterdata-export.server.ts
+    audit-export.server.ts  list-filters/customer.ts  export-columns.ts
     dates.ts  activity-format.ts  pagination.ts  reply-parser.ts  whatsapp-number.ts  upload.ts  template-vars.ts
-    dates.ts  activity-format.ts  upload.ts  waha-session.ts   (no `.server` → safe to import in components)
+    dates.ts  activity-format.ts  upload.ts  waha-session.ts  export-columns.ts  list-filters/*  (no `.server` → safe in components)
   routes/                  one file per route: loader/action + page component
 tests/
   setup.ts                 sets DATABASE_PATH (temp dir) + SESSION_SECRET BEFORE app modules load
@@ -180,6 +193,7 @@ Not app code, ignore unless asked: `.agents/skills|workflow|templates|commands`,
 | `customer_status_history` | replaces `status_logs`: `from_status`, `to_status`, `reason` (manual_inactive / manual_reactivation / auto_reactivation), `changed_by_id` (null = system), `changed_at`. Only real transitions |
 | `import_batches` | one Excel import: `file_name`, `file_sha256`, `row_count`, `imported_by_id`, `imported_at`; `transaksi.import_batch_id` points here |
 | `activity_logs` | `entity_type` (free text, no CHECK), `entity_id`, `entity_label` + `actor_name` (snapshots), `action` create/update/delete/**restore**, `changes` JSON, `created_at` ISO; indexes (entity_type, entity_id, id) and (actor_id, created_at); `actor_id` SET NULL |
+| `export_logs` | Admin list Excel exports (ADR-0010): `list_key`, `mode` filtered\|selected, `filters` JSON, `row_count`, `column_keys` JSON, actor snapshot, `created_at`; append-only; index (created_at, id). Migration 0010 |
 | `inbound_messages` | a WhatsApp message from the WAHA webhook (ADR-0009): `provider_message_id` (unique = exactly once), `session`, `from_address` (digits), `salesman_id` (null = stranger), `body` ("" for a stranger: their text is never kept), `reply_to` (the quoted message id as WAHA sent it, migration 0008), `outcome` recorded/unrecognized/nothing_pending/unknown_sender (CHECK), `detail`, `reply_text`, `reply_status` none/sent/failed (CHECK), `received_at`, `created_at` |
 | `record_comments` | messages on a record's panel: `entity_type` (transaksi/customer/salesman/user, no CHECK), `entity_id` (no FK), `body` (CHECK not empty; ≤2000 in app), `author_id` (set null) + `author_name` snapshot, `created_at`; index (entity_type, entity_id, id). Never edited or deleted |
 | `app_settings` | key/value store + `is_secret`, `updated_at`, `updated_by_id`: `waha.{base_url,session,api_key,timeout_ms,webhook_secret}` (api_key and webhook_secret are secrets), `cron.{enabled,expression,last_run_at,last_run_status,last_run_message}` |
@@ -400,8 +414,13 @@ the same, and any new field needs a `FIELD_LABELS` entry.
 | `/admin/transaksi` | `admin.transaksi.tsx` | admin | Transaksi table + drawer; intents `create` / `update` / `delete_many`; the Excel import (icon left of "+ Tambah transaksi" → `UploadButton`) posts `preview` (multipart `.xlsx` ≤ 10 MB) / `confirm` (`preview_token`, `treat_unknown`) / `discard`, all routed through `handleUpload`. The route holds only the record-specific bits: `describeImportPreview`, `describeImportResult`, and the `parse`/`confirm` callbacks |
 | `/admin/transaksi/template.xlsx` | `admin.transaksi.template.tsx` | admin | import template download |
 | `/admin/imports` | `admin.imports.redirect.tsx` | – | redirect → `/admin/transaksi` |
-| `/admin/masterdata?tab=` | `admin.masterdata.tsx` | admin | 3 tabs × drawer; intents `create_/update_/delete_many_` + `customer`/`salesman`/`user`; errors caught → flash. Customer rows carry `daysSinceOrder` + `overdue` (loader, `orderStanding`): columns *Transaksi terakhir* and *Status order* (Overdue / On track); the drawer shows both read-only (`ReadonlyField`, not submitted) under a `ToggleField` for Aktif/Inactive at the top Customer panel ⋮ → "Kirim pengingat kembali" (intent `resend_reminder`); salesman panel ⋮ → "Kirim pesan tes" (`RecordDrawer` `actions`, intent `send_test_message`); both need `notification.manage` (else 403) and redirect back to the panel with the outcome as `flash` |
-| `/admin/audit` | `admin.audit.tsx` | admin | four lists, each paged in SQL with its own page param: activity (`page`; filter `entity`, `q`), salesman moves (`movePage`), status changes (`statusPage`), WhatsApp replies received (`replyPage`, `listInboundPage`); `pageSize` shared |
+| `/admin/masterdata?tab=` | `admin.masterdata.tsx` | admin | 3 tabs × drawer; intents `create_/update_/delete_many_` + `customer`/`salesman`/`user`; errors caught → flash. Each tab: Export icon (+ Export terpilih). Customer: URL filters (`CustomerFilterBar` + `filteredCustomers`); rows carry `daysSinceOrder` + `overdue`; drawer ToggleField + ⋮ "Kirim pengingat kembali"; salesman panel ⋮ "Kirim pesan tes" (`notification.manage`) |
+| `/admin/export/customer` | `admin.export.customer.tsx` | `masterdata.manage` | GET = filtered xlsx; POST = selected ids ∩ filter; writes `export_logs`; `cols` query/form |
+| `/admin/export/transaksi` | `admin.export.transaksi.tsx` | `transaksi.manage` | GET/POST xlsx for Transaksi (`q`/`trash`); `export_logs` |
+| `/admin/export/salesman` | `admin.export.salesman.tsx` | `masterdata.manage` | GET/POST xlsx for Salesman (`q`/`trash`); `export_logs` |
+| `/admin/export/user` | `admin.export.user.tsx` | `masterdata.manage` | GET/POST xlsx for User (`q`/`trash`); `export_logs` |
+| `/admin/export/audit` | `admin.export.audit.tsx` | `audit.read` | GET xlsx one audit section (`section` + activity `q`/`entity`); listKey `audit.<section>` |
+| `/admin/audit` | `admin.audit.tsx` | admin | five lists, each paged in SQL: activity (`page`), moves (`movePage`), status (`statusPage`), WhatsApp replies (`replyPage`), **Export** (`exportPage` / `listExportPage`); toolbar Export with section picker; `pageSize` shared |
 | `/admin/settings?tab=waha\|cron\|templates` | `admin.settings.tsx` | admin | sidebar submenu "Koneksi WAHA" (default) / "Jadwal Cron", no in-page tab bar; intents `save_waha` / `test_waha` / `save_cron` / `save_template` (whatsapp only, also enforced server-side; rejected text comes back as `draft`); the WAHA tab also mounts `<WahaSessionCard />` |
 | `/admin/settings/waha-session` | `admin.settings.waha-session.tsx` | admin | resource route (no page): GET → `{view, error:null}` (status + QR), POST intent `login` / `logout` → `{view, error}`; unknown intent → 400. `Cache-Control: no-store` via **both** `data()` and the `headers` export (the QR is sensitive) |
 | `/reports/salesman/:id` | `reports.salesman.$id.tsx` | salesman, admin | `.xlsx`; `me` = own salesman |

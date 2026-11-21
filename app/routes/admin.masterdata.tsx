@@ -19,6 +19,15 @@ import {
   useDrawerHref,
   useRowOpen,
 } from "~/components/RecordDrawer";
+import {
+  CustomerExportSelected,
+  CustomerExportToolbar,
+  SalesmanExportSelected,
+  SalesmanExportToolbar,
+  UserExportSelected,
+  UserExportToolbar,
+} from "~/components/ExportToolbar";
+import { CustomerFilterBar } from "~/components/ListFilterBar";
 import { TableToolbar } from "~/components/TableSearch";
 import { ToggleField } from "~/components/ToggleField";
 import { TrashTable } from "~/components/TrashTable";
@@ -30,6 +39,11 @@ import { resendReminder, sendTestMessage } from "~/lib/reminders.server";
 import { attachWhatsapp } from "~/lib/contacts.server";
 import { formatStamp } from "~/lib/activity-format";
 import { orderStanding, orderStatusText, sinceLabel, todayIso } from "~/lib/dates";
+import { filteredCustomers } from "~/lib/customer-export.server";
+import {
+  customerFiltersToParams,
+  parseCustomerFilters,
+} from "~/lib/list-filters/customer";
 import { listRoles, rolesForUsers } from "~/lib/roles.server";
 import { canOwnOrAll } from "~/lib/access.server";
 import { FEED_PAGE_PARAM } from "~/lib/activity-format";
@@ -52,7 +66,6 @@ import {
 } from "~/lib/masterdata.server";
 import {
   countDeleted,
-  listDeletedCustomers,
   listDeletedSalesmen,
   listDeletedUsers,
   restoreCustomersMany,
@@ -75,10 +88,11 @@ export async function loader({ request }: Route.LoaderArgs) {
   const user = await requirePermission(request, PERM.masterdataManage);
   const url = new URL(request.url);
   const tab = url.searchParams.get("tab") ?? "customer";
-  const q = url.searchParams.get("q")?.trim().toLowerCase() ?? "";
+  const customerFilters = parseCustomerFilters(url.searchParams);
+  const q = customerFilters.q;
   const pageSize = resolvePageSize(url.searchParams.get("pageSize"));
   const requestedPage = Math.max(1, Number(url.searchParams.get("page")) || 1);
-  const trash = url.searchParams.get("trash") === "1";
+  const trash = customerFilters.trash;
 
   const allSalesmen = attachWhatsapp(listLiveSalesmen());
   const allCustomers = listLiveCustomers();
@@ -100,15 +114,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     return { ...u, roleCodes: userRoles.map((r) => r.code), roleNames: userRoles.map((r) => r.name) };
   });
 
-  const customersFiltered = q
-    ? allCustomers.filter((c) => {
-        const sm = allSalesmen.find((s) => s.id === c.salesmanId);
-        return (
-          c.nama.toLowerCase().includes(q) ||
-          (sm?.nama.toLowerCase().includes(q) ?? false)
-        );
-      })
-    : allCustomers;
+  const customersFiltered = filteredCustomers({ ...customerFilters, trash: false });
   const salesmenFiltered = q
     ? allSalesmen.filter(
         (s) =>
@@ -126,15 +132,11 @@ export async function loader({ request }: Route.LoaderArgs) {
     : allUsers;
 
   // Terhapus view: only the current tab's list is loaded, and the drawer is off.
-  const matches = (q: string, ...fields: (string | null)[]) =>
-    !q || fields.some((f) => (f ?? "").toLowerCase().includes(q));
+  const matches = (needle: string, ...fields: (string | null)[]) =>
+    !needle || fields.some((f) => (f ?? "").toLowerCase().includes(needle));
   const customerTrash =
     trash && tab === "customer"
-      ? paginate(
-          listDeletedCustomers().filter((c) => matches(q, c.nama, c.salesmanNama)),
-          requestedPage,
-          pageSize,
-        )
+      ? paginate(filteredCustomers({ ...customerFilters, trash: true }), requestedPage, pageSize)
       : null;
   const salesmanTrash =
     trash && tab === "salesman"
@@ -186,6 +188,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     user,
     tab,
     q,
+    customerFilters,
     pageSize,
     trash,
     roles: listRoles(),
@@ -204,10 +207,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     creating: drawer?.mode === "new",
     editing,
     flash: url.searchParams.get("flash"),
-    customerTable: (() => {
-      const page = paginate(customersFiltered, requestedPage, pageSize);
-      return { ...page, rows: page.rows.map(withStanding) };
-    })(),
+    customerTable: paginate(customersFiltered, requestedPage, pageSize),
     salesmen: allSalesmen,
     salesmanTable: paginate(salesmenFiltered, requestedPage, pageSize),
     // ADR-0004: any other salesman can be a supervisor, except this one and
@@ -427,6 +427,7 @@ export default function AdminMasterdata() {
     resend,
     userTable,
     q,
+    customerFilters,
     pageSize,
     trash,
     roles: roleList,
@@ -445,10 +446,24 @@ export default function AdminMasterdata() {
   const list = customerTable.rows;
   const smRows = salesmanTable.rows;
   const userList = userTable.rows;
+  // `q` is owned by TableToolbar's search input — do not also hide it or the form posts twice.
+  const structuredFilterParams = customerFiltersToParams({ ...customerFilters, q: "" });
+  const customerListHidden = {
+    tab: "customer",
+    ...structuredFilterParams,
+  };
+  const customerFilterKey = new URLSearchParams(
+    customerFiltersToParams(customerFilters),
+  ).toString();
+  const customerPageHidden = {
+    ...customerListHidden,
+    ...(q ? { q } : {}),
+    pageSize: String(pageSize),
+  };
 
   const customerSelection = useRowSelection(
     list.map((c) => c.id),
-    `customer:${q}:${customerTable.page}:${pageSize}`,
+    `customer:${customerFilterKey}:${customerTable.page}:${pageSize}`,
   );
   const salesmanSelection = useRowSelection(
     smRows.map((s) => s.id),
@@ -468,16 +483,31 @@ export default function AdminMasterdata() {
 
       {tab === "customer" ? (
         <>
-          {trash ? null : (
-            <div className="mb-3 flex justify-end">
-              <AddLink href={drawerHref("new")} label="Tambah customer" />
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+              Customer
+            </h2>
+            <div className="flex items-center gap-2">
+              <CustomerExportToolbar filters={customerFilters} />
+              {trash ? null : <AddLink href={drawerHref("new")} label="Tambah customer" />}
             </div>
-          )}
+          </div>
+
+          <CustomerFilterBar
+            filters={customerFilters}
+            salesmen={smList}
+            pageSize={pageSize}
+            hiddenFields={{
+              tab: "customer",
+              ...(q ? { q } : {}),
+              ...(trash ? { trash: "1" } : {}),
+            }}
+          />
 
           <TableToolbar
             q={q}
             pageSize={pageSize}
-            hiddenFields={{ tab: "customer" }}
+            hiddenFields={customerListHidden}
             statusFilter={{ trash, activeCount: activeCounts.customer, trashCount: trashCounts.customer }}
             placeholder="Cari customer atau salesman…"
           />
@@ -488,15 +518,22 @@ export default function AdminMasterdata() {
               noun="customer"
               intent="restore_many_customer"
               idName="customer_id"
-              resetKey={`customer-trash:${q}:${customerTrash.page}:${pageSize}`}
+              resetKey={`customer-trash:${customerFilterKey}:${customerTrash.page}:${pageSize}`}
               q={q}
-              hrefForPage={(p) =>
-                `?tab=customer&trash=1&q=${encodeURIComponent(q)}&pageSize=${pageSize}&page=${p}`
-              }
-              hiddenFields={{ tab: "customer", trash: "1", q, pageSize: String(pageSize) }}
+              hrefForPage={(p) => {
+                const params = new URLSearchParams({ ...customerPageHidden, page: String(p) });
+                return `?${params}`;
+              }}
+              hiddenFields={customerPageHidden}
               columns={[
                 { header: "Customer", cell: (c) => <span className="font-medium">{c.nama}</span> },
-                { header: "Salesman", hideOnMobile: true, cell: (c) => c.salesmanNama },
+                {
+                  header: "Salesman",
+                  hideOnMobile: true,
+                  cell: (c) => String((c as { salesman?: string; salesmanNama?: string }).salesman
+                    ?? (c as { salesmanNama?: string }).salesmanNama
+                    ?? "—"),
+                },
                 { header: "Tipe", hideOnMobile: true, cell: (c) => c.tipeCustomer },
                 {
                   header: "Status",
@@ -516,6 +553,12 @@ export default function AdminMasterdata() {
             idName="customer_id"
             ids={[...customerSelection.selected]}
             onClear={customerSelection.clear}
+            extra={
+              <CustomerExportSelected
+                ids={[...customerSelection.selected]}
+                filters={customerFilters}
+              />
+            }
           />
 
           <div className="table-wrap">
@@ -546,7 +589,9 @@ export default function AdminMasterdata() {
                 {list.length === 0 ? (
                   <tr>
                     <td colSpan={9} className="text-slate-500">
-                      {q ? "Tidak ada customer yang cocok." : "Belum ada customer."}
+                      {customerFilterKey || q
+                        ? "Tidak ada customer yang cocok."
+                        : "Belum ada customer."}
                     </td>
                   </tr>
                 ) : (
@@ -567,7 +612,9 @@ export default function AdminMasterdata() {
                         />
                       </td>
                       <td className="font-medium align-top">{c.nama}</td>
-                      <td className="align-top hide-sm">{smName(c.salesmanId)}</td>
+                      <td className="align-top hide-sm">
+                        {c.salesman || smName(c.salesmanId)}
+                      </td>
                       <td className="align-top hide-sm">{c.tipeCustomer}</td>
                       <td className="align-top hide-sm">{c.orderCycleDays} hari</td>
                       <td className="align-top hide-sm">
@@ -600,10 +647,11 @@ export default function AdminMasterdata() {
               pageSize={pageSize}
               totalPages={customerTable.totalPages}
               total={customerTable.total}
-              hrefForPage={(p) =>
-                `?tab=customer&q=${encodeURIComponent(q)}&pageSize=${pageSize}&page=${p}`
-              }
-              hiddenFields={{ tab: "customer", q, pageSize: String(pageSize) }}
+              hrefForPage={(p) => {
+                const params = new URLSearchParams({ ...customerPageHidden, page: String(p) });
+                return `?${params}`;
+              }}
+              hiddenFields={customerPageHidden}
               emptyLabel="0 customer"
             />
           </div>
@@ -737,11 +785,15 @@ export default function AdminMasterdata() {
 
       {tab === "salesman" ? (
         <>
-          {trash ? null : (
-            <div className="mb-3 flex justify-end">
-              <AddLink href={drawerHref("new")} label="Tambah salesman" />
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+              Salesman
+            </h2>
+            <div className="flex items-center gap-2">
+              <SalesmanExportToolbar q={q} trash={trash} />
+              {trash ? null : <AddLink href={drawerHref("new")} label="Tambah salesman" />}
             </div>
-          )}
+          </div>
 
           <TableToolbar
             q={q}
@@ -783,6 +835,13 @@ export default function AdminMasterdata() {
             idName="salesman_id"
             ids={[...salesmanSelection.selected]}
             onClear={salesmanSelection.clear}
+            extra={
+              <SalesmanExportSelected
+                ids={[...salesmanSelection.selected]}
+                q={q}
+                trash={trash}
+              />
+            }
           />
 
           <div className="table-wrap">
@@ -955,11 +1014,15 @@ export default function AdminMasterdata() {
 
       {tab === "user" ? (
         <>
-          {trash ? null : (
-            <div className="mb-3 flex justify-end">
-              <AddLink href={drawerHref("new")} label="Tambah user" />
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+              User
+            </h2>
+            <div className="flex items-center gap-2">
+              <UserExportToolbar q={q} trash={trash} />
+              {trash ? null : <AddLink href={drawerHref("new")} label="Tambah user" />}
             </div>
-          )}
+          </div>
 
           <TableToolbar
             q={q}
@@ -1002,6 +1065,9 @@ export default function AdminMasterdata() {
             idName="user_id"
             ids={[...userSelection.selected]}
             onClear={userSelection.clear}
+            extra={
+              <UserExportSelected ids={[...userSelection.selected]} q={q} trash={trash} />
+            }
           />
 
           <div className="table-wrap">

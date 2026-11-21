@@ -563,6 +563,35 @@ export const appSettings = sqliteTable("app_settings", {
 });
 
 
+export const EXPORT_MODES = ["filtered", "selected"] as const;
+export type ExportMode = (typeof EXPORT_MODES)[number];
+
+/**
+ * Append-only log of admin list Excel exports (ADR-0010). Separate from
+ * `activity_logs`, which is the per-record mutate trail.
+ */
+export const exportLogs = sqliteTable(
+  "export_logs",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    listKey: text("list_key").notNull(),
+    mode: text("mode", { enum: EXPORT_MODES }).notNull(),
+    filters: text("filters").notNull().default("{}"),
+    rowCount: integer("row_count").notNull(),
+    columnKeys: text("column_keys").notNull().default("[]"),
+    actorId: integer("actor_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    actorName: text("actor_name").notNull().default(""),
+    createdAt: text("created_at").notNull(),
+  },
+  (t) => [
+    check("export_logs_mode_check", oneOf(t.mode, EXPORT_MODES)),
+    check("export_logs_row_count_check", sql`${t.rowCount} >= 0`),
+    index("export_logs_created_idx").on(t.createdAt, t.id),
+  ],
+);
+
 /**
  * Per-record audit trail. `entityLabel` and `actorName` are snapshots so the
  * trail stays readable after the record or the user is deleted; `changes` is

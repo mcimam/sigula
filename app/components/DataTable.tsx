@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Form, Link } from "react-router";
 
 import { pageWindow } from "~/lib/pagination";
@@ -86,6 +86,7 @@ export function BulkActionBar({
   ids,
   onClear,
   variant = "delete",
+  extra,
 }: {
   count: number;
   intent: string;
@@ -94,6 +95,8 @@ export function BulkActionBar({
   onClear: () => void;
   /** `restore` is the Terhapus view: same bar, a non-destructive button. */
   variant?: "delete" | "restore";
+  /** Optional actions (e.g. Export terpilih) rendered beside delete/restore. */
+  extra?: ReactNode;
 }) {
   if (count === 0) return null;
   return (
@@ -114,6 +117,7 @@ export function BulkActionBar({
           </button>
         )}
       </Form>
+      {extra}
       <button type="button" className="btn btn-sm btn-outline" onClick={onClear}>
         Batalkan pilihan
       </button>

@@ -24,6 +24,7 @@ import { roleIdsByCode, setUserRoles } from "~/lib/roles.server";
 // `role_permissions` (0004) are reference data seeded by migration; they are not wiped (see `resetDb`).
 const TABLES = [
   "activity_logs",
+  "export_logs",
   "record_comments",
   "inbound_messages",
   "app_settings",

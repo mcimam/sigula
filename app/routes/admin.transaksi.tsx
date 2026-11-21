@@ -13,6 +13,10 @@ import {
 } from "~/components/DataTable";
 import { TableToolbar } from "~/components/TableSearch";
 import { TrashTable } from "~/components/TrashTable";
+import {
+  TransaksiExportSelected,
+  TransaksiExportToolbar,
+} from "~/components/ExportToolbar";
 import { UploadButton, type UploadPreviewView } from "~/components/UploadDialog";
 import {
   AddLink,
@@ -344,29 +348,30 @@ export default function AdminTransaksi() {
         <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
           Log transaksi
         </h2>
-        {trash ? null : (
         <div className="flex items-center gap-2">
-          <UploadButton
-            title="Import dari Excel"
-            description="Unggah file .xlsx untuk melihat preview sebelum diimpor."
-            accept=".xlsx"
-            template={{
-              href: "/admin/transaksi/template.xlsx",
-              note: (
-                <>
-                  Satu sheet per salesman (nama sheet = nama salesman), dengan
-                  kolom <b>Nama Konsumen</b>, <b>Status (Lama/Baru)</b>, dan{" "}
-                  <b>Tgl Terakhir Order</b>.
-                </>
-              ),
-            }}
-            confirmLabel="Konfirmasi import"
-            describePreview={describeImportPreview}
-            describeResult={describeImportResult}
-          />
-          <AddLink href={drawerHref("new")} label="Tambah transaksi" />
+          {trash ? null : (
+            <UploadButton
+              title="Import dari Excel"
+              description="Unggah file .xlsx untuk melihat preview sebelum diimpor."
+              accept=".xlsx"
+              template={{
+                href: "/admin/transaksi/template.xlsx",
+                note: (
+                  <>
+                    Satu sheet per salesman (nama sheet = nama salesman), dengan
+                    kolom <b>Nama Konsumen</b>, <b>Status (Lama/Baru)</b>, dan{" "}
+                    <b>Tgl Terakhir Order</b>.
+                  </>
+                ),
+              }}
+              confirmLabel="Konfirmasi import"
+              describePreview={describeImportPreview}
+              describeResult={describeImportResult}
+            />
+          )}
+          <TransaksiExportToolbar q={q} trash={trash} />
+          {trash ? null : <AddLink href={drawerHref("new")} label="Tambah transaksi" />}
         </div>
-        )}
       </div>
 
       <TableToolbar
@@ -410,6 +415,7 @@ export default function AdminTransaksi() {
         idName="transaksi_id"
         ids={[...selected]}
         onClear={clearSelection}
+        extra={<TransaksiExportSelected ids={[...selected]} q={q} trash={trash} />}
       />
 
       <div className="table-wrap">

@@ -28,6 +28,11 @@ export default [
   route("admin/transaksi/template.xlsx", "routes/admin.transaksi.template.tsx"),
   route("admin/imports", "routes/admin.imports.redirect.tsx"),
   route("admin/masterdata", "routes/admin.masterdata.tsx"),
+  route("admin/export/customer", "routes/admin.export.customer.tsx"),
+  route("admin/export/transaksi", "routes/admin.export.transaksi.tsx"),
+  route("admin/export/salesman", "routes/admin.export.salesman.tsx"),
+  route("admin/export/user", "routes/admin.export.user.tsx"),
+  route("admin/export/audit", "routes/admin.export.audit.tsx"),
   route("admin/audit", "routes/admin.audit.tsx"),
   route("admin/settings", "routes/admin.settings.tsx"),
   route(

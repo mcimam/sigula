@@ -441,7 +441,7 @@ describe("0006: the new reminder text", () => {
 
 describe("0009: answering in the salesman's own words", () => {
   const WHATSAPP = "code = 'reminder_salesman' AND channel = 'whatsapp'";
-  const TAIL = "0009_free_text_reason";
+  const TAIL = ["0009_free_text_reason", "0010_export_logs"] as const;
   /** A database with everything up to 0008, i.e. 0009 is next. `edit` runs before it. */
   function beforeFreeText(edit?: (dbh: Database.Database) => void) {
     const dbh = legacyDb();
@@ -457,7 +457,7 @@ describe("0009: answering in the salesman's own words", () => {
     const before = all(dbh, "SELECT * FROM follow_up_reasons WHERE code <> 'other' ORDER BY id");
     expect(all(dbh, "SELECT * FROM follow_up_reasons WHERE code = 'other'")).toHaveLength(0);
 
-    expect(runMigrations(dbh)).toEqual([TAIL]);
+    expect(runMigrations(dbh)).toEqual([...TAIL]);
 
     expect(all(dbh, "SELECT code, label, deactivates_customer, is_active FROM follow_up_reasons WHERE code = 'other'")).toEqual([
       { code: "other", label: "Lainnya", deactivates_customer: 0, is_active: 1 },
@@ -499,7 +499,7 @@ describe("0009: answering in the salesman's own words", () => {
     dbh.prepare('INSERT INTO "__drizzle_migrations" ("hash", "created_at") VALUES (?, ?)').run("empty-stub", at("0006_reminder_message_v2"));
     expect(versions(dbh).map((v) => [v.version, v.is_active])).toEqual([[1, 1]]); // still the original
 
-    expect(runMigrations(dbh)).toEqual(["0007_inbound_replies", "0008_inbound_reply_to", TAIL]);
+    expect(runMigrations(dbh)).toEqual(["0007_inbound_replies", "0008_inbound_reply_to", ...TAIL]);
 
     expect(versions(dbh).map((v) => [v.version, v.is_active])).toEqual([[1, 0], [2, 1]]);
     expect(String(versions(dbh)[1].body)).toContain("Cara membalas");

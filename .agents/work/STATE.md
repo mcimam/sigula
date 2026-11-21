@@ -7,10 +7,19 @@
 |---|---|
 | Project | SiGula |
 | Track | production |
-| Phase | deployment |
-| Updated | 2026-09-27 |
+| Phase | development (Export + filters — all admin lists) |
+| Updated | 2026-11-21 |
 
 ## Now
+
+**Built 2026-11-21 — Export to Excel on all Master Data tabs + Log Audit (extends Customer/Transaksi).**
+Routes: `/admin/export/{customer,transaksi,salesman,user}` (GET filtered / POST selected ∩ filter) and
+`/admin/export/audit` (GET, section picker). Shared modal + column catalogues (`export-columns.ts`);
+row helpers `*-export.server.ts` / `masterdata-export` / `audit-export`; every download → `export_logs`
+(listKey `audit.<section>` for audit). Verified: `npm run typecheck` clean; `tests/export-customer` +
+`tests/export-master-audit` pass.
+- **Done for this feature:** Customer filters + export; Transaksi / Salesman / User / Audit export.
+- **Not in scope (unchanged):** PDF/CSV, new export permission, streaming/SQL-paged export volume.
 
 **DEPLOYED to production 2026-09-26 16:37Z — `master` = `89d8bc4`** (user approved the deploy and the credential rotation).
 The old production database was the pre-migration schema (2 accounts, 555 customers, 822 transaksi, 10 salesmen + 1 legacy

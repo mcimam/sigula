@@ -4,6 +4,7 @@ import { Link, useLoaderData } from "react-router";
 import type { Route } from "./+types/admin.audit";
 import { AppShell, PageHeader, StatusPill } from "~/components/AppShell";
 import { resolvePageSize, TablePagination } from "~/components/DataTable";
+import { AuditExportToolbar } from "~/components/ExportToolbar";
 import { TableToolbar } from "~/components/TableSearch";
 import { db } from "~/db/client.server";
 import { users } from "~/db/schema";
@@ -11,6 +12,7 @@ import { ACTIVITY_ENTITIES } from "~/lib/activity-entities";
 import { listActivityPage } from "~/lib/activity.server";
 import { listInboundPage } from "~/lib/inbound.server";
 import { listAssignmentMovesPage, listStatusChangesPage } from "~/lib/customer-history.server";
+import { listExportPage } from "~/lib/export.server";
 import { parsePage } from "~/lib/pagination";
 import { customerName, salesmanName } from "~/lib/names.server";
 import {
@@ -22,6 +24,22 @@ import {
 } from "~/lib/activity-format";
 import { requirePermission } from "~/lib/auth.server";
 import { PERM } from "~/lib/permissions";
+
+const LIST_KEY_LABELS: Record<string, string> = {
+  customer: "Customer",
+  transaksi: "Transaksi",
+  salesman: "Salesman",
+  user: "User",
+  "audit.activity": "Audit · Aktivitas",
+  "audit.moves": "Audit · Mutasi",
+  "audit.statuses": "Audit · Status",
+  "audit.replies": "Audit · Balasan",
+  "audit.exports": "Audit · Export",
+};
+const EXPORT_MODE_LABELS = {
+  filtered: "Semua hasil filter",
+  selected: "Terpilih",
+} as const;
 
 const OPEN_HREF = {
   transaksi: (id: number) => `/admin/transaksi?edit=${id}`,
@@ -91,7 +109,9 @@ export async function loader({ request }: Route.LoaderArgs) {
     })),
   };
 
-  return { user, mutations, statuses, replies, activityTable, q, entity, pageSize };
+  const exports = listExportPage(parsePage(url.searchParams.get("exportPage")), pageSize);
+
+  return { user, mutations, statuses, replies, exports, activityTable, q, entity, pageSize };
 }
 
 /** How each fate of an incoming message reads on the page. */
@@ -103,14 +123,24 @@ const REPLY_OUTCOMES = {
 } as const;
 const REPLY_SENT = { none: "—", sent: "terkirim", failed: "gagal terkirim" } as const;
 
+function summarizeFilters(filters: Record<string, unknown>) {
+  const parts: string[] = [];
+  for (const [k, v] of Object.entries(filters)) {
+    if (v === null || v === false || v === "" || v === undefined) continue;
+    parts.push(`${k}=${String(v)}`);
+  }
+  return parts.length ? parts.join(", ") : "—";
+}
+
 export default function AdminAudit() {
-  const { user, mutations, statuses, replies, activityTable, q, entity, pageSize } =
+  const { user, mutations, statuses, replies, exports, activityTable, q, entity, pageSize } =
     useLoaderData<typeof loader>();
   const current = {
     page: activityTable.page,
     movePage: mutations.page,
     statusPage: statuses.page,
     replyPage: replies.page,
+    exportPage: exports.page,
   };
   type PageKey = keyof typeof current;
   /** This page's URL with some page numbers (and/or the record type) changed. */
@@ -137,9 +167,12 @@ export default function AdminAudit() {
     <AppShell user={user}>
       <PageHeader title="Log Audit" subtitle="Append-only — tidak bisa diedit/hapus" />
 
-      <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
-        Aktivitas record
-      </h2>
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+          Aktivitas record
+        </h2>
+        <AuditExportToolbar q={q} entity={entity} />
+      </div>
       <div className="mb-3 flex flex-wrap gap-2">
         {[{ id: "", label: "Semua" }, ...ACTIVITY_ENTITIES.map((e) => ({ id: e, label: ENTITY_LABELS[e] }))].map(
           (chip) => (
@@ -374,6 +407,58 @@ export default function AdminAudit() {
           hiddenFields={hiddenFor("replyPage")}
           pageParam="replyPage"
           emptyLabel="0 balasan"
+        />
+      </div>
+
+      <h2 className="mb-2 mt-6 text-sm font-semibold uppercase tracking-wide text-slate-500">
+        Export
+      </h2>
+      <div className="table-wrap">
+        <table className="data">
+          <thead>
+            <tr>
+              <th>Waktu</th>
+              <th>List</th>
+              <th>Mode</th>
+              <th>Baris</th>
+              <th className="hide-sm">Filter</th>
+              <th>Oleh</th>
+            </tr>
+          </thead>
+          <tbody>
+            {exports.rows.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="text-slate-500">
+                  Belum ada export tercatat.
+                </td>
+              </tr>
+            ) : (
+              exports.rows.map((row) => (
+                <tr key={row.id}>
+                  <td className="align-top whitespace-nowrap">{formatStamp(row.createdAt)}</td>
+                  <td className="align-top">{LIST_KEY_LABELS[row.listKey] ?? row.listKey}</td>
+                  <td className="align-top">
+                    <StatusPill tone="muted">{EXPORT_MODE_LABELS[row.mode]}</StatusPill>
+                  </td>
+                  <td className="align-top">{row.rowCount}</td>
+                  <td className="align-top hide-sm text-xs text-slate-600">
+                    {summarizeFilters(row.filters)}
+                  </td>
+                  <td className="align-top">{row.actorName || "sistem"}</td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+        <TablePagination
+          page={exports.page}
+          pageSize={pageSize}
+          totalPages={exports.totalPages}
+          total={exports.total}
+          hrefForPage={(p) => hrefFor({ exportPage: p })}
+          hiddenFields={hiddenFor("exportPage")}
+          pageParam="exportPage"
+          emptyLabel="0 export"
         />
       </div>
     </AppShell>
